@@ -97,22 +97,13 @@ export default function App() {
               }
             }}
             className="flex items-center gap-3 group transition-transform duration-300 hover:scale-105"
-            aria-label="Orbit Home"
+            aria-label="The Diamond Casino Home"
           >
-            <svg
-              className="w-8 h-8 sm:w-10 sm:h-10 transition-transform duration-700 group-hover:rotate-90"
-              viewBox="0 0 66 62"
-              fill="none"
-              aria-hidden="true"
-            >
-              <line x1="33" y1="1" x2="33" y2="61" stroke="white" strokeWidth="5" strokeLinecap="square" />
-              <line x1="3" y1="31" x2="63" y2="31" stroke="white" strokeWidth="5" strokeLinecap="square" />
-              <line x1="11.8" y1="9.8" x2="54.2" y2="52.2" stroke="white" strokeWidth="5" strokeLinecap="square" />
-              <line x1="54.2" y1="9.8" x2="11.8" y2="52.2" stroke="white" strokeWidth="5" strokeLinecap="square" />
-            </svg>
-            <span className="font-semibold text-lg tracking-wider uppercase font-['Geist_Mono'] hidden md:inline-block">
-              ORBIT // LOOP
-            </span>
+            <img
+              src="/diamond_casino_logo.png"
+              alt="The Diamond Casino & Resort"
+              className="h-9 sm:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+            />
           </a>
 
           {/* Primary Nav with optical scaleX from Orbit */}
@@ -549,8 +540,8 @@ export default function App() {
                   </h2>
                 </div>
                 <div className="font-['Geist_Mono'] text-xs text-neutral-400 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  ORBIT ENGINE v4.8 ACTIVE
+                  <span className="w-2 h-2 rounded-full bg-white" />
+                  DIAMOND CLUB VIP // LEVEL 5
                 </div>
               </div>
 
@@ -604,14 +595,14 @@ export default function App() {
               <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
                 <div>
                   <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-1">
-                    PRMPT ARCHIVE // SYNTHESIS
+                    THE DIAMOND // VAULT ARCHIVE
                   </span>
                   <h3 className="text-3xl sm:text-5xl font-semibold tracking-tight">
-                    Visual Manifest & Records
+                    Exclusive Suites & Visual Gallery
                   </h3>
                 </div>
                 <p className="text-neutral-400 text-sm max-w-sm">
-                  Curated render snapshots from our neural generation enclaves. High resolution black and white geometry.
+                  Curated architectural perspectives and high-roller private salon records. Pure black and white aesthetic.
                 </p>
               </div>
 
@@ -656,18 +647,17 @@ export default function App() {
 
               {/* CTA Center Box */}
               <div className="relative z-10 flex flex-col items-center max-w-2xl mx-auto">
-                {/* Orbit Asterisk in circle */}
-                <div className="w-14 h-14 rounded-full border border-white/30 bg-black/40 backdrop-blur-md flex items-center justify-center mb-8">
-                  <svg className="w-7 h-7" viewBox="0 0 66 62" fill="none">
-                    <line x1="33" y1="1" x2="33" y2="61" stroke="white" strokeWidth="6" />
-                    <line x1="3" y1="31" x2="63" y2="31" stroke="white" strokeWidth="6" />
-                    <line x1="11.8" y1="9.8" x2="54.2" y2="52.2" stroke="white" strokeWidth="6" />
-                    <line x1="54.2" y1="9.8" x2="11.8" y2="52.2" stroke="white" strokeWidth="6" />
-                  </svg>
+                {/* The Diamond Casino Logo badge */}
+                <div className="flex items-center justify-center mb-6">
+                  <img
+                    src="/diamond_casino_logo.png"
+                    alt="The Diamond Casino & Resort"
+                    className="h-16 sm:h-20 w-auto object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.2)]"
+                  />
                 </div>
 
                 <h2 className="text-4xl sm:text-6xl md:text-7xl font-semibold text-white tracking-tight mb-4">
-                  Start Your <span className="font-['Instrument_Serif'] font-normal italic">Journey</span>
+                  Step Into the <span className="font-['Instrument_Serif'] font-normal italic">Diamond</span> Experience
                 </h2>
                 <p className="text-neutral-300 text-base sm:text-lg leading-relaxed mb-10 max-w-lg">
                   Experience the unified standard in autonomous publishing, intelligence discovery, and cryptographic clarity.
@@ -697,15 +687,14 @@ export default function App() {
 
             {/* 8. Footer */}
             <footer id="contact" className="py-14 px-6 sm:px-12 border-t border-white/10 bg-black flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6" viewBox="0 0 66 62" fill="none">
-                  <line x1="33" y1="1" x2="33" y2="61" stroke="white" strokeWidth="5" />
-                  <line x1="3" y1="31" x2="63" y2="31" stroke="white" strokeWidth="5" />
-                  <line x1="11.8" y1="9.8" x2="54.2" y2="52.2" stroke="white" strokeWidth="5" />
-                  <line x1="54.2" y1="9.8" x2="11.8" y2="52.2" stroke="white" strokeWidth="5" />
-                </svg>
+              <div className="flex items-center gap-4">
+                <img
+                  src="/diamond_casino_logo.png"
+                  alt="The Diamond Casino & Resort"
+                  className="h-8 w-auto object-contain"
+                />
                 <span className="font-['Geist_Mono'] text-xs text-neutral-400">
-                  © 2026 ORBIT × MINDLOOP ARCHIVE. ALL RIGHTS RESERVED.
+                  © 2026 THE DIAMOND CASINO & RESORT. ALL RIGHTS RESERVED.
                 </span>
               </div>
 

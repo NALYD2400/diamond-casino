@@ -39,7 +39,7 @@ export const Architecture: React.FC = () => {
           {
             num: "02",
             title: "Coffre-Fort Sécurisé",
-            desc: "Système de coffre blindé, conversion instantanée cash/jetons et intégrité totale garantie par la gérance."
+            desc: "Coffre blindé pour vos jetons, caisse ouverte 24/7 et intégrité totale garantie par la gérance."
           },
           {
             num: "03",

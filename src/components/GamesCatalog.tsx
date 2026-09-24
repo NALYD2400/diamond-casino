@@ -312,7 +312,7 @@ export const GamesCatalog: React.FC = () => {
               La Roue de la <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">Fortune</span>
             </h2>
             <p className="text-neutral-400 leading-relaxed mb-8 max-w-md">
-              Un tirage gratuit pour chaque citoyen. Jetons, cash, lots d’exception et la supercar du podium.
+              Un tirage gratuit pour chaque citoyen. Jetons, lots d’exception et véhicules à gagner.
             </p>
             <div className="flex flex-wrap items-center gap-4">
               <Link
@@ -403,7 +403,7 @@ export const GamesCatalog: React.FC = () => {
                   { icon: MapPin, label: 'Emplacement', value: selected.location },
                   { icon: Clock, label: 'Horaires', value: selected.hours },
                   { icon: Users, label: 'Capacité', value: selected.seats },
-                  { icon: Crown, label: 'Mises', value: `${formatBet(selected.minBet)} – ${formatBet(selected.maxBet)}` },
+                  { icon: Crown, label: 'Mises (jetons)', value: `${formatBet(selected.minBet)} – ${formatBet(selected.maxBet)}` },
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
                     <dt className="font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500 flex items-center gap-1.5">

@@ -6,7 +6,6 @@ import {
   Copy,
   Disc,
   Coins,
-  DollarSign,
   Crown,
   ShieldAlert,
   Code,
@@ -45,7 +44,7 @@ interface CitizenProfileSheetProps {
   onSave: (updated: MockCitizen) => void;
   onUpdateLive?: (updated: MockCitizen) => void;
   onResetCooldown: (citizenId: string) => Promise<boolean> | void;
-  onAdjustBalance: (chipsDelta: number, cashDelta: number, reason: string) => Promise<boolean>;
+  onAdjustBalance: (chipsDelta: number, reason: string) => Promise<boolean>;
   adminLogs: AdminLogEntry[];
   onAddLog: (action: string, category: 'WHEEL' | 'ECONOMY' | 'CITIZEN' | 'SYSTEM', detail: string) => void;
   showToast: (msg: string) => void;
@@ -276,7 +275,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
       label = label || 'Achat / Crédit de Jetons Casino';
     }
 
-    const ok = await onAdjustBalance(chipsDelta, 0, label);
+    const ok = await onAdjustBalance(chipsDelta, label);
     if (!ok) return;
 
     setDraft((d) => ({ ...d, chips: Math.max(0, (d.chips || 0) + chipsDelta) }));
@@ -382,15 +381,13 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
       if (txFilter === 'DEPOSIT') {
-        const isDep = t.type === 'deposit' || (t.amountCash && t.amountCash > 0) || (t.amountChips && t.amountChips > 0);
+        const isDep = t.amountChips > 0;
         if (!isDep) return false;
       } else if (txFilter === 'WITHDRAWAL') {
-        const isWith = t.type === 'withdrawal' || (t.amountCash && t.amountCash < 0) || (t.amountChips && t.amountChips < 0);
+        const isWith = t.amountChips < 0;
         if (!isWith) return false;
       } else if (txFilter === 'CHIPS') {
         if (!t.amountChips || t.amountChips === 0) return false;
-      } else if (txFilter === 'CASH') {
-        if (!t.amountCash || t.amountCash === 0) return false;
       }
 
       if (!txSearch.trim()) return true;
@@ -404,23 +401,9 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
   }, [transactions, txFilter, txSearch]);
 
   // Financial summary metrics
-  const totalCashDeposited = useMemo(() => {
-    return transactions.reduce((acc, t) => {
-      if (t.amountCash && t.amountCash > 0) return acc + t.amountCash;
-      return acc;
-    }, 0);
-  }, [transactions]);
-
   const totalChipsAcquired = useMemo(() => {
     return transactions.reduce((acc, t) => {
       if (t.amountChips && t.amountChips > 0) return acc + t.amountChips;
-      return acc;
-    }, 0);
-  }, [transactions]);
-
-  const totalCashWithdrawn = useMemo(() => {
-    return transactions.reduce((acc, t) => {
-      if (t.amountCash && t.amountCash < 0) return acc + Math.abs(t.amountCash);
       return acc;
     }, 0);
   }, [transactions]);
@@ -1229,7 +1212,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                   </div>
                 ) : (
                   filteredTransactions.map((tx, idx) => {
-                    const isPositive = (tx.amountCash && tx.amountCash > 0) || (tx.amountChips && tx.amountChips > 0);
+                    const isPositive = tx.amountChips >= 0;
                     return (
                       <div
                         key={`tx_${tx.id || idx}_${idx}`}
@@ -1261,11 +1244,6 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                           {tx.amountChips !== undefined && tx.amountChips !== 0 && (
                             <span className={`font-mono font-bold text-sm ${tx.amountChips > 0 ? 'text-white' : 'text-red-400'}`}>
                               {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
-                            </span>
-                          )}
-                          {tx.amountCash !== undefined && tx.amountCash !== 0 && (
-                            <span className={`font-mono font-bold text-sm ${tx.amountCash > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {tx.amountCash > 0 ? `+$${tx.amountCash.toLocaleString()}` : `-$${Math.abs(tx.amountCash).toLocaleString()}`}
                             </span>
                           )}
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-neutral-400 border border-white/10 uppercase">

@@ -12,13 +12,11 @@ import {
   CheckCircle2, 
   Building2, 
   Car, 
-  DollarSign,
   User,
   ArrowRight,
   Flame,
   HelpCircle,
-  Gem,
-  Banknote
+  Gem
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { Footer } from './Footer';
@@ -43,7 +41,7 @@ const TIERS: TierData[] = [
     id: 'SILVER',
     name: 'Carte Silver',
     badge: 'MEMBRE PRIVILÈGE',
-    priceRP: '$25,000 / mois',
+    priceRP: '25 000 jetons / mois',
     priceReal: '10 € / mois',
     description: "L'accès privilégié aux commodités et tables du Diamond Casino.",
     accentColor: 'text-neutral-300',
@@ -62,38 +60,38 @@ const TIERS: TierData[] = [
     id: 'GOLD',
     name: 'Carte Gold',
     badge: 'RECOMMANDÉ',
-    priceRP: '$75,000 / mois',
+    priceRP: '75 000 jetons / mois',
     priceReal: '20 € / mois',
     description: "Pour les joueurs d'envergure souhaitant des privilèges VIP exclusifs.",
     accentColor: 'text-white',
     borderStyle: 'border-white/30 bg-neutral-950 shadow-[0_0_40px_rgba(255,255,255,0.05)]',
     chipsBonus: 60000,
     dailySpins: 2,
-    cashback: '5% Hebdomadaire',
+    cashback: '5 % remboursés / semaine',
     perks: [
       'Accès prioritaire au Salon VIP',
       '2 tirages de Roue par jour',
       '60 000 jetons mensuels',
-      '5% de cashback sur les pertes',
+      '5 % des pertes remboursés en jetons',
     ],
   },
   {
     id: 'DIAMOND',
     name: 'Black Diamond',
     badge: 'PRESTIGE',
-    priceRP: '$180,000 / mois',
+    priceRP: '180 000 jetons / mois',
     priceReal: '35 € / mois',
     description: "Le statut d'élite absolu. Tous les accès déverrouillés.",
     accentColor: 'text-white',
     borderStyle: 'border-white/20 bg-black shadow-[0_0_50px_rgba(255,255,255,0.08)]',
     chipsBonus: 150000,
     dailySpins: 3,
-    cashback: '10% Hebdomadaire',
+    cashback: '10 % remboursés / semaine',
     perks: [
       'Accès illimité aux Salons High Roller',
       '3 tirages de Roue par jour',
       '150 000 jetons mensuels',
-      '10% de cashback VIP global',
+      '10 % des pertes remboursés en jetons',
     ],
   },
 ];
@@ -168,7 +166,7 @@ const FallingBills = () => {
               opacity: { duration: duration, times: [0, 0.2, 0.8, 1], repeat: Infinity, delay: delay }
             }}
           >
-            <Banknote size={32} />
+            <Coins size={32} />
           </motion.div>
         );
       })}

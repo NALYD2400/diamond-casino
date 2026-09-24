@@ -163,6 +163,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   WHEEL_NOT_CONFIGURED: 'La roue n’est pas encore configurée par la direction.',
   VIP_ALREADY_ACTIVE: 'Cette carte VIP est déjà active sur votre compte.',
   VIP_REQUEST_PENDING: 'Une demande VIP est déjà en attente de validation.',
+  REWARD_NOT_CLAIMABLE: 'Ce lot a déjà été réclamé ou traité.',
+  REWARD_NOT_FOUND: 'Lot introuvable.',
+  VEHICLE_NOT_FOUND: 'Véhicule introuvable dans le catalogue.',
+  INVALID_REWARD: 'Lot invalide.',
+  INVALID_STATUS: 'Statut invalide.',
+  INVALID_IMPORT: 'Fichier d’import invalide (3 000 véhicules maximum par envoi).',
   FORBIDDEN: 'Action réservée à la gérance.',
   FORBIDDEN_ROLE_CHANGE: 'Vous n’avez pas les droits pour modifier ce rôle.',
   CANNOT_DELETE_SELF: 'Vous ne pouvez pas supprimer votre propre profil.',
@@ -219,6 +225,7 @@ export const apiUpdateMyProfile = (p: { firstName: string; lastName: string; cit
 export interface SpinResult {
   segment_index: number;
   segment: Record<string, unknown>;
+  reward_id: string | null;
   profile: ProfilePayload;
 }
 
@@ -250,6 +257,127 @@ export async function dbFetchBetsHistory(profileId: string, limit = 50): Promise
     .limit(limit);
   if (error) throw toApiError(error);
   return (data || []) as SupabaseBetEntry[];
+}
+
+// -------------------------------------------------------------
+// Vehicle catalogue & won prizes
+// -------------------------------------------------------------
+
+export interface VehicleCatalogEntry {
+  model: string;
+  hash: string | null;
+  dlc: string | null;
+  manufacturer: string | null;
+  class: string | null;
+  type: string | null;
+  seats: number | null;
+  price: number | null;
+  photo_url: string | null;
+  photo_full_url: string | null;
+  screenshot_url: string | null;
+}
+
+export type RewardStatus = 'IN_INVENTORY' | 'CLAIMED' | 'DELIVERED' | 'REVOKED';
+
+export interface PlayerReward {
+  id: string;
+  profile_id: string;
+  kind: 'vehicle' | 'item';
+  label: string;
+  vehicle_model: string | null;
+  image_url: string | null;
+  source: 'wheel' | 'admin';
+  status: RewardStatus;
+  note: string | null;
+  created_at: string;
+  claimed_at: string | null;
+  handled_at: string | null;
+  handled_by: string | null;
+}
+
+export async function dbSearchVehicles(query: string, opts: { vehicleClass?: string; limit?: number } = {}): Promise<VehicleCatalogEntry[]> {
+  let req = supabase.from('vehicle_catalog').select('*').order('price', { ascending: false }).limit(opts.limit ?? 40);
+  const q = query.trim().replace(/[%,()]/g, ' ').trim();
+  if (q) req = req.or(`model.ilike.%${q}%,manufacturer.ilike.%${q}%`);
+  if (opts.vehicleClass) req = req.eq('class', opts.vehicleClass);
+  const { data, error } = await req;
+  if (error) throw toApiError(error);
+  return (data || []) as VehicleCatalogEntry[];
+}
+
+export async function dbCountVehicles(): Promise<number> {
+  const { count } = await supabase.from('vehicle_catalog').select('model', { count: 'exact', head: true });
+  return count || 0;
+}
+
+export async function dbFetchMyRewards(profileId: string): Promise<PlayerReward[]> {
+  const { data, error } = await supabase
+    .from('player_rewards')
+    .select('*')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw toApiError(error);
+  return (data || []) as PlayerReward[];
+}
+
+/** Staff: every prize, newest first (optionally filtered by status) */
+export async function dbFetchRewards(status?: RewardStatus, limit = 200): Promise<PlayerReward[]> {
+  let req = supabase.from('player_rewards').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (status) req = req.eq('status', status);
+  const { data, error } = await req;
+  if (error) throw toApiError(error);
+  return (data || []) as PlayerReward[];
+}
+
+export const apiClaimReward = (rewardId: string) => rpc<PlayerReward>('claim_reward', { p_reward_id: rewardId });
+
+export const apiAdminGrantReward = (profileId: string, p: { vehicleModel?: string; label?: string; note?: string }) =>
+  rpc<PlayerReward>('admin_grant_reward', {
+    p_profile_id: profileId,
+    p_vehicle_model: p.vehicleModel || null,
+    p_label: p.label || null,
+    p_note: p.note || null,
+  });
+
+export const apiAdminUpdateReward = (rewardId: string, status: Exclude<RewardStatus, 'CLAIMED'>, note?: string) =>
+  rpc<PlayerReward>('admin_update_reward', { p_reward_id: rewardId, p_status: status, p_note: note || null });
+
+export const CTG_ASSET_BASE = 'https://api.staff.gta.ctgaming.fr:2096';
+
+/**
+ * Accepts either the raw CTG export (Name, Manufacturer, photoUrl…) or the
+ * already-normalised format, and returns rows for admin_import_vehicles.
+ */
+export function normalizeVehicleImport(raw: unknown): VehicleCatalogEntry[] {
+  if (!Array.isArray(raw)) throw new CasinoApiError('INVALID_IMPORT');
+  const abs = (p: unknown) =>
+    typeof p === 'string' && p ? (p.startsWith('http') ? p : `${CTG_ASSET_BASE}${p.startsWith('/') ? '' : '/'}${p}`) : null;
+  return raw
+    .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+    .map((r) => ({
+      model: String(r.model ?? r.Name ?? '').trim(),
+      hash: r.hash != null || r.Hash != null ? String(r.hash ?? r.Hash) : null,
+      dlc: (r.dlc ?? r.DlcName ?? null) as string | null,
+      manufacturer: (r.manufacturer ?? r.Manufacturer ?? null) as string | null,
+      class: (r.class ?? r.Class ?? null) as string | null,
+      type: (r.type ?? r.Type ?? null) as string | null,
+      seats: Number(r.seats ?? r.Seats) || null,
+      price: Math.max(0, Number(r.price ?? r.Price) || 0),
+      photo_url: abs(r.photo_url ?? r.photoUrl),
+      photo_full_url: abs(r.photo_full_url ?? r.photoFullUrl),
+      screenshot_url: abs(r.screenshot_url ?? r.screenshotUrl),
+    }))
+    .filter((r) => r.model);
+}
+
+export async function apiAdminImportVehicles(rows: VehicleCatalogEntry[], onProgress?: (done: number) => void): Promise<number> {
+  let total = 0;
+  for (let i = 0; i < rows.length; i += 400) {
+    total += await rpc<number>('admin_import_vehicles', { p_rows: rows.slice(i, i + 400) });
+    onProgress?.(Math.min(rows.length, i + 400));
+  }
+  return total;
 }
 
 // -------------------------------------------------------------
@@ -330,11 +458,11 @@ export interface AdminProfilePatch {
 export const apiAdminUpdateProfile = (profileId: string, patch: AdminProfilePatch) =>
   rpc<SupabaseProfile>('admin_update_profile', { p_profile_id: profileId, p_patch: patch });
 
-export const apiAdminAdjustBalance = (profileId: string, chipsDelta: number, cashDelta: number, reason?: string) =>
+export const apiAdminAdjustBalance = (profileId: string, chipsDelta: number, reason?: string) =>
   rpc<SupabaseProfile>('admin_adjust_balance', {
     p_profile_id: profileId,
     p_chips_delta: Math.trunc(chipsDelta),
-    p_cash_delta: Math.trunc(cashDelta),
+    p_cash_delta: 0,
     p_reason: reason || null,
   });
 

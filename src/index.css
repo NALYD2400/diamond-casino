@@ -87,7 +87,32 @@ html, body {
 }
 .wheel-win-pulse { animation: wheel-win-pulse 0.9s ease-in-out infinite; }
 
+/* Fortune wheel marquee bulbs */
+.wheel-bulb { fill: #fde68a; }
+.wheel-idle .wheel-bulb { animation: bulb-twinkle 2.4s ease-in-out infinite; }
+.wheel-idle .wheel-bulb:nth-child(even) { animation-delay: -1.2s; }
+.wheel-spinning .wheel-bulb {
+  animation: bulb-chase 0.8s linear infinite;
+  animation-delay: calc(var(--i) * -0.025s);
+}
+.wheel-won .wheel-bulb { animation: bulb-blink 0.45s steps(1) infinite; }
+.wheel-won .wheel-bulb:nth-child(even) { animation-delay: -0.225s; }
+
+@keyframes bulb-twinkle {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+@keyframes bulb-chase {
+  0% { opacity: 1; fill: #fffbe8; }
+  35%, 100% { opacity: 0.25; fill: #fbbf24; }
+}
+@keyframes bulb-blink {
+  0% { opacity: 1; fill: #fffbe8; }
+  50% { opacity: 0.2; fill: #fbbf24; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wheel-win-pulse { animation: none; }
+  .wheel-bulb { animation: none !important; opacity: 0.8; }
   html { scroll-behavior: auto; }
 }

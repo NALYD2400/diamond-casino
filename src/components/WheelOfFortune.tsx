@@ -7,11 +7,11 @@ import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin, type WheelSegmentConfig } from '../context/CasinoAdminContext';
 import { apiRecentWheelWins, type WheelWin } from '../lib/supabase';
 import { Wheel } from './wheel/Wheel';
+import { WheelAudio } from './wheel/wheelAudio';
 
 const PRIZE_IMAGES: Record<WheelSegmentConfig['type'], string> = {
   vehicle: '/podium_supercar.jpg',
   chips: '/diamond_chips_jackpot.jpg',
-  cash: '/diamond_cash_case.jpg',
   mystery: '/mystery_vault.jpg',
   clothing: '/diamond_vip_couture.jpg',
 };
@@ -19,7 +19,6 @@ const PRIZE_IMAGES: Record<WheelSegmentConfig['type'], string> = {
 const TYPE_LABEL: Record<WheelSegmentConfig['type'], string> = {
   vehicle: 'Véhicule',
   chips: 'Jetons',
-  cash: 'Cash',
   mystery: 'Lot mystère',
   clothing: 'Garde-robe',
 };
@@ -28,15 +27,17 @@ const RULES = [
   { num: '01', title: 'Un tirage par cycle', desc: 'Chaque citoyen inscrit dispose d’un tirage gratuit toutes les 24 heures.' },
   { num: '02', title: 'Avantage VIP', desc: 'Carte Gold : un tirage toutes les 12 h. Black Diamond : toutes les 8 h.' },
   { num: '03', title: 'Tirage certifié', desc: 'Le résultat est calculé par le serveur du casino, jamais par votre navigateur.' },
-  { num: '04', title: 'Gains crédités', desc: 'Jetons et cash arrivent immédiatement sur votre compte. Les lots vous sont remis en ville par la direction.' },
+  { num: '04', title: 'Gains crédités', desc: 'Les jetons sont crédités immédiatement. Les véhicules et lots rejoignent votre inventaire : réclamez-les, la direction vous les remet en ville.' },
 ];
 
-const SPIN_MS = 7000;
-const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
+// Long spin for suspense: fast launch, then a slow crawl over the last studs
+const SPIN_MS = 12000;
+const SPIN_TURNS = 10;
+const SUSPENSE_FROM = 0.58; // fraction of the spin where the tension drone starts
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 function formatPrizeValue(seg: WheelSegmentConfig): string {
   if (seg.type === 'chips' && typeof seg.value === 'number') return `${seg.value.toLocaleString('fr-FR')} jetons`;
-  if (seg.type === 'cash' && typeof seg.value === 'number') return `$${seg.value.toLocaleString('fr-FR')}`;
   return String(seg.value);
 }
 
@@ -69,12 +70,12 @@ export const WheelOfFortune: React.FC = () => {
   });
 
   const rotorRef = useRef<HTMLDivElement>(null);
+  const pointerRef = useRef<HTMLDivElement>(null);
   const rotationRef = useRef(0);
   const rafRef = useRef<number | null>(null);
-  const audioRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<WheelAudio>(new WheelAudio());
   const pendingCommitRef = useRef<(() => void) | null>(null);
-  const mutedRef = useRef(muted);
-  mutedRef.current = muted;
+  audioRef.current.muted = muted;
 
   const n = Math.max(segments.length, 1);
   const deg = 360 / n;
@@ -94,7 +95,7 @@ export const WheelOfFortune: React.FC = () => {
     () => () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       pendingCommitRef.current?.();
-      audioRef.current?.close().catch(() => {});
+      audioRef.current.close();
     },
     [],
   );
@@ -109,6 +110,7 @@ export const WheelOfFortune: React.FC = () => {
   const toggleMute = () => {
     setMuted((prev) => {
       const next = !prev;
+      if (next) audioRef.current.stopSuspense();
       try {
         localStorage.setItem('diamond_wheel_sound_muted', String(next));
       } catch {
@@ -117,50 +119,6 @@ export const WheelOfFortune: React.FC = () => {
       return next;
     });
   };
-
-  const tick = useCallback((volume: number) => {
-    if (mutedRef.current) return;
-    try {
-      const ctx = audioRef.current;
-      if (!ctx) return;
-      const t = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(1800, t);
-      osc.frequency.exponentialRampToValueAtTime(260, t + 0.02);
-      gain.gain.setValueAtTime(volume, t);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.035);
-    } catch {
-      // audio not permitted
-    }
-  }, []);
-
-  const chime = useCallback(() => {
-    if (mutedRef.current) return;
-    try {
-      const ctx = audioRef.current;
-      if (!ctx) return;
-      [659.25, 783.99, 1046.5].forEach((freq, i) => {
-        const start = ctx.currentTime + i * 0.12;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, start);
-        gain.gain.setValueAtTime(0, start);
-        gain.gain.linearRampToValueAtTime(0.08, start + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(start);
-        osc.stop(start + 0.75);
-      });
-    } catch {
-      // audio not permitted
-    }
-  }, []);
 
   const maintenance = economy.maintenanceMode;
   const busy = phase === 'requesting' || phase === 'spinning';
@@ -173,16 +131,9 @@ export const WheelOfFortune: React.FC = () => {
     setWinIndex(null);
     setPhase('requesting');
 
-    // The AudioContext must be created from a user gesture
-    try {
-      if (!audioRef.current) {
-        const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        audioRef.current = Ctor ? new Ctor() : null;
-      }
-      await audioRef.current?.resume();
-    } catch {
-      audioRef.current = null;
-    }
+    // The AudioContext must be created synchronously inside the click (browser autoplay rules)
+    const audio = audioRef.current;
+    audio.unlock();
 
     let outcome;
     try {
@@ -201,26 +152,41 @@ export const WheelOfFortune: React.FC = () => {
     };
 
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const duration = reduceMotion ? 1200 : SPIN_MS;
+    const duration = reduceMotion ? 1500 : SPIN_MS;
     const jitter = (Math.random() - 0.5) * deg * 0.6;
     const targetMod = (((360 - (index + 0.5) * deg + jitter) % 360) + 360) % 360;
     const from = rotationRef.current;
     const base = from - (from % 360);
-    const to = base + (reduceMotion ? 2 : 7) * 360 + targetMod;
+    const to = base + (reduceMotion ? 2 : SPIN_TURNS) * 360 + targetMod;
 
     setPhase('spinning');
+    audio.whoosh();
     const start = performance.now();
     let lastPin = Math.floor(from / deg);
+    let suspenseStarted = false;
 
     const frame = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
-      const angle = from + (to - from) * easeOutQuart(t);
+      const angle = from + (to - from) * easeOutCubic(t);
       if (rotorRef.current) rotorRef.current.style.transform = `rotate(${angle}deg)`;
 
       const pin = Math.floor(angle / deg);
       if (pin !== lastPin) {
         lastPin = pin;
-        tick(0.02 + 0.05 * (1 - t));
+        audio.tick(Math.pow(1 - t, 2));
+        // Flapper flicks back as each stud passes under it
+        const ptr = pointerRef.current;
+        if (ptr) {
+          ptr.style.transform = `rotate(${-(8 + 18 * (1 - t))}deg)`;
+          window.setTimeout(() => {
+            if (pointerRef.current) pointerRef.current.style.transform = '';
+          }, 60);
+        }
+      }
+
+      if (!suspenseStarted && !reduceMotion && t >= SUSPENSE_FROM) {
+        suspenseStarted = true;
+        audio.startSuspense(((1 - SUSPENSE_FROM) * duration) / 1000);
       }
 
       if (t < 1) {
@@ -234,7 +200,8 @@ export const WheelOfFortune: React.FC = () => {
       setWinIndex(index);
       setWonSegment(segment);
       setPhase('won');
-      chime();
+      audio.stopSuspense();
+      audio.win(segment.type === 'vehicle' || segment.type === 'mystery' || segment.type === 'clothing');
       loadRecentWins();
       window.setTimeout(() => setResultOpen(true), 600);
     };
@@ -290,7 +257,7 @@ export const WheelOfFortune: React.FC = () => {
             La Roue de la <em className="italic text-amber-400">Fortune</em>
           </motion.h1>
           <motion.p {...fadeUp(0.15)} className="text-base sm:text-lg text-neutral-300 max-w-2xl mx-auto leading-relaxed">
-            Un tirage offert à chaque citoyen. Jetons, cash, lots d’exception et la {podiumVehicle.name} exposée sur le
+            Un tirage offert à chaque citoyen. Jetons, lots d’exception et la {podiumVehicle.name} exposée sur le
             podium — chaque lancer est gagnant.
           </motion.p>
         </div>
@@ -311,7 +278,15 @@ export const WheelOfFortune: React.FC = () => {
           {/* Wheel */}
           <motion.div {...fadeUp(0.1)} className="relative mx-auto w-full max-w-[560px]">
             <div className="absolute inset-[8%] rounded-full bg-amber-500/10 blur-[80px]" aria-hidden="true" />
-            <Wheel ref={rotorRef} segments={segments} highlightIndex={phase === 'won' ? winIndex : null} className="w-full" />
+            <Wheel
+              ref={rotorRef}
+              pointerRef={pointerRef}
+              segments={segments}
+              mode={phase === 'won' ? 'won' : busy ? 'spinning' : 'idle'}
+              highlightIndex={phase === 'won' ? winIndex : null}
+              className="w-full drop-shadow-[0_30px_60px_rgba(0,0,0,0.9)]"
+            />
+            <div className="mx-auto mt-4 h-6 w-3/4 rounded-[100%] bg-amber-500/20 blur-2xl" aria-hidden="true" />
           </motion.div>
 
           {/* Session panel */}
@@ -348,15 +323,21 @@ export const WheelOfFortune: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-[1fr_auto] gap-3">
                   <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
                     <span className="font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500">Jetons</span>
-                    <p className="font-semibold text-lg tabular-nums">{user.chips.toLocaleString('fr-FR')}</p>
+                    <p className="font-semibold text-xl tabular-nums">{user.chips.toLocaleString('fr-FR')}</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                    <span className="font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500">Cash</span>
-                    <p className="font-semibold text-lg tabular-nums">${user.cash.toLocaleString('fr-FR')}</p>
-                  </div>
+                  <Link
+                    to="/espace-membre"
+                    className="rounded-xl border border-white/10 bg-white/[0.02] p-3 hover:border-amber-400/40 transition-colors"
+                    title="Voir mon inventaire"
+                  >
+                    <span className="font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500">Lots</span>
+                    <p className="font-semibold text-xl tabular-nums text-amber-400">
+                      {user.rewards.filter((r) => r.status === 'IN_INVENTORY' || r.status === 'CLAIMED').length}
+                    </p>
+                  </Link>
                 </div>
               </>
             ) : (
@@ -451,7 +432,7 @@ export const WheelOfFortune: React.FC = () => {
               <span className="font-['Geist_Mono'] text-xs tracking-[3px] uppercase text-amber-400">Lot 01 // Podium</span>
               <h3 className="text-3xl sm:text-4xl font-semibold mt-2">{podiumVehicle.name}</h3>
               <p className="text-neutral-300 text-sm mt-1">
-                Valeur estimée ${podiumVehicle.value.toLocaleString('fr-FR')}
+                Valeur concession : {podiumVehicle.value.toLocaleString('fr-FR')}
               </p>
             </div>
           </motion.div>
@@ -575,9 +556,12 @@ export const WheelOfFortune: React.FC = () => {
             >
               <div className="relative h-56">
                 <img
-                  src={wonSegment.type === 'vehicle' ? podiumVehicle.imageUrl : PRIZE_IMAGES[wonSegment.type]}
+                  src={wonSegment.imageUrl || (wonSegment.type === 'vehicle' ? podiumVehicle.imageUrl : PRIZE_IMAGES[wonSegment.type])}
                   alt=""
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = PRIZE_IMAGES[wonSegment.type] || '/mystery_vault.jpg';
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
                 <button
@@ -595,16 +579,16 @@ export const WheelOfFortune: React.FC = () => {
                   <em className="italic text-amber-400">{wonSegment.label}</em>
                 </h3>
                 <p className="text-neutral-300 text-sm">
-                  {wonSegment.type === 'chips' || wonSegment.type === 'cash'
+                  {wonSegment.type === 'chips'
                     ? `${formatPrizeValue(wonSegment)} crédités sur votre compte.`
-                    : `« ${formatPrizeValue(wonSegment)} » a été ajouté à votre inventaire. La direction vous le remettra en ville.`}
+                    : `« ${formatPrizeValue(wonSegment)} » est dans votre inventaire. Réclamez-le depuis l’Espace Membre : la direction vous le remettra en ville.`}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 mt-7">
                   <Link
                     to="/espace-membre"
                     className="flex-1 rounded-full py-3 text-sm font-semibold bg-white text-black flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors"
                   >
-                    <Coins size={15} /> Voir mon compte
+                    <Coins size={15} /> {wonSegment.type === 'chips' ? 'Voir mon compte' : 'Réclamer mon lot'}
                   </Link>
                   <button
                     type="button"

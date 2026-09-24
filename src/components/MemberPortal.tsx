@@ -27,13 +27,14 @@ import { useCasinoUser, type CasinoTransaction } from '../context/CasinoUserCont
 import { sanitizeText, isValidCitizenId, isValidRPName, isValidPhoneNumber } from '../lib/security';
 import { dbCheckHealth } from '../lib/supabase';
 import { hasAdminPermissions } from '../lib/discord';
+import { MemberRewards } from './member/MemberRewards';
 
 interface MemberPortalProps {
   onBackToHome?: () => void;
   onNavigateToWheel?: () => void;
 }
 
-type ConsoleTab = 'overview' | 'vault' | 'profile' | 'vip';
+type ConsoleTab = 'overview' | 'lots' | 'vault' | 'profile' | 'vip';
 
 export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavigateToWheel }) => {
   const { 
@@ -814,6 +815,22 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
           <button
             type="button"
+            onClick={() => setActiveTab('lots')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'lots'
+                ? 'bg-white text-black shadow-lg shadow-white/10'
+                : 'text-neutral-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Car size={15} />
+            <span>Mes lots</span>
+            {user.rewards.some((r) => r.status === 'IN_INVENTORY') && (
+              <span className="w-2 h-2 rounded-full bg-amber-400" aria-label="Lots à réclamer" />
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('vault')}
             className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'vault'
@@ -1192,10 +1209,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                             <span className={`font-mono font-bold text-xs shrink-0 ${tx.amountChips > 0 ? 'text-white' : 'text-red-400'}`}>
                               {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
                             </span>
-                          ) : tx.amountCash !== 0 ? (
-                            <span className={`font-mono font-bold text-xs shrink-0 ${tx.amountCash > 0 ? 'text-emerald-300' : 'text-red-400'}`}>
-                              {tx.amountCash > 0 ? '+' : '-'}${Math.abs(tx.amountCash).toLocaleString()}
-                            </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-white/10 text-neutral-300 shrink-0">
                               {tx.category}
@@ -1214,6 +1227,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               </div>
 
             </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'lots' && (
+          <motion.div key="tab-lots" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <MemberRewards showToast={showToast} />
           </motion.div>
         )}
 
@@ -1369,10 +1388,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                         {tx.amountChips !== 0 ? (
                           <span className={`font-mono font-bold text-sm ${tx.amountChips > 0 ? 'text-white' : 'text-red-400'}`}>
                             {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
-                          </span>
-                        ) : tx.amountCash !== 0 ? (
-                          <span className={`font-mono font-bold text-sm ${tx.amountCash > 0 ? 'text-emerald-300' : 'text-red-400'}`}>
-                            {tx.amountCash > 0 ? '+' : '-'}${Math.abs(tx.amountCash).toLocaleString()}
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold uppercase bg-white/10 text-neutral-300 border border-white/20">

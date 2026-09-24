@@ -125,6 +125,22 @@ async function main() {
       ['cannot adjust balances via RPC', isRefused(() =>
         supabase.rpc('admin_adjust_balance', { p_profile_id: '00000000-0000-0000-0000-000000000000', p_chips_delta: 1000, p_cash_delta: 0, p_reason: 'x' }),
       )],
+      ['cannot claim a prize', isRefused(() => supabase.rpc('claim_reward', { p_reward_id: '00000000-0000-0000-0000-000000000000' }))],
+      ['cannot deliver / revoke prizes', isRefused(() =>
+        supabase.rpc('admin_update_reward', { p_reward_id: '00000000-0000-0000-0000-000000000000', p_status: 'DELIVERED', p_note: null }),
+      )],
+      ['cannot grant vehicles', isRefused(() =>
+        supabase.rpc('admin_grant_reward', { p_profile_id: '00000000-0000-0000-0000-000000000000', p_vehicle_model: 'adder', p_label: null, p_note: null }),
+      )],
+      ['cannot import the vehicle catalogue', isRefused(() => supabase.rpc('admin_import_vehicles', { p_rows: [] }))],
+      ['cannot read player prizes', (async () => {
+        const { data } = await supabase.from('player_rewards').select('id');
+        return !data || data.length === 0;
+      })()],
+      ['can browse the vehicle catalogue', (async () => {
+        const { data, error } = await supabase.from('vehicle_catalog').select('model, photo_url').limit(5);
+        return !error && Array.isArray(data) && data.length > 0;
+      })()],
       ['can read public wheel settings', (async () => {
         const { data, error } = await supabase.from('casino_settings').select('key').eq('key', 'wheel_segments');
         return !error && Array.isArray(data) && data.length === 1;

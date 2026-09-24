@@ -25,7 +25,7 @@ import {
 import { hasAdminPermissions } from '../lib/discord';
 import { useCasinoUser, type CasinoTransaction } from './CasinoUserContext';
 
-export type RewardType = 'vehicle' | 'chips' | 'cash' | 'mystery' | 'clothing';
+export type RewardType = 'vehicle' | 'chips' | 'mystery' | 'clothing';
 
 export interface WheelSegmentConfig {
   id: number;
@@ -36,12 +36,18 @@ export interface WheelSegmentConfig {
   textColor: string;
   icon: string;
   dropRate: number; // Drop rate percentage (e.g. 5 = 5%)
+  /** type 'vehicle': model from the vehicle catalogue (delivered in game) */
+  vehicleModel?: string;
+  /** Optional picture shown when the prize is won */
+  imageUrl?: string;
 }
 
 export interface PodiumVehicleConfig {
   name: string;
   imageUrl: string;
   value: number;
+  /** Catalogue model of the podium vehicle (optional) */
+  model?: string;
 }
 
 export interface CasinoEconomyConfig {
@@ -72,7 +78,6 @@ export interface MockCitizen {
   role: string;
   vipTier?: VipTier;
   chips: number;
-  cash: number;
   phoneNumber?: string;
   wheelCooldownRemaining: string;
   lastSpinTimestamp: number | null;
@@ -118,7 +123,7 @@ interface CasinoAdminContextType {
   // Citizens (staff only)
   citizens: MockCitizen[];
   updateCitizen: (citizenId: string, patch: Partial<MockCitizen>) => Promise<boolean>;
-  adjustCitizenBalance: (citizenId: string, chipsDelta: number, cashDelta: number, reason?: string) => Promise<boolean>;
+  adjustCitizenBalance: (citizenId: string, chipsDelta: number, reason?: string) => Promise<boolean>;
   setCitizenVip: (citizenId: string, tier: VipTier | null, grantBonus?: boolean) => Promise<boolean>;
   resetCitizenWheelCooldown: (citizenId: string) => Promise<boolean>;
   resetAllWheelCooldowns: () => Promise<boolean>;
@@ -145,19 +150,19 @@ interface CasinoAdminContextType {
 export const DEFAULT_SEGMENTS: WheelSegmentConfig[] = [
   { id: 0, label: 'VÉHICULE PODIUM', type: 'vehicle', value: 'Grotti Itali RSX', color: '#fbbf24', textColor: '#000000', icon: '🏎️', dropRate: 1.5 },
   { id: 1, label: '50 000 JETONS', type: 'chips', value: 50000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 3.5 },
-  { id: 2, label: '$50 000 CASH', type: 'cash', value: 50000, color: '#047857', textColor: '#ffffff', icon: '💵', dropRate: 3.5 },
+  { id: 2, label: '75 000 JETONS', type: 'chips', value: 75000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 3.5 },
   { id: 3, label: 'MYSTÈRE DIAMOND', type: 'mystery', value: 'Montre Vacheron Royale', color: '#6d28d9', textColor: '#ffffff', icon: '🎁', dropRate: 4.0 },
   { id: 4, label: '25 000 JETONS', type: 'chips', value: 25000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 8.0 },
-  { id: 5, label: '$25 000 CASH', type: 'cash', value: 25000, color: '#059669', textColor: '#ffffff', icon: '💵', dropRate: 8.0 },
+  { id: 5, label: '30 000 JETONS', type: 'chips', value: 30000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 8.0 },
   { id: 6, label: 'VÊTEMENT VIP', type: 'clothing', value: 'Costume Sur-Mesure Diamond', color: '#2563eb', textColor: '#ffffff', icon: '👔', dropRate: 6.0 },
   { id: 7, label: '10 000 JETONS', type: 'chips', value: 10000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 14.5 },
-  { id: 8, label: '$10 000 CASH', type: 'cash', value: 10000, color: '#059669', textColor: '#ffffff', icon: '💵', dropRate: 14.5 },
+  { id: 8, label: '5 000 JETONS', type: 'chips', value: 5000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 14.5 },
   { id: 9, label: 'CHAMPAGNE VIP', type: 'mystery', value: 'Bouteille Diamond Reserve', color: '#b45309', textColor: '#ffffff', icon: '🍾', dropRate: 5.0 },
   { id: 10, label: '35 000 JETONS', type: 'chips', value: 35000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 5.0 },
-  { id: 11, label: '$20 000 CASH', type: 'cash', value: 20000, color: '#059669', textColor: '#ffffff', icon: '💵', dropRate: 7.0 },
+  { id: 11, label: '20 000 JETONS', type: 'chips', value: 20000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 7.0 },
   { id: 12, label: 'PASS HIGH ROLLER', type: 'mystery', value: 'Accès Salon Privé VIP', color: '#4f46e5', textColor: '#ffffff', icon: '🔑', dropRate: 2.0 },
   { id: 13, label: '15 000 JETONS', type: 'chips', value: 15000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 10.0 },
-  { id: 14, label: '$15 000 CASH', type: 'cash', value: 15000, color: '#059669', textColor: '#ffffff', icon: '💵', dropRate: 8.5 },
+  { id: 14, label: '12 000 JETONS', type: 'chips', value: 12000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 8.5 },
   { id: 15, label: 'BONUS HIGH ROLLER', type: 'chips', value: 40000, color: '#374151', textColor: '#ffffff', icon: '⭐', dropRate: 3.0 },
 ];
 
@@ -177,7 +182,7 @@ export const DEFAULT_ECONOMY: CasinoEconomyConfig = {
   maintenanceMode: false,
 };
 
-const REWARD_TYPES: RewardType[] = ['vehicle', 'chips', 'cash', 'mystery', 'clothing'];
+const REWARD_TYPES: string[] = ['vehicle', 'chips', 'cash', 'mystery', 'clothing'];
 
 function isValidSegments(value: unknown): value is WheelSegmentConfig[] {
   return (
@@ -215,7 +220,6 @@ function toCitizen(p: SupabaseProfile, cooldownHours: number): MockCitizen {
     role: p.role,
     vipTier: p.vip_tier || undefined,
     chips: Number(p.chips) || 0,
-    cash: Number(p.cash) || 0,
     phoneNumber: p.phone_number || '',
     wheelCooldownRemaining: onCooldown ? 'Cooldown actif' : 'Disponible',
     lastSpinTimestamp: lastSpin,
@@ -267,7 +271,10 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
       dbGetSetting<number>('wheel_cooldown'),
       dbGetSetting<CasinoEconomyConfig>('economy_config'),
     ]);
-    if (isValidSegments(remoteSegments)) setSegments(remoteSegments);
+    if (isValidSegments(remoteSegments)) {
+      // Single currency: a legacy « cash » segment is shown (and paid) as chips
+      setSegments(remoteSegments.map((s) => ((s.type as string) === 'cash' ? { ...s, type: 'chips' as const } : s)));
+    }
     if (remotePodium && typeof remotePodium.name === 'string') {
       setPodiumVehicle({ ...DEFAULT_PODIUM, ...remotePodium, imageUrl: remotePodium.imageUrl || DEFAULT_PODIUM.imageUrl });
     }
@@ -401,9 +408,12 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
           label: sanitizeText(merged.label, 30) || s.label,
           dropRate: sanitizeNumber(merged.dropRate, 0, 100, s.dropRate),
           value:
-            merged.type === 'chips' || merged.type === 'cash'
+            merged.type === 'chips'
               ? sanitizeNumber(merged.value, 0, 100_000_000, 0)
               : sanitizeText(String(merged.value), 60),
+          vehicleModel:
+            merged.type === 'vehicle' && /^[A-Za-z0-9_-]{1,64}$/.test(merged.vehicleModel || '') ? merged.vehicleModel : undefined,
+          imageUrl: /^(https:\/\/|\/)[^\s"'<>]{1,500}$/.test(merged.imageUrl || '') ? merged.imageUrl : undefined,
         };
       });
       setSegments(next);
@@ -425,8 +435,13 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
       setPodiumVehicle(next);
       persistSetting('podium_vehicle', next);
-      if (next.name !== prev.name) {
-        const updated = segments.map((s) => (s.type === 'vehicle' ? { ...s, value: next.name } : s));
+      // Keep the "podium" wheel segment(s) in sync; vehicle segments bound to another model are left alone
+      if (next.name !== prev.name || next.model !== prev.model || next.imageUrl !== prev.imageUrl) {
+        const isPodiumSegment = (s: WheelSegmentConfig) =>
+          s.type === 'vehicle' && (!s.vehicleModel || s.vehicleModel === prev.model);
+        const updated = segments.map((s) =>
+          isPodiumSegment(s) ? { ...s, value: next.name, vehicleModel: next.model, imageUrl: next.imageUrl } : s,
+        );
         setSegments(updated);
         persistSetting('wheel_segments', updated);
       }
@@ -495,7 +510,6 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       if (patch.vipTier !== undefined && patch.vipTier !== existing.vipTier) serverPatch.vip_tier = patch.vipTier ?? null;
       if (patch.chips !== undefined && patch.chips !== existing.chips) serverPatch.chips = sanitizeNumber(patch.chips, 0);
-      if (patch.cash !== undefined && patch.cash !== existing.cash) serverPatch.cash = sanitizeNumber(patch.cash, 0);
 
       const noteTouched =
         patch.adminNote !== undefined ||
@@ -520,11 +534,11 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 
   const adjustCitizenBalance = useCallback(
-    async (citizenId: string, chipsDelta: number, cashDelta: number, reason?: string) => {
+    async (citizenId: string, chipsDelta: number, reason?: string) => {
       const existing = findCitizen(citizenId);
       if (!existing) return false;
       return runMutation(existing.profileId, () =>
-        apiAdminAdjustBalance(existing.profileId, chipsDelta, cashDelta, reason ? sanitizeText(reason, 140) : undefined),
+        apiAdminAdjustBalance(existing.profileId, chipsDelta, reason ? sanitizeText(reason, 140) : undefined),
       );
     },
     [findCitizen, runMutation],

@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   RefreshCw,
   Sliders,
-  DollarSign,
   TrendingUp,
   Download,
   Trash2,
@@ -40,6 +39,7 @@ import {
   Plus,
   Minus,
   Wallet,
+  Car,
 } from 'lucide-react';
 import {
   useCasinoAdmin,
@@ -51,8 +51,11 @@ import { useCasinoUser } from '../context/CasinoUserContext';
 import { dbCheckHealth, type SupabaseHealthResult, supabase } from '../lib/supabase';
 import { getDefaultDiscordAvatar, hasAdminPermissions } from '../lib/discord';
 import { CitizenProfileSheet } from './CitizenProfileSheet';
+import { RewardsPanel } from './admin/RewardsPanel';
+import { VehiclePicker } from './admin/VehiclePicker';
+import { vehicleDisplayName } from '../lib/rewards';
 
-export type AdminTab = 'overview' | 'stats' | 'citizens' | 'wheel' | 'economy' | 'logs' | 'system' | 'dev';
+export type AdminTab = 'overview' | 'stats' | 'citizens' | 'wheel' | 'rewards' | 'economy' | 'logs' | 'system' | 'dev';
 
 interface AdminConsoleProps {
   initialTab?: AdminTab;
@@ -143,7 +146,6 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
     const ok = await adjustCitizenBalance(
       quickMoneyCitizen.profileId,
       delta,
-      0,
       quickMoneyReason.trim() || `Ajustement console (${delta > 0 ? '+' : ''}${delta.toLocaleString('fr-FR')} jetons)`,
     );
     if (!ok) return;
@@ -252,7 +254,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
   const handleAddCustomChips = async (explicit?: number) => {
     const amt = explicit ?? Number(customChipsAmount);
     if (!user || !amt || amt <= 0) return;
-    const ok = await adjustCitizenBalance(user.id, amt, 0, 'Injection Développeur (test)');
+    const ok = await adjustCitizenBalance(user.id, amt, 'Injection Développeur (test)');
     if (ok) showToast(`+${amt.toLocaleString('fr-FR')} jetons crédités.`);
   };
 
@@ -570,6 +572,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               <nav className="flex flex-col gap-1">
                 {[
                   { id: 'wheel', icon: Disc, label: 'Roue de Fortune' },
+                  { id: 'rewards', icon: Car, label: 'Lots & Véhicules' },
                   { id: 'economy', icon: Coins, label: 'Économie & Caisse' },
                 ].map((item) => {
                   const isActive = activeTab === item.id;
@@ -742,16 +745,16 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                 <div className="p-6 rounded-2xl bg-neutral-950 border border-white/10 flex flex-col justify-between gap-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wider text-neutral-400 font-medium">
-                      Coffre-Fort Central
+                      Réserve de Jetons
                     </span>
-                    <DollarSign size={16} className="text-neutral-500" />
+                    <Wallet size={16} className="text-neutral-500" />
                   </div>
                   <div>
                     <div className="text-2xl sm:text-3xl font-bold text-white font-mono tracking-tight">
-                      ${economy.vaultCash.toLocaleString()}
+                      {economy.vaultCash.toLocaleString('fr-FR')} ⛁
                     </div>
                     <span className="text-[11px] text-neutral-500 mt-1 block">
-                      Trésorerie globale du casino
+                      Coffre du casino
                     </span>
                   </div>
                 </div>
@@ -768,7 +771,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                       {economy.circulatingChips.toLocaleString()}
                     </div>
                     <span className="text-[11px] text-neutral-500 mt-1 block">
-                      Taux : 1 Jeton = ${economy.chipToCashRate}
+                      Monnaie unique du casino
                     </span>
                   </div>
                 </div>
@@ -992,7 +995,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                       </div>
                       <div>
                         <label className="text-[10px] font-mono text-neutral-500 uppercase block mb-1">
-                          Valeur Estimée ($)
+                          Valeur Estimée (concession)
                         </label>
                         <input
                           type="number"
@@ -1006,13 +1009,20 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
 
                   <div>
                     <label className="text-[10px] font-mono text-neutral-500 uppercase block mb-1">
-                      URL Image Directe
+                      Choisir dans le catalogue {podiumVehicle.model && <span className="text-amber-400">· {podiumVehicle.model}</span>}
                     </label>
-                    <input
-                      type="text"
-                      value={podiumVehicle.imageUrl}
-                      onChange={(e) => updatePodiumVehicle({ imageUrl: e.target.value })}
-                      className="w-full h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-xs text-neutral-300 focus:outline-none focus:border-white transition-colors"
+                    <VehiclePicker
+                      selectedModel={podiumVehicle.model}
+                      className="max-h-48"
+                      onSelect={(v) => {
+                        updatePodiumVehicle({
+                          name: vehicleDisplayName(v.manufacturer, v.model),
+                          model: v.model,
+                          value: v.price || 0,
+                          imageUrl: v.photo_full_url || v.photo_url || '/podium_supercar.jpg',
+                        });
+                        showToast(`Podium : ${vehicleDisplayName(v.manufacturer, v.model)}`);
+                      }}
                     />
                   </div>
                 </div>
@@ -1431,10 +1441,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                                       e.stopPropagation();
                                       setQuickMoneyCitizen(c);
                                     }}
-                                    title="Ajustement rapide : Ajouter ou enlever de l'argent/jetons (+/-)"
+                                    title="Ajustement rapide : ajouter ou retirer des jetons (+/-)"
                                     className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer flex items-center gap-1 text-xs font-mono font-bold shadow-sm"
                                   >
-                                    <DollarSign size={13} />
+                                    <Coins size={13} />
                                     <span>+/-</span>
                                   </button>
 
@@ -1475,6 +1485,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
           )}
 
           {/* TAB 4: ECONOMY & VAULT */}
+          {activeTab === 'rewards' && <RewardsPanel showToast={showToast} />}
+
           {activeTab === 'economy' && (
             <div className="max-w-4xl mx-auto flex flex-col gap-8 animate-in fade-in duration-300">
               <div className="border-b border-white/10 pb-6">
@@ -1482,7 +1494,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                   Économie Centrale & Caisse
                 </h1>
                 <p className="text-xs sm:text-sm text-neutral-400">
-                  Ajustez les réserves du coffre-fort et configurez le taux de conversion Jetons / Cash.
+                  Réserve de jetons du casino, limites de mise et cagnotte. Le jeton est la seule monnaie du casino.
                 </p>
               </div>
 
@@ -1491,10 +1503,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <span className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
-                      Solde Réel du Coffre-Fort
+                      Réserve de Jetons du Coffre
                     </span>
                     <div className="text-4xl sm:text-5xl font-bold text-white font-mono">
-                      ${economy.vaultCash.toLocaleString()}
+                      {economy.vaultCash.toLocaleString('fr-FR')} ⛁
                     </div>
                   </div>
 
@@ -1502,7 +1514,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      placeholder="Montant ($)"
+                      placeholder="Jetons"
                       value={vaultActionAmount}
                       onChange={(e) => setVaultActionAmount(e.target.value)}
                       className="w-36 h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm font-mono text-white placeholder-neutral-600 focus:outline-none focus:border-white transition-colors"
@@ -1513,7 +1525,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                         if (amt > 0) {
                           updateEconomy({ vaultCash: economy.vaultCash + amt });
                           setVaultActionAmount('');
-                          showToast(`+$${amt.toLocaleString()} ajoutés au coffre.`);
+                          showToast(`+${amt.toLocaleString('fr-FR')} jetons ajoutés au coffre.`);
                         }
                       }}
                       className="px-4 py-2.5 rounded-xl bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 transition-colors cursor-pointer"
@@ -1526,7 +1538,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                         if (amt > 0) {
                           updateEconomy({ vaultCash: Math.max(0, economy.vaultCash - amt) });
                           setVaultActionAmount('');
-                          showToast(`-$${amt.toLocaleString()} retirés du coffre.`);
+                          showToast(`-${amt.toLocaleString('fr-FR')} jetons retirés du coffre.`);
                         }
                       }}
                       className="px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-semibold uppercase tracking-wider hover:bg-white/20 transition-colors cursor-pointer"
@@ -1541,23 +1553,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="p-6 rounded-2xl bg-neutral-950 border border-white/10 space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400 block">
-                    Taux de conversion (1 Jeton = $)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={economy.chipToCashRate}
-                    onChange={(e) => updateEconomy({ chipToCashRate: parseFloat(e.target.value) || 1.0 })}
-                    className="w-full h-11 px-3.5 rounded-xl bg-white/5 border border-white/10 text-lg font-mono text-white focus:outline-none focus:border-white transition-colors"
-                  />
-                  <span className="text-[11px] text-neutral-500 block">
-                    Ratio appliqué lors de l'achat ou revente de jetons à la caisse.
-                  </span>
-                </div>
-
-                <div className="p-6 rounded-2xl bg-neutral-950 border border-white/10 space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400 block">
-                    Cagnotte Jackpot ($)
+                    Cagnotte Jackpot (jetons)
                   </label>
                   <input
                     type="number"
@@ -2036,7 +2032,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-neutral-950 border border-white/20 p-6 sm:p-8 rounded-3xl flex flex-col gap-6 shadow-[0_0_50px_rgba(255,255,255,0.1)]"
+              className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-neutral-950 border border-white/20 p-6 sm:p-8 rounded-3xl flex flex-col gap-6 shadow-[0_0_50px_rgba(255,255,255,0.1)]"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <h3 className="text-base font-bold text-white">
@@ -2070,13 +2066,18 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                     </label>
                     <select
                       value={editingSegment.type}
-                      onChange={(e) =>
-                        setEditingSegment({ ...editingSegment, type: e.target.value as RewardType })
-                      }
+                      onChange={(e) => {
+                        const type = e.target.value as RewardType;
+                        setEditingSegment({
+                          ...editingSegment,
+                          type,
+                          value: type === 'chips' ? Number(editingSegment.value) || 0 : String(editingSegment.value),
+                          vehicleModel: type === 'vehicle' ? editingSegment.vehicleModel : undefined,
+                        });
+                      }}
                       className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-white uppercase font-mono cursor-pointer"
                     >
                       <option value="chips" className="bg-black">Jetons</option>
-                      <option value="cash" className="bg-black">Cash</option>
                       <option value="vehicle" className="bg-black">Véhicule</option>
                       <option value="mystery" className="bg-black">Mystère</option>
                       <option value="clothing" className="bg-black">Vêtement</option>
@@ -2102,17 +2103,42 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                   </div>
                 </div>
 
+                {editingSegment.type === 'vehicle' && (
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 uppercase block mb-1">
+                      Véhicule à gagner {editingSegment.vehicleModel && <span className="text-amber-400">· {editingSegment.vehicleModel}</span>}
+                    </label>
+                    {editingSegment.imageUrl && (
+                      <img src={editingSegment.imageUrl} alt="" className="w-full h-32 object-cover rounded-xl border border-white/10 mb-2" />
+                    )}
+                    <VehiclePicker
+                      selectedModel={editingSegment.vehicleModel}
+                      className="max-h-56"
+                      onSelect={(v) =>
+                        setEditingSegment({
+                          ...editingSegment,
+                          value: vehicleDisplayName(v.manufacturer, v.model),
+                          vehicleModel: v.model,
+                          imageUrl: v.photo_full_url || v.photo_url || undefined,
+                        })
+                      }
+                    />
+                    <p className="text-[11px] text-neutral-500 mt-1.5">
+                      Le gagnant reçoit ce véhicule dans son inventaire, puis la gérance le lui remet en jeu.
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-[10px] font-mono text-neutral-400 uppercase block mb-1">
-                    Valeur Réelle (Jetons / Cash / Item)
+                    {editingSegment.type === 'chips' ? 'Nombre de jetons' : 'Nom du lot (reçu par le joueur)'}
                   </label>
                   <input
                     type="text"
                     value={String(editingSegment.value)}
                     onChange={(e) => {
-                      const v = isNaN(Number(e.target.value))
-                        ? e.target.value
-                        : Number(e.target.value);
+                      const raw = e.target.value;
+                      const v = editingSegment.type === 'chips' ? Math.max(0, Number(raw.replace(/\s/g, '')) || 0) : raw;
                       setEditingSegment({ ...editingSegment, value: v });
                     }}
                     className="w-full h-11 px-3.5 rounded-xl bg-white/5 border border-white/10 text-white font-mono focus:outline-none focus:border-white transition-colors"
@@ -2389,9 +2415,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               void updateCitizen(editingCitizen.profileId, updated);
             }}
             onResetCooldown={() => resetCitizenWheelCooldown(editingCitizen.profileId)}
-            onAdjustBalance={(chipsDelta, cashDelta, reason) =>
-              adjustCitizenBalance(editingCitizen.profileId, chipsDelta, cashDelta, reason)
-            }
+            onAdjustBalance={(chipsDelta, reason) => adjustCitizenBalance(editingCitizen.profileId, chipsDelta, reason)}
             adminLogs={logs}
             onAddLog={addLog}
             showToast={showToast}

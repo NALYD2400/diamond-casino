@@ -9,6 +9,9 @@ import {
   apiSpinWheel,
   apiRequestVip,
   dbFetchTransactions,
+  dbFetchMyRewards,
+  apiClaimReward,
+  type PlayerReward,
   type ProfilePayload,
   type ProfileRole,
   type SupabaseTransaction,
@@ -24,7 +27,6 @@ export interface CasinoTransaction {
   type: 'spin_reward' | 'vip_subscription' | 'vip_request' | 'deposit' | 'withdrawal' | 'bet' | 'bonus' | 'admin';
   label: string;
   amountChips: number;
-  amountCash: number;
   date: string; // ISO date string
   status: 'COMPLÉTÉ' | 'EN ATTENTE' | 'ANNULÉ';
   category: 'Roue de la Fortune' | 'Abonnement VIP' | 'Caisse Casino' | 'Jeux';
@@ -43,7 +45,6 @@ export interface CasinoUser {
   role: UserRole;
   isStaff: boolean;
   chips: number;
-  cash: number;
   isDiscordSynced: boolean;
   vipTier?: VipTier;
   lastWheelSpin: number | null; // ms timestamp
@@ -52,6 +53,8 @@ export interface CasinoUser {
   inventory: string[];
   vehicles: string[];
   transactions: CasinoTransaction[];
+  /** Non-currency prizes (vehicles, items) and their delivery status */
+  rewards: PlayerReward[];
   joinedAt?: string;
   totalWon: number;
   totalSpins: number;
@@ -89,6 +92,7 @@ interface CasinoUserContextType {
   refreshProfile: () => Promise<void>;
   spinWheel: () => Promise<SpinOutcome>;
   requestVip: (tier: VipTier) => Promise<void>;
+  claimReward: (rewardId: string) => Promise<void>;
   canSpinWheel: boolean;
   timeUntilNextSpin: string;
 }
@@ -111,14 +115,13 @@ export function mapTransaction(tx: SupabaseTransaction): CasinoTransaction {
     ...mapped,
     label: tx.description || 'Opération casino',
     amountChips: Number(tx.chips) || 0,
-    amountCash: Number(tx.amount) || 0,
     date: tx.created_at,
     status: tx.status === 'PENDING' ? 'EN ATTENTE' : tx.status === 'CANCELLED' ? 'ANNULÉ' : 'COMPLÉTÉ',
     vipTier: tx.type === 'VIP_REQUEST' ? ((tx.game as VipTier) || undefined) : undefined,
   };
 }
 
-function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[]): CasinoUser {
+function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[], rewards: PlayerReward[]): CasinoUser {
   return {
     id: p.id,
     discordId: p.discord_id || '',
@@ -131,7 +134,6 @@ function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[]): Casin
     role: p.role,
     isStaff: !!p.is_staff,
     chips: Number(p.chips) || 0,
-    cash: Number(p.cash) || 0,
     isDiscordSynced: !!p.discord_id,
     vipTier: p.vip_tier || undefined,
     lastWheelSpin: p.last_wheel_spin ? new Date(p.last_wheel_spin).getTime() : null,
@@ -140,6 +142,7 @@ function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[]): Casin
     inventory: Array.isArray(p.inventory) ? p.inventory : [],
     vehicles: Array.isArray(p.vehicles) ? p.vehicles : [],
     transactions,
+    rewards,
     joinedAt: p.created_at || undefined,
     totalWon: Number(p.total_won) || 0,
     totalSpins: Number(p.total_spins) || 0,
@@ -179,16 +182,24 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const loadTransactions = useCallback(async (profileId: string) => {
     try {
-      const rows = await dbFetchTransactions(profileId, 50);
-      setUser((prev) => (prev && prev.id === profileId ? { ...prev, transactions: rows.map(mapTransaction) } : prev));
+      const [rows, rewards] = await Promise.all([dbFetchTransactions(profileId, 50), dbFetchMyRewards(profileId)]);
+      setUser((prev) =>
+        prev && prev.id === profileId ? { ...prev, transactions: rows.map(mapTransaction), rewards } : prev,
+      );
     } catch (err) {
-      console.warn('[CasinoUser] transactions unavailable:', err);
+      console.warn('[CasinoUser] history unavailable:', err);
     }
   }, []);
 
   const applyProfile = useCallback(
     (profile: ProfilePayload) => {
-      setUser((prev) => mapProfile(profile, prev && prev.id === profile.id ? prev.transactions : []));
+      setUser((prev) =>
+        mapProfile(
+          profile,
+          prev && prev.id === profile.id ? prev.transactions : [],
+          prev && prev.id === profile.id ? prev.rewards : [],
+        ),
+      );
       setPendingDiscordUser(null);
       void loadTransactions(profile.id);
     },
@@ -329,6 +340,14 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [user, loadTransactions],
   );
 
+  const claimReward = useCallback(
+    async (rewardId: string) => {
+      await apiClaimReward(rewardId);
+      if (user) await loadTransactions(user.id);
+    },
+    [user, loadTransactions],
+  );
+
   const value = useMemo<CasinoUserContextType>(
     () => ({
       user,
@@ -345,6 +364,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       refreshProfile,
       spinWheel,
       requestVip,
+      claimReward,
       canSpinWheel,
       timeUntilNextSpin,
     }),
@@ -362,6 +382,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       refreshProfile,
       spinWheel,
       requestVip,
+      claimReward,
       canSpinWheel,
       timeUntilNextSpin,
     ],

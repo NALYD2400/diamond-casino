@@ -1,41 +1,67 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import { X, User, Disc } from 'lucide-react';
+import { useCasinoUser } from '../context/CasinoUserContext';
+
+export type AppView = 'landing' | 'member-portal' | 'lucky-wheel' | '404';
 
 interface NavbarProps {
-  view404: boolean;
-  setView404: (val: boolean) => void;
-  mobileMenuOpen: boolean;
-  setMobileMenuOpen: (val: boolean) => void;
+  currentView?: AppView;
+  setCurrentView?: (view: AppView) => void;
+  mobileMenuOpen?: boolean;
+  setMobileMenuOpen?: (val: boolean) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  view404,
-  setView404,
-  mobileMenuOpen,
-  setMobileMenuOpen,
+  currentView: propCurrentView,
+  setCurrentView,
+  mobileMenuOpen: propMobileMenuOpen,
+  setMobileMenuOpen: propSetMobileMenuOpen,
 }) => {
-  const handleNavClick = (sectionId?: string) => {
-    if (view404) setView404(false);
-    setMobileMenuOpen(false);
-    if (sectionId) {
+  const { user, isAuthenticated } = useCasinoUser();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [internalMenuOpen, setInternalMenuOpen] = useState<boolean>(false);
+  const isMenuOpen = propMobileMenuOpen !== undefined ? propMobileMenuOpen : internalMenuOpen;
+  const setMenuOpen = propSetMobileMenuOpen || setInternalMenuOpen;
+
+  // Determine current active route
+  const currentPath = location.pathname;
+  const isHome = currentPath === '/' || propCurrentView === 'landing';
+  const isWheel = currentPath === '/roue-de-la-fortune' || propCurrentView === 'lucky-wheel';
+  const isVip = currentPath === '/abonnements';
+  const isMember = currentPath === '/espace-membre' || propCurrentView === 'member-portal';
+
+  const handleSectionScroll = (sectionId: string) => {
+    setMenuOpen(false);
+    if (currentPath !== '/') {
+      navigate({ to: '/' }).then(() => {
+        setTimeout(() => {
+          const el = document.getElementById(sectionId);
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      });
+    } else {
       const el = document.getElementById(sectionId);
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
+    setCurrentView?.('landing');
   };
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 h-[80px] sm:h-[90px] px-6 sm:px-12 flex items-center justify-between pointer-events-none backdrop-blur-md bg-black/40 border-b border-white/10">
+      <header className="fixed top-0 left-0 right-0 z-50 h-[80px] sm:h-[90px] px-6 sm:px-12 flex items-center justify-between pointer-events-none backdrop-blur-md bg-black/50 border-b border-white/10">
         <div className="flex items-center gap-6 sm:gap-10 pointer-events-auto">
           {/* Official Diamond Casino Logo Brand */}
-          <a
-            href="#home"
-            onClick={(e) => {
-              e.preventDefault();
-              handleNavClick('home');
+          <Link
+            to="/"
+            onClick={() => {
+              setMenuOpen(false);
+              setCurrentView?.('landing');
             }}
-            className="flex items-center gap-3 group transition-transform duration-300 hover:scale-105"
+            className="flex items-center gap-3 group transition-transform duration-300 hover:scale-105 cursor-pointer bg-transparent border-none p-0"
             aria-label="The Diamond Casino & Resort Home"
           >
             <img
@@ -43,51 +69,55 @@ export const Navbar: React.FC<NavbarProps> = ({
               alt="The Diamond Casino & Resort"
               className="h-9 sm:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
             />
-          </a>
+          </Link>
 
-          {/* Primary Nav with optical scaleX from Orbit */}
+          {/* Primary Nav */}
           <nav className="hidden lg:flex items-center gap-8 text-[15px] tracking-tight">
-            <a
-              href="#home"
-              onClick={() => handleNavClick()}
-              className="nav-home-scale text-white/90 hover:text-white transition-opacity font-medium"
+            <Link
+              to="/"
+              onClick={() => setCurrentView?.('landing')}
+              className={`font-medium transition-colors cursor-pointer ${
+                isHome && !isWheel && !isVip && !isMember
+                  ? 'text-white font-semibold'
+                  : 'text-white/70 hover:text-white'
+              }`}
             >
-              Home
-            </a>
-            <a
-              href="#resources"
-              onClick={() => handleNavClick()}
-              className="nav-resources-scale text-white/70 hover:text-white transition-opacity font-medium"
+              Accueil
+            </Link>
+            
+            {/* Clean Roue de la Fortune Nav Link */}
+            <Link
+              to="/roue-de-la-fortune"
+              onClick={() => setCurrentView?.('lucky-wheel')}
+              className={`font-medium transition-colors cursor-pointer ${
+                isWheel ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+              }`}
             >
-              Resources
-            </a>
-            <a
-              href="#benefits"
-              onClick={() => handleNavClick()}
-              className="nav-benefits-scale text-white/70 hover:text-white transition-opacity font-medium"
+              Roue de la Fortune
+            </Link>
+
+            {/* Clean Abonnements VIP Nav Link */}
+            <Link
+              to="/abonnements"
+              className={`font-medium transition-colors cursor-pointer ${
+                location.pathname === '/abonnements' ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+              }`}
             >
-              Benefits
-            </a>
-            <a
-              href="#contact"
-              onClick={() => handleNavClick()}
-              className="nav-contact-scale text-white/70 hover:text-white transition-opacity font-medium"
-            >
-              Contact
-            </a>
+              Abonnements VIP
+            </Link>
           </nav>
         </div>
 
-        {/* Right Action: Discord icon + Pill button ("Secure system") + Mobile toggle */}
+        {/* Right Action: Discord icon + Espace Membre + Mobile toggle */}
         <div className="flex items-center gap-3 sm:gap-4 pointer-events-auto">
           {/* Discord Icon */}
           <a
-            href="https://discord.com"
+            href="https://discord.gg/patvwjhNzK"
             target="_blank"
             rel="noopener noreferrer"
             className="liquid-glass w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white/80 hover:text-white transition-colors"
             aria-label="Discord"
-            title="Join Discord Community"
+            title="Rejoindre la communauté Discord"
           >
             <svg
               viewBox="0 0 24 24"
@@ -100,25 +130,46 @@ export const Navbar: React.FC<NavbarProps> = ({
             </svg>
           </a>
 
-          {/* Orbit Secure system pill */}
-          <a
-            href="#secure"
-            onClick={(e) => {
-              e.preventDefault();
-              handleNavClick('secure');
-            }}
-            className="flex items-center justify-center bg-white text-black font-semibold text-xs sm:text-sm tracking-wide rounded-full px-5 sm:px-7 py-2.5 sm:py-3 transition-transform duration-200 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.25)]"
-          >
-            Secure system
-          </a>
+          {/* Member Status Pill or Login Button */}
+          {isAuthenticated && user ? (
+            <Link
+              to="/espace-membre"
+              onClick={() => {
+                setMenuOpen(false);
+                setCurrentView?.('member-portal');
+              }}
+              className="flex items-center gap-2.5 bg-neutral-900 border border-white/20 text-white rounded-full px-4 sm:px-5 py-2 hover:border-amber-400/80 transition-all cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+            >
+              <img
+                src={user.avatarUrl}
+                alt={user.rpFirstName}
+                className="w-6 h-6 rounded-full object-cover border border-amber-400"
+              />
+              <span className="text-xs sm:text-sm font-semibold tracking-wide">
+                {user.rpFirstName} <span className="text-neutral-400 font-normal">| {user.citizenId}</span>
+              </span>
+            </Link>
+          ) : (
+            <Link
+              to="/espace-membre"
+              onClick={() => {
+                setMenuOpen(false);
+                setCurrentView?.('member-portal');
+              }}
+              className="flex items-center justify-center gap-2 bg-white text-black font-semibold text-xs sm:text-sm tracking-wide rounded-full px-5 sm:px-7 py-2.5 sm:py-3 transition-transform duration-200 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.25)] cursor-pointer"
+            >
+              <User size={14} />
+              <span>Espace Membre</span>
+            </Link>
+          )}
 
           {/* Mobile menu toggle */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-full border border-white/20 text-white bg-white/5"
+            onClick={() => setMenuOpen(!isMenuOpen)}
+            className="lg:hidden p-2 rounded-full border border-white/20 text-white bg-white/5 cursor-pointer"
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X size={20} /> : (
+            {isMenuOpen ? <X size={20} /> : (
               <svg viewBox="0 0 24 24" className="w-5 h-5 stroke-white stroke-2 fill-none">
                 <line x1="4" y1="7" x2="20" y2="7" />
                 <line x1="4" y1="12" x2="20" y2="12" />
@@ -131,41 +182,52 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Drawer */}
       <AnimatePresence>
-        {mobileMenuOpen && (
+        {isMenuOpen && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             className="fixed inset-x-0 top-[80px] bg-black/95 backdrop-blur-2xl border-b border-white/10 z-40 p-6 flex flex-col gap-4 lg:hidden"
           >
-            <a
-              href="#home"
-              onClick={() => handleNavClick('home')}
-              className="text-lg font-medium text-white/90 hover:text-white"
+            <Link
+              to="/"
+              onClick={() => {
+                setMenuOpen(false);
+                setCurrentView?.('landing');
+              }}
+              className="text-left text-lg font-medium text-white/90 hover:text-white"
             >
-              Home
-            </a>
-            <a
-              href="#resources"
-              onClick={() => handleNavClick('resources')}
-              className="text-lg font-medium text-white/70 hover:text-white"
+              Accueil
+            </Link>
+            <Link
+              to="/roue-de-la-fortune"
+              onClick={() => {
+                setMenuOpen(false);
+                setCurrentView?.('lucky-wheel');
+              }}
+              className="text-left text-lg font-medium text-white/90 hover:text-white"
             >
-              Resources
-            </a>
-            <a
-              href="#benefits"
-              onClick={() => handleNavClick('benefits')}
-              className="text-lg font-medium text-white/70 hover:text-white"
+              Roue de la Fortune
+            </Link>
+            <Link
+              to="/abonnements"
+              onClick={() => {
+                setMenuOpen(false);
+              }}
+              className="text-left text-lg font-medium text-white/90 hover:text-white"
             >
-              Benefits
-            </a>
-            <a
-              href="#contact"
-              onClick={() => handleNavClick('contact')}
-              className="text-lg font-medium text-white/70 hover:text-white"
+              Abonnements VIP
+            </Link>
+            <Link
+              to="/espace-membre"
+              onClick={() => {
+                setMenuOpen(false);
+                setCurrentView?.('member-portal');
+              }}
+              className="text-left text-lg font-medium text-white/90 hover:text-white border-t border-white/10 pt-3 flex items-center gap-2"
             >
-              Contact
-            </a>
+              <User size={18} /> Espace Membre (Connexion Discord)
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>

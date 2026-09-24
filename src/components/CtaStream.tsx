@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { Link } from '@tanstack/react-router';
 import Hls from 'hls.js';
 
 interface CtaStreamProps {
@@ -66,29 +67,32 @@ export const CtaStream: React.FC<CtaStreamProps> = ({ view404 }) => {
         </div>
 
         <h2 className="text-4xl sm:text-6xl md:text-7xl font-semibold text-white tracking-tight mb-4">
-          Step Into the <span className="font-['Instrument_Serif'] font-normal italic">Diamond</span> Experience
+          Entrez dans l'univers <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">The Diamond</span>
         </h2>
-        <p className="text-neutral-300 text-base sm:text-lg leading-relaxed mb-10 max-w-lg">
-          Experience the unified standard in autonomous publishing, intelligence discovery, and cryptographic clarity.
+        <p className="text-neutral-300 text-base sm:text-lg leading-relaxed mb-10 max-w-xl">
+          Tables VIP de grand prestige, suites penthouse, Roue de la Fortune quotidienne et privilèges exclusifs réservés aux citoyens de Los Santos.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <button
-            onClick={() => {
-              const homeEl = document.getElementById('home');
-              if (homeEl) homeEl.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="bg-white text-black font-semibold rounded-full px-8 py-4 text-sm hover:bg-neutral-200 transition-transform active:scale-95 cursor-pointer shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+          <Link
+            to="/espace-membre"
+            className="bg-white text-black font-semibold rounded-full px-8 py-4 text-sm hover:bg-neutral-200 transition-transform active:scale-95 cursor-pointer shadow-[0_0_30px_rgba(255,255,255,0.3)] text-center"
           >
-            Subscribe to Feed
-          </button>
+            Rejoindre l'Espace Membre
+          </Link>
+          <Link
+            to="/roue-de-la-fortune"
+            className="liquid-glass rounded-full px-8 py-4 text-white text-sm font-medium hover:bg-white/10 transition-transform active:scale-95 cursor-pointer flex items-center gap-2 border border-amber-500/30 text-amber-300 text-center"
+          >
+            Tourner la Roue
+          </Link>
           <a
-            href="https://discord.com"
+            href="https://discord.gg/patvwjhNzK"
             target="_blank"
             rel="noopener noreferrer"
             className="liquid-glass rounded-full px-8 py-4 text-white text-sm font-medium hover:bg-white/10 transition-transform active:scale-95 cursor-pointer flex items-center gap-2"
           >
-            Join Discord
+            Rejoindre le Discord
           </a>
         </div>
       </div>

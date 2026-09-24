@@ -8,15 +8,11 @@ export const Architecture: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
         <div>
           <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-2">
-            CORE SYSTEM ARCHITECTURE
+            PRESTIGE &amp; INFRASTRUCTURE
           </span>
           <h2 className="text-4xl sm:text-6xl font-semibold text-white tracking-[-0.03em]">
-            The substrate for <span className="font-['Instrument_Serif'] font-normal italic">meaningful</span> depth
+            L'excellence d'un complexe d'exception à <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">Los Santos</span>
           </h2>
-        </div>
-        <div className="font-['Geist_Mono'] text-xs text-neutral-400 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-white" />
-          DIAMOND CLUB VIP // LEVEL 5
         </div>
       </div>
 
@@ -37,27 +33,27 @@ export const Architecture: React.FC = () => {
         {[
           {
             num: "01",
-            title: "Curated Neural Feed",
-            desc: "Hand-picked intelligence streams engineered for high signal-to-noise ratio without algorithmic traps."
+            title: "Salons Privés & Croupiers",
+            desc: "Tables réservées aux membres VIP Gold et Diamond avec service haut de gamme et croupiers dédiés."
           },
           {
             num: "02",
-            title: "Immaculate Typography",
-            desc: "Precision optical kerning, instrument serif rhythm, and liquid glass HUD components built for clarity."
+            title: "Coffre-Fort Sécurisé",
+            desc: "Système de coffre blindé, conversion instantanée cash/jetons et intégrité totale garantie par la gérance."
           },
           {
             num: "03",
-            title: "Encrypted Syndication",
-            desc: "Zero-knowledge cryptographic distribution directly feeding verified AI agents and citations."
+            title: "Lounge & Gastronomie",
+            desc: "Cocktails d'exception, champagnes millésimés et restauration raffinée servie directement à votre table."
           },
           {
             num: "04",
-            title: "Autonomous 404 Recovery",
-            desc: "Dynamic failover states with embedded cinematic backups ensuring continuity across all endpoints."
+            title: "Voiturier & Rooftop",
+            desc: "Service voiturier dès votre arrivée, garage surveillé pour vos supercars et héliport sur le rooftop."
           },
         ].map((item, idx) => (
           <motion.div key={item.title} {...fadeUp(0.1 * idx)} className="flex flex-col border-l border-white/10 pl-5">
-            <span className="font-['Geist_Mono'] text-xs text-neutral-500 mb-2">{item.num}</span>
+            <span className="font-['Geist_Mono'] text-xs text-amber-400/80 mb-2">{item.num}</span>
             <h3 className="font-semibold text-lg text-white mb-2">{item.title}</h3>
             <p className="text-neutral-400 text-sm leading-relaxed">{item.desc}</p>
           </motion.div>

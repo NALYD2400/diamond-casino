@@ -33,10 +33,10 @@ export const Mission: React.FC = () => {
     offset: ['start 85%', 'end 25%']
   });
 
-  const p1Text = "We're building an autonomous space where curiosity meets pristine clarity — where intelligence finds depth, creators find reach, and every synthesis becomes a paradigm shift.";
+  const p1Text = "Nous bâtissons un sanctuaire où le frisson du jeu côtoie le raffinement le plus absolu — où chaque mise devient une légende, chaque soirée un triomphe, et chaque instant un souvenir inoubliable.";
   const p1Words = p1Text.split(' ');
 
-  const p2Text = "A high-performance substrate where knowledge, cryptographic security, and neural insight flow together — with zero noise, zero friction, and immaculate execution.";
+  const p2Text = "Une oasis d'exception à Los Santos où l'élégance, la discrétion et le prestige se rencontrent — sans compromis, sans fausse note, avec une intensité sans pareille.";
   const p2Words = p2Text.split(' ');
 
   return (
@@ -59,7 +59,7 @@ export const Mission: React.FC = () => {
           {p1Words.map((word, i) => {
             const start = (i / (p1Words.length + p2Words.length)) * 0.7;
             const end = start + 0.08;
-            const isHighlight = ['curiosity', 'clarity', 'intelligence', 'depth', 'paradigm'].some(w =>
+            const isHighlight = ['sanctuaire', 'frisson', 'raffinement', 'légende', 'triomphe', 'inoubliable'].some(w =>
               word.toLowerCase().includes(w)
             );
             return (

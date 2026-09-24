@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite --port 5179",
     "build": "tsc && vite build",
-    "preview": "vite preview --port 5179"
+    "preview": "vite preview --port 5179",
+    "test": "npx tsx verify_suite.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-router": "^1.170.39",
     "@vitejs/plugin-react": "^6.1.1",
     "framer-motion": "^13.4.2",
     "hls.js": "^1.7.3",

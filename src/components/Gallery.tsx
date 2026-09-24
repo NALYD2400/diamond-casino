@@ -12,7 +12,7 @@ export const Gallery: React.FC = () => {
             THE DIAMOND // VAULT ARCHIVE
           </span>
           <h3 className="text-3xl sm:text-5xl font-semibold tracking-tight">
-            Exclusive Suites & Visual Gallery
+            Exclusive Salons & Visual Gallery
           </h3>
         </div>
         <p className="text-neutral-400 text-sm max-w-sm">

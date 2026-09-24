@@ -32,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isHome = currentPath === '/' || propCurrentView === 'landing';
   const isWheel = currentPath === '/roue-de-la-fortune' || propCurrentView === 'lucky-wheel';
   const isVip = currentPath === '/abonnements';
+  const isGames = currentPath === '/jeux';
   const isMember = currentPath === '/espace-membre' || propCurrentView === 'member-portal';
 
   const handleSectionScroll = (sectionId: string) => {
@@ -77,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               to="/"
               onClick={() => setCurrentView?.('landing')}
               className={`font-medium transition-colors cursor-pointer ${
-                isHome && !isWheel && !isVip && !isMember
+                isHome && !isWheel && !isVip && !isMember && !isGames
                   ? 'text-white font-semibold'
                   : 'text-white/70 hover:text-white'
               }`}
@@ -85,6 +86,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               Accueil
             </Link>
             
+            <Link
+              to="/jeux"
+              className={`font-medium transition-colors cursor-pointer ${
+                isGames ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Jeux
+            </Link>
+
             {/* Clean Roue de la Fortune Nav Link */}
             <Link
               to="/roue-de-la-fortune"
@@ -198,6 +208,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="text-left text-lg font-medium text-white/90 hover:text-white"
             >
               Accueil
+            </Link>
+            <Link
+              to="/jeux"
+              onClick={() => setMenuOpen(false)}
+              className="text-left text-lg font-medium text-white/90 hover:text-white"
+            >
+              Jeux
             </Link>
             <Link
               to="/roue-de-la-fortune"

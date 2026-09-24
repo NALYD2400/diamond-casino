@@ -1,34 +1,31 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
-import { 
-  Trophy, 
-  Sparkles, 
-  Clock, 
-  Coins, 
-  DollarSign, 
-  Gift, 
-  Car, 
-  RotateCcw, 
-  SlidersHorizontal, 
-  Volume2, 
-  VolumeX, 
-  Eye, 
-  X, 
-  Flame, 
-  ShieldCheck, 
-  CheckCircle2, 
-  Info, 
-  ExternalLink, 
+import {
+  Sparkles,
+  Clock,
+  Coins,
+  DollarSign,
+  Gift,
   Zap,
   Shirt,
-  Disc,
-  Award,
-  Play,
-  ArrowRight
+  RotateCcw,
+  SlidersHorizontal,
+  Volume2,
+  VolumeX,
+  Eye,
+  X,
+  ShieldCheck,
+  ExternalLink,
+  Crown,
+  Lock,
+  ChevronRight,
+  Dices,
+  ScrollText,
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin, type WheelSegmentConfig } from '../context/CasinoAdminContext';
+import { FortuneWheel, segmentIcon, segmentPalettes, paletteSwatch, type WheelMode } from './wheel/FortuneWheel';
 
 interface LuckyWheelProps {
   onBackToHome?: () => void;
@@ -123,51 +120,59 @@ const PRIZE_ASSETS: Record<string, {
   },
 };
 
+const SPIN_DURATION_MS = 8200;
+const SHOWCASE_ORDER = ['vehicle', 'chips', 'cash', 'mystery', 'clothing'] as const;
+
+// Heavy ease-out: fast launch, long suspenseful crawl over the last pins
+const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
+
 export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
-  const { 
-    user, 
-    isAuthenticated, 
-    claimWheelReward, 
-    canSpinWheel, 
-    timeUntilNextSpin, 
-    resetSpinCooldown 
+  const {
+    user,
+    isAuthenticated,
+    claimWheelReward,
+    canSpinWheel,
+    timeUntilNextSpin,
+    resetSpinCooldown,
   } = useCasinoUser();
 
-  const {
-    segments,
-    podiumVehicle,
-    economy,
-    recordSpinEvent,
-    logs,
-  } = useCasinoAdmin();
+  const { segments, podiumVehicle, economy, recordSpinEvent, logs } = useCasinoAdmin();
 
   // State
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [spinPhase, setSpinPhase] = useState<'idle' | 'spinning' | 'slowing' | 'won'>('idle');
-  const [rotationDegrees, setRotationDegrees] = useState<number>(0);
   const [winningSegment, setWinningSegment] = useState<WheelSegmentConfig | null>(null);
   const [celebrationOpen, setCelebrationOpen] = useState<boolean>(false);
   const [activeModalKey, setActiveModalKey] = useState<string | null>(null);
   const [oddsModalOpen, setOddsModalOpen] = useState<boolean>(false);
-  const [selectedShowcaseTab, setSelectedShowcaseTab] = useState<string>('vehicle');
   const [isMuted, setIsMuted] = useState<boolean>(() => {
-    return localStorage.getItem('diamond_wheel_sound_muted') === 'true';
+    try {
+      return localStorage.getItem('diamond_wheel_sound_muted') === 'true';
+    } catch {
+      return false;
+    }
   });
 
   const currentRotationRef = useRef<number>(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const spinTimeoutsRef = useRef<number[]>([]);
-  const needleRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const rotorRef = useRef<HTMLDivElement | null>(null);
+  const pointerRef = useRef<SVGGElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const numSegments = segments.length;
   const degreesPerSegment = 360 / numSegments;
+  const palettes = useMemo(() => segmentPalettes(segments), [segments]);
 
-  // Persist sound preference
   const toggleMute = () => {
     setIsMuted((prev) => {
       const next = !prev;
-      localStorage.setItem('diamond_wheel_sound_muted', String(next));
+      try {
+        localStorage.setItem('diamond_wheel_sound_muted', String(next));
+      } catch {
+        // Storage unavailable
+      }
       return next;
     });
   };
@@ -190,14 +195,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
     }
   }, []);
 
-  // Eagerly unlock audio on any first user touch/click
   useEffect(() => {
     const unlock = () => {
       try {
         const ctx = getAudioContext();
-        if (ctx && ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
-        }
+        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
       } catch {
         // Safe fallback
       }
@@ -206,13 +208,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
     return () => {
       window.removeEventListener('pointerdown', unlock);
       spinTimeoutsRef.current.forEach((t) => clearTimeout(t));
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
         audioCtxRef.current.close().catch(() => {});
       }
     };
   }, [getAudioContext]);
 
-  // Authentic mechanical ratchet click (dual tone: sharp transient click + wood/metal body resonance)
+  // Mechanical ratchet click (sharp transient + body resonance)
   const playRatchetTick = useCallback((volume = 0.08) => {
     if (isMuted) return;
     try {
@@ -220,7 +223,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
       if (!audioCtx) return;
       const now = audioCtx.currentTime;
 
-      // 1. Sharp high-frequency transient click
       const clickOsc = audioCtx.createOscillator();
       const clickGain = audioCtx.createGain();
       clickOsc.type = 'triangle';
@@ -233,7 +235,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
       clickOsc.start(now);
       clickOsc.stop(now + 0.02);
 
-      // 2. Low metallic/wood body resonance
       const bodyOsc = audioCtx.createOscillator();
       const bodyGain = audioCtx.createGain();
       bodyOsc.type = 'sine';
@@ -250,14 +251,13 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
     }
   }, [isMuted, getAudioContext]);
 
-  // Luxury Casino Victory Fanfare chime
+  // Victory fanfare arpeggio
   const playVictoryFanfare = useCallback(() => {
     if (isMuted) return;
     try {
       const audioCtx = getAudioContext();
       if (!audioCtx) return;
-      // Grand Arpeggio chords: C5, E5, G5, C6 with warm reverb decay
-      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
       notes.forEach((freq, idx) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -277,7 +277,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
     }
   }, [isMuted, getAudioContext]);
 
-  // Engine rev sound effect when inspecting the supercar
+  // Engine rev when inspecting the supercar
   const playEngineRev = useCallback(() => {
     if (isMuted) return;
     try {
@@ -303,7 +303,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
     }
   }, [isMuted, getAudioContext]);
 
-  // Particle explosion for celebration modal
+  // Gold confetti burst for the celebration modal
   useEffect(() => {
     if (!celebrationOpen || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -313,12 +313,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
 
-    const colors = ['#f59e0b', '#fbbf24', '#ffffff', '#a855f7', '#06b6d4', '#10b981', '#ec4899', '#ffd700'];
-    const particles = Array.from({ length: 110 }).map(() => ({
+    const colors = ['#f5d27a', '#fbe7a6', '#d9a93e', '#ffffff', '#c42a3c', '#18925f'];
+    const particles = Array.from({ length: 140 }).map(() => ({
       x: canvas.width / 2,
-      y: canvas.height / 2 - 40,
-      vx: (Math.random() - 0.5) * 16,
-      vy: (Math.random() - 0.7) * 18,
+      y: canvas.height / 2 - 60,
+      vx: (Math.random() - 0.5) * 18,
+      vy: (Math.random() - 0.75) * 20,
       size: Math.random() * 7 + 3,
       color: colors[Math.floor(Math.random() * colors.length)],
       alpha: 1,
@@ -333,10 +333,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
       particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.38; // gravity
-        p.alpha -= 0.008;
+        p.vy += 0.36;
+        p.vx *= 0.99;
+        p.alpha -= 0.007;
         p.rotation += p.vRotation;
-
         if (p.alpha > 0) {
           alive = true;
           ctx.save();
@@ -344,57 +344,72 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
           ctx.rotate((p.rotation * Math.PI) / 180);
           ctx.globalAlpha = Math.max(0, p.alpha);
           ctx.fillStyle = p.color;
-          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 1.5);
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 1.6);
           ctx.restore();
         }
       });
-
-      if (alive) {
-        animId = requestAnimationFrame(render);
-      }
+      if (alive) animId = requestAnimationFrame(render);
     };
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
   }, [celebrationOpen]);
 
-  // Recent winners list
+  // Recent winners (live admin logs, with a fallback showcase)
   const recentWinners = useMemo(() => {
     const wheelLogs = logs.filter((l) => l.category === 'WHEEL' && l.action.toLowerCase().includes('spin'));
     if (wheelLogs.length > 0) {
-      return wheelLogs.slice(0, 6).map((log) => ({
+      return wheelLogs.slice(0, 8).map((log) => ({
         id: log.id,
         author: log.detail.split(' a obtenu')[0] || 'Citoyen VIP',
-        prize: log.detail.split('a obtenu : ')[1]?.split(' (')[0] || 'Lot d\'exception',
+        prize: log.detail.split('a obtenu : ')[1]?.split(' (')[0] || "Lot d'exception",
         time: log.timestamp || 'Récemment',
       }));
     }
     return [
-      { id: '1', author: 'Citoyen #1042', prize: 'Grotti Itali RSX (Véhicule Podium)', time: 'Il y a 12 min' },
+      { id: '1', author: 'Citoyen #1042', prize: 'Grotti Itali RSX', time: 'Il y a 12 min' },
       { id: '2', author: 'Marcus V.', prize: '50 000 Jetons Diamond', time: 'Il y a 34 min' },
-      { id: '3', author: 'Dylan R.', prize: '$50 000 Cash Portefeuille', time: 'Il y a 1h' },
+      { id: '3', author: 'Dylan R.', prize: '$50 000 Cash', time: 'Il y a 1h' },
       { id: '4', author: 'Éléonore D.', prize: 'Coffre Mystère Diamond', time: 'Il y a 2h' },
-      { id: '5', author: 'Lucas K.', prize: 'Pass High Roller Salon VIP', time: 'Il y a 3h' },
+      { id: '5', author: 'Lucas K.', prize: 'Pass High Roller', time: 'Il y a 3h' },
     ];
   }, [logs]);
+
+  // Rarest prizes first for the "lots en jeu" board
+  const rarestSegments = useMemo(
+    () => segments.map((s, i) => ({ seg: s, palette: palettes[i] })).sort((a, b) => a.seg.dropRate - b.seg.dropRate),
+    [segments, palettes],
+  );
+  const maxDropRate = useMemo(() => Math.max(...segments.map((s) => s.dropRate), 1), [segments]);
+
+  const dropRateByType = useCallback(
+    (type: string) => segments.filter((s) => s.type === type).reduce((acc, s) => acc + s.dropRate, 0),
+    [segments],
+  );
+
+  // Flapper kick when a pin passes under it
+  const kickPointer = (strength: number) => {
+    const el = pointerRef.current;
+    if (!el) return;
+    el.style.transform = `rotate(${-(6 + strength * 20)}deg)`;
+    window.setTimeout(() => {
+      if (pointerRef.current) pointerRef.current.style.transform = 'rotate(0deg)';
+    }, 55);
+  };
 
   // Main spin handler
   const handleSpin = () => {
     if (economy.maintenanceMode) return;
     if (isSpinning || (!canSpinWheel && isAuthenticated)) return;
 
-    // Immediately unlock audio context in the user event handler
     const audioCtx = getAudioContext();
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
-    }
-    playRatchetTick(0.12);
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
 
     setIsSpinning(true);
     setSpinPhase('spinning');
     setWinningSegment(null);
 
-    // Pick target index using drop rate weights from Admin config
+    // Weighted draw using admin-configured drop rates
     const totalWeight = segments.reduce((acc, s) => acc + (s.dropRate > 0 ? s.dropRate : 1), 0);
     let rand = Math.random() * totalWeight;
     let targetIndex = 0;
@@ -408,895 +423,690 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = () => {
     }
     const chosenSegment = segments[targetIndex];
 
-    // Compute target angle (top needle at 12 o'clock / 0 deg)
-    const fullSpins = 6 + Math.floor(Math.random() * 3); // 6 to 8 full rotations
-    // Small random organic jitter within the winning segment (±20% of segment width)
-    const jitter = (Math.random() - 0.5) * (degreesPerSegment * 0.4);
-    const targetSegmentOffset = (360 - (targetIndex * degreesPerSegment) - (degreesPerSegment / 2) + jitter) % 360;
-    
-    const baseRotation = Math.ceil(currentRotationRef.current / 360) * 360;
-    const finalRotation = baseRotation + (fullSpins * 360) + targetSegmentOffset;
+    // Flapper sits at 12 o'clock: bring the chosen wedge's centre (± jitter) to 0°
+    const fullSpins = 7 + Math.floor(Math.random() * 3);
+    const jitter = (Math.random() - 0.5) * (degreesPerSegment * 0.6);
+    const targetOffset = (360 - targetIndex * degreesPerSegment - degreesPerSegment / 2 + jitter + 360) % 360;
+    const from = currentRotationRef.current;
+    const baseRotation = Math.ceil(from / 360) * 360;
+    const to = baseRotation + fullSpins * 360 + targetOffset;
+    currentRotationRef.current = to;
 
-    currentRotationRef.current = finalRotation;
-    setRotationDegrees(finalRotation);
-
-    // Clear prior timeouts
     spinTimeoutsRef.current.forEach((t) => clearTimeout(t));
     spinTimeoutsRef.current = [];
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
 
-    // Realistic mechanical ratcheting tick delays over 7000ms
-    const tickDelays = [
-      70, 140, 210, 280, 350, 420, 490, 560, 640, 720, 810, 910, 1020, 1140,
-      1280, 1430, 1600, 1800, 2030, 2300, 2620, 3000, 3450, 4000, 4650, 5400,
-      6100, 6600, 6900
-    ];
+    // Frame-driven spin so every pin crossing clicks & kicks the flapper in sync
+    const startTime = performance.now();
+    let lastPin = Math.floor(from / degreesPerSegment);
+    let lastTickAt = 0;
+    let slowingFlagged = false;
 
-    tickDelays.forEach((delay, idx) => {
-      const tid = window.setTimeout(() => {
-        const progress = idx / tickDelays.length;
-        const vol = Math.max(0.02, 0.08 * (1 - progress * 0.4));
-        playRatchetTick(vol);
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - startTime) / SPIN_DURATION_MS);
+      const angle = from + (to - from) * easeOutQuart(t);
+      if (rotorRef.current) rotorRef.current.style.transform = `rotate(${angle}deg)`;
 
-        // Needle deflection directly via DOM manipulation (zero React re-renders)
-        if (needleRef.current) {
-          const wobble = idx % 2 === 0 ? 12 : -9;
-          needleRef.current.style.transform = `rotate(${wobble}deg)`;
-          window.setTimeout(() => {
-            if (needleRef.current) {
-              needleRef.current.style.transform = 'rotate(0deg)';
-            }
-          }, 35);
+      const pin = Math.floor(angle / degreesPerSegment);
+      if (pin !== lastPin) {
+        lastPin = pin;
+        const speed = Math.pow(1 - t, 3); // normalised angular speed
+        if (now - lastTickAt > 40) {
+          lastTickAt = now;
+          playRatchetTick(0.03 + 0.06 * Math.min(1, speed * 2 + 0.3));
+          kickPointer(Math.min(1, speed * 1.5 + 0.25));
         }
+      }
 
-        if (delay >= 4000) {
-          setSpinPhase((prev) => (prev === 'spinning' ? 'slowing' : prev));
-        }
-      }, delay);
-      spinTimeoutsRef.current.push(tid);
-    });
+      if (!slowingFlagged && t > 0.55) {
+        slowingFlagged = true;
+        setSpinPhase('slowing');
+      }
 
-    // Complete spin after 7150ms
-    const completeTid = window.setTimeout(() => {
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(frame);
+        return;
+      }
+
+      rafRef.current = null;
       setIsSpinning(false);
       setSpinPhase('won');
       setWinningSegment(chosenSegment);
-      setCelebrationOpen(true);
       playVictoryFanfare();
-
-      // Record event in admin logs
       recordSpinEvent(chosenSegment, user ? `${user.rpFirstName} ${user.rpLastName}` : undefined);
-
       if (isAuthenticated) {
-        claimWheelReward({
-          type: chosenSegment.type,
-          value: chosenSegment.value,
-          label: chosenSegment.label,
-        });
+        claimWheelReward({ type: chosenSegment.type, value: chosenSegment.value, label: chosenSegment.label });
       }
-    }, 7150);
-    spinTimeoutsRef.current.push(completeTid);
+      // Let the winning wedge glow under the flapper for a beat before the reveal
+      spinTimeoutsRef.current.push(window.setTimeout(() => setCelebrationOpen(true), 900));
+    };
+    rafRef.current = requestAnimationFrame(frame);
   };
 
-  // Resolved winning asset
   const winningAsset = useMemo(() => {
     if (!winningSegment) return null;
     return PRIZE_ASSETS[winningSegment.type] || PRIZE_ASSETS.mystery;
   }, [winningSegment]);
 
-  // Current active showcase data
-  const currentShowcase = PRIZE_ASSETS[selectedShowcaseTab] || PRIZE_ASSETS.vehicle;
+  const wheelMode: WheelMode = isSpinning ? 'spinning' : spinPhase === 'won' ? 'won' : 'idle';
+  const spinLocked = economy.maintenanceMode || isSpinning || (!canSpinWheel && isAuthenticated);
+  const userTierKey = user?.vipTier === 'DIAMOND' ? 'DIAMOND' : user?.vipTier === 'GOLD' ? 'GOLD' : 'CITIZEN';
+  const isStaff = user?.role === 'DÉVELOPPEUR' || user?.role === 'DIRECTEUR CASINO';
 
   return (
-    <div className="relative min-h-screen bg-black text-white pt-24 sm:pt-32 pb-24 px-4 sm:px-8 overflow-hidden font-sans select-none">
-      
-      {/* Dynamic Keyframes for High-Performance CSS Chase Animation */}
-      <style>{`
-        @keyframes bulbChase {
-          0%, 100% {
-            opacity: 0.35;
-            transform: translate(-50%, -50%) scale(0.9);
-            box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
-          }
-          50% {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1.35);
-            background-color: #ffffff !important;
-            box-shadow: 0 0 16px 4px rgba(255, 255, 255, 0.95), 0 0 24px rgba(245, 158, 11, 0.9);
-          }
-        }
-        @keyframes bulbGentleGlow {
-          0%, 100% {
-            opacity: 0.6;
-            transform: translate(-50%, -50%) scale(1);
-          }
-          50% {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1.15);
-            box-shadow: 0 0 10px 2px rgba(251, 191, 36, 0.8);
-          }
-        }
-      `}</style>
-
+    <div className="relative min-h-screen text-white pt-24 sm:pt-28 pb-24 overflow-hidden font-sans select-none bg-black">
       {/* ============================================================ */}
-      {/* 1. ATMOSPHERIC CASINO HALL BACKGROUND & LIGHTING             */}
+      {/* ATMOSPHERE                                                   */}
       {/* ============================================================ */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* Real AI-generated Diamond Casino Hall ambient backdrop */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-35 mix-blend-screen scale-105 filter blur-[0.5px]"
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-20 scale-105 blur-[2px]"
           style={{ backgroundImage: `url('/diamond_casino_hall.jpg')` }}
         />
-        {/* Luxury gradient vignettes */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/15 via-transparent to-transparent" />
-        
-        {/* Dynamic ambient neon glow spots */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-amber-500/[0.08] rounded-full blur-[180px]" />
-        <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-purple-600/[0.06] rounded-full blur-[150px]" />
-        <div className="absolute top-1/2 right-1/4 w-[450px] h-[450px] bg-yellow-400/[0.05] rounded-full blur-[160px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/90 to-black" />
+        <div className="absolute inset-0 deco-pattern opacity-60 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]" />
+        {/* Stage spotlight */}
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[1100px] bg-[conic-gradient(from_180deg_at_50%_0%,transparent_160deg,rgba(255,225,150,0.10)_175deg,rgba(255,225,150,0.14)_180deg,rgba(255,225,150,0.10)_185deg,transparent_200deg)]" />
+        <div className="absolute top-[30%] left-1/2 -translate-x-1/2 w-[760px] h-[760px] rounded-full bg-[#d9a93e]/10 blur-[160px]" />
+        <div className="absolute top-1/3 -left-40 w-[500px] h-[500px] rounded-full bg-[#8e1424]/15 blur-[160px]" />
+        <div className="absolute top-1/2 -right-40 w-[500px] h-[500px] rounded-full bg-[#0b6040]/15 blur-[160px]" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto z-10">
-
-        {/* Maintenance Banner */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8">
         {economy.maintenanceMode && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center gap-3 text-amber-300 font-['Geist_Mono'] text-xs sm:text-sm text-center shadow-[0_0_30px_rgba(245,158,11,0.2)]">
-            <span className="text-xl">⚠️</span>
-            <span>MAINTENANCE DU DIAMOND CASINO EN COURS // Les machines et la Roue sont temporairement suspendues par la direction générale.</span>
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex items-center justify-center gap-3 text-amber-200 font-['Geist_Mono'] text-xs sm:text-sm text-center">
+            <Lock size={16} className="shrink-0" />
+            <span>MAINTENANCE EN COURS — La Roue est temporairement suspendue par la direction.</span>
           </div>
         )}
 
         {/* ============================================================ */}
-        {/* 2. VIP TOP BAR (Player Balance, Sound Toggle, Live Clock)     */}
+        {/* HEADER                                                       */}
         {/* ============================================================ */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 p-3.5 sm:p-4 rounded-2xl bg-neutral-950/85 border border-white/10 backdrop-blur-xl shadow-2xl">
-          
-          {/* Left: Casino Brand Tag */}
-          <div className="flex items-center gap-3">
-            <img 
-              src="/diamond_casino_logo.png" 
-              alt="Diamond Casino" 
-              className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-[0_0_12px_rgba(255,215,0,0.5)]" 
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-['Geist_Mono'] tracking-widest text-amber-400 uppercase font-bold">
-                  The Diamond Casino &amp; Resort
-                </span>
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              </div>
-              <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">
-                Rotonde Officielle de la Roue de la Fortune • Los Santos, San Andreas
-              </span>
-            </div>
+        <header className="text-center mb-8 sm:mb-10">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <span className="h-px w-10 sm:w-20 bg-gradient-to-r from-transparent to-[#d9a93e]" />
+            <span className="font-cinzel text-[10px] sm:text-xs tracking-[0.45em] text-[#e2b54e] uppercase">
+              The Diamond · Rotonde
+            </span>
+            <span className="h-px w-10 sm:w-20 bg-gradient-to-l from-transparent to-[#d9a93e]" />
           </div>
+          <h1 className="font-cinzel font-black text-4xl sm:text-6xl lg:text-7xl tracking-wide leading-none">
+            <span className="text-gold drop-shadow-[0_4px_30px_rgba(217,169,62,0.35)]">Roue de la Fortune</span>
+          </h1>
+          <p className="mt-4 text-neutral-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
+            Un tirage offert à chaque visite. Supercar du podium, mallettes de cash, jetons et trésors du coffre —
+            <span className="text-[#f5d27a]"> chaque lancer est gagnant.</span>
+          </p>
+        </header>
 
-          {/* Right: Balances & Audio Controls */}
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+        {/* ============================================================ */}
+        {/* STAGE: session panel · wheel · prize board                   */}
+        {/* ============================================================ */}
+        <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_300px] gap-8 xl:gap-10 items-start">
+          {/* ---------- LEFT: player session ---------- */}
+          <aside className="order-2 xl:order-1 deco-panel rounded-2xl p-5 flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <span className="font-cinzel text-xs tracking-[0.3em] text-[#e2b54e]">VOTRE SESSION</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setOddsModalOpen(true)}
+                  className="p-2 rounded-lg border border-white/10 text-neutral-400 hover:text-white hover:border-[#d9a93e]/50 transition-colors cursor-pointer"
+                  title="Règlement & probabilités"
+                  aria-label="Règlement et probabilités"
+                >
+                  <ScrollText size={15} />
+                </button>
+                <button
+                  onClick={toggleMute}
+                  className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+                    isMuted ? 'border-white/10 text-neutral-500 hover:text-white' : 'border-[#d9a93e]/50 text-[#f5d27a] bg-[#d9a93e]/10'
+                  }`}
+                  title={isMuted ? 'Activer le son' : 'Couper le son'}
+                  aria-label="Contrôle audio de la roue"
+                >
+                  {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                </button>
+              </div>
+            </div>
+
             {isAuthenticated && user ? (
               <>
-                {/* Chips Balance */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-amber-500/30 font-['Geist_Mono'] text-xs">
-                  <Coins size={14} className="text-amber-400" />
-                  <span className="text-neutral-400 hidden sm:inline">JETONS:</span>
-                  <span className="font-bold text-amber-300">{(user.chips || 0).toLocaleString()}</span>
+                <div className="flex items-center gap-3">
+                  <img src={user.avatarUrl} alt="" className="w-11 h-11 rounded-full object-cover ring-2 ring-[#d9a93e]/70" />
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate">
+                      {user.rpFirstName} {user.rpLastName}
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] font-['Geist_Mono'] text-[#e2b54e] uppercase tracking-wider">
+                      <Crown size={11} />
+                      <span className="truncate">{user.role}</span>
+                    </div>
+                  </div>
                 </div>
-
-                {/* Cash Balance */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-emerald-500/30 font-['Geist_Mono'] text-xs">
-                  <DollarSign size={14} className="text-emerald-400" />
-                  <span className="text-neutral-400 hidden sm:inline">CASH:</span>
-                  <span className="font-bold text-emerald-400">${(user.cash || 0).toLocaleString()}</span>
-                </div>
-
-                {/* VIP Role Badge */}
-                <div className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-['Geist_Mono'] text-[11px] font-bold uppercase tracking-wider hidden md:flex items-center gap-1.5">
-                  <ShieldCheck size={13} />
-                  <span>{user.role}</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-black/50 border border-[#d9a93e]/20 p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-['Geist_Mono'] uppercase">
+                      <Coins size={11} className="text-[#e2b54e]" /> Jetons
+                    </div>
+                    <div className="mt-1 font-['Geist_Mono'] font-bold text-[#f5d27a] tabular-nums">
+                      {(user.chips || 0).toLocaleString('fr-FR')}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-black/50 border border-emerald-500/20 p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-['Geist_Mono'] uppercase">
+                      <DollarSign size={11} className="text-emerald-400" /> Cash
+                    </div>
+                    <div className="mt-1 font-['Geist_Mono'] font-bold text-emerald-400 tabular-nums">
+                      ${(user.cash || 0).toLocaleString('fr-FR')}
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
-              <Link
-                to="/espace-membre"
-                className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-['Geist_Mono'] transition-colors flex items-center gap-1.5"
-              >
-                <span>Connexion Citoyen RP</span>
-                <ExternalLink size={12} />
-              </Link>
+              <div className="rounded-xl border border-dashed border-[#d9a93e]/30 p-4 text-center">
+                <p className="text-sm text-neutral-300 mb-3">
+                  Mode démonstration. Connectez votre profil citoyen pour encaisser vos gains en jeu.
+                </p>
+                <Link
+                  to="/espace-membre"
+                  className="btn-gold inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider"
+                >
+                  Connexion citoyen <ChevronRight size={14} />
+                </Link>
+              </div>
             )}
 
-            {/* Odds Table Modal Trigger */}
-            <button
-              onClick={() => setOddsModalOpen(true)}
-              className="p-2 rounded-xl bg-neutral-900/80 hover:bg-neutral-800 border border-white/10 text-neutral-300 hover:text-white transition-colors cursor-pointer"
-              title="Tableau des probabilités des 16 lots"
-              aria-label="Tableau des probabilités"
-            >
-              <Info size={16} />
-            </button>
+            <div className="gold-rule" />
 
-            {/* Sound Toggle */}
-            <button
-              onClick={toggleMute}
-              className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                isMuted 
-                  ? 'bg-neutral-900 border-white/10 text-neutral-500 hover:text-white' 
-                  : 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
-              }`}
-              title={isMuted ? 'Activer le son' : 'Couper le son'}
-              aria-label="Contrôle audio de la roue"
-            >
-              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
-          </div>
-        </div>
-
-        {/* ============================================================ */}
-        {/* 3. HEADLINE & LIVE RECENT WINNERS MARQUEE                     */}
-        {/* ============================================================ */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-['Geist_Mono'] text-xs font-semibold uppercase tracking-widest mb-3">
-            <Sparkles size={13} className="text-amber-400" />
-            <span>Tirage Quotidien Garanti 100% Gagnant</span>
-          </div>
-          
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight mb-3">
-            La Roue de la <span className="font-['Instrument_Serif'] font-normal italic text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500">Fortune</span>
-          </h1>
-          
-          <p className="text-neutral-400 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-            Chaque citoyen bénéficie d'un tirage gratuit toutes les 24 heures (cooldown réduit à 12h pour Gold et 8h pour Diamond VIP).
-            Tentez de remporter le prestigieux bolide sur le podium, des liasses de cash liquide ou jusqu'à 50 000 jetons.
-          </p>
-
-          {/* Marquee Ticker */}
-          <div className="mt-5 max-w-4xl mx-auto overflow-hidden rounded-xl bg-neutral-950/70 border border-white/10 py-2 px-4 backdrop-blur-md">
-            <div className="flex items-center gap-4 text-xs font-['Geist_Mono']">
-              <span className="flex items-center gap-1.5 text-amber-400 uppercase font-bold tracking-wider shrink-0">
-                <Flame size={14} className="text-amber-400" />
-                <span>DERNIERS GAGNANTS :</span>
-              </span>
-              <div className="flex items-center gap-6 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap text-neutral-300">
-                {recentWinners.map((win) => (
-                  <span key={win.id} className="inline-flex items-center gap-1.5 text-neutral-300 shrink-0">
-                    <span className="text-white font-semibold">{win.author}</span>
-                    <span className="text-amber-400">➔</span>
-                    <span className="text-amber-200">{win.prize}</span>
-                    <span className="text-neutral-400 text-[10px]">({win.time})</span>
-                  </span>
-                ))}
+            {/* Spin cadence by tier */}
+            <div>
+              <div className="text-[11px] font-['Geist_Mono'] uppercase tracking-wider text-neutral-500 mb-2.5">
+                Cadence des tirages
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ============================================================ */}
-        {/* 4. MAIN INTERACTIVE SECTION: THE WHEEL & SHOWCASE CARDS       */}
-        {/* ============================================================ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-          
-          {/* ---------------------------------------------------------- */}
-          {/* LEFT: THE INTERACTIVE WHEEL & MECHANICS                    */}
-          {/* ---------------------------------------------------------- */}
-          <div className="lg:col-span-7 flex flex-col items-center justify-center relative">
-            
-            {/* Ambient Wheel Stand Background Glow */}
-            <div className="absolute w-[380px] h-[380px] sm:w-[500px] sm:h-[500px] rounded-full bg-gradient-to-b from-amber-500/10 via-amber-600/5 to-transparent blur-3xl pointer-events-none" />
-
-            {/* Wheel Container with Authentic GTA Casino Bezel */}
-            <div className="relative w-[300px] h-[300px] sm:w-[440px] sm:h-[440px] md:w-[480px] md:h-[480px] flex items-center justify-center max-w-[92vw]">
-              
-              {/* Outer Golden Bezel Ring with Light Studs */}
-              <div className="absolute inset-0 rounded-full border-[6px] border-gradient-to-b from-amber-300 via-amber-600 to-yellow-800 shadow-[0_0_60px_rgba(245,158,11,0.25),inset_0_0_30px_rgba(0,0,0,0.8)] pointer-events-none bg-gradient-to-b from-amber-900/20 via-black to-neutral-950/60" />
-              
-              {/* Outer Illuminated Studs / Bulbs around the perimeter (24 bulbs) */}
-              <div className="absolute inset-2 rounded-full pointer-events-none">
-                {Array.from({ length: 24 }).map((_, bulbIdx) => {
-                  const bulbAngle = (bulbIdx * 360) / 24;
-                  const rad = (bulbAngle - 90) * (Math.PI / 180);
-                  const radiusPct = 48.5; // percentage from center
-                  const left = 50 + radiusPct * Math.cos(rad);
-                  const top = 50 + radiusPct * Math.sin(rad);
-
+              <ul className="space-y-1.5">
+                {[
+                  { key: 'DIAMOND', label: 'Diamond VIP', value: 'toutes les 8 h' },
+                  { key: 'GOLD', label: 'Gold VIP', value: 'toutes les 12 h' },
+                  { key: 'CITIZEN', label: 'Citoyen', value: 'toutes les 24 h' },
+                ].map((tier) => {
+                  const active = isAuthenticated && tier.key === userTierKey;
                   return (
-                    <div
-                      key={bulbIdx}
-                      className="absolute w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full"
-                      style={{
-                        left: `${left}%`,
-                        top: `${top}%`,
-                        backgroundColor: bulbIdx % 2 === 0 ? '#fbbf24' : '#f59e0b',
-                        animation: isSpinning 
-                          ? `bulbChase 0.75s infinite linear` 
-                          : `bulbGentleGlow 2.5s infinite ease-in-out`,
-                        animationDelay: isSpinning 
-                          ? `${-(bulbIdx / 24) * 0.75}s` 
-                          : `${(bulbIdx % 4) * 0.4}s`,
-                      }}
-                    />
+                    <li
+                      key={tier.key}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs border ${
+                        active ? 'border-[#d9a93e]/60 bg-[#d9a93e]/10 text-[#fbe7a6]' : 'border-white/5 text-neutral-400'
+                      }`}
+                    >
+                      <span className="font-semibold">{tier.label}</span>
+                      <span className="font-['Geist_Mono']">{tier.value}</span>
+                    </li>
                   );
                 })}
-              </div>
-
-              {/* Physical Pointer / Mechanical Needle at 12 o'clock */}
-              <div 
-                ref={needleRef}
-                className="absolute -top-4 z-40 flex flex-col items-center origin-top pointer-events-none transition-transform duration-75 ease-out"
-                style={{ transform: 'rotate(0deg)' }}
+              </ul>
+              <Link
+                to="/abonnements"
+                className="mt-3 inline-flex items-center gap-1 text-xs text-[#e2b54e] hover:text-[#fbe7a6] transition-colors"
               >
-                {/* Needle Blade */}
-                <div className="relative w-8 h-11 filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.9)]">
-                  <svg viewBox="0 0 32 44" className="w-full h-full">
-                    <defs>
-                      <linearGradient id="needleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#fef08a" />
-                        <stop offset="40%" stopColor="#f59e0b" />
-                        <stop offset="80%" stopColor="#b45309" />
-                        <stop offset="100%" stopColor="#78350f" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d="M 16 42 L 5 10 C 3 4, 10 2, 16 2 C 22 2, 29 4, 27 10 Z"
-                      fill="url(#needleGrad)"
-                      stroke="#fef08a"
-                      strokeWidth="1.2"
-                    />
-                    <circle cx="16" cy="12" r="3.5" fill="#ef4444" stroke="#ffffff" strokeWidth="1" />
-                    <circle cx="16" cy="12" r="1.5" fill="#ffffff" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Rotating Wheel Surface */}
-              <div
-                className="w-[280px] h-[280px] sm:w-[410px] sm:h-[410px] md:w-[446px] md:h-[446px] rounded-full overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.9)]"
-                style={{
-                  transform: `rotate(${rotationDegrees}deg)`,
-                  transition: 'transform 7.15s cubic-bezier(0.12, 0.98, 0.16, 1)',
-                }}
-              >
-                <svg viewBox="0 0 500 500" className="w-full h-full select-none">
-                  <defs>
-                    <radialGradient id="wheelVignette" cx="50%" cy="50%" r="50%">
-                      <stop offset="70%" stopColor="transparent" />
-                      <stop offset="100%" stopColor="rgba(0,0,0,0.65)" />
-                    </radialGradient>
-                    <linearGradient id="goldStud" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ffffff" />
-                      <stop offset="50%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#78350f" />
-                    </linearGradient>
-                  </defs>
-
-                  <g transform="translate(250, 250)">
-                    {segments.map((seg: WheelSegmentConfig, i: number) => {
-                      const angle = degreesPerSegment;
-                      const startAngle = i * angle;
-                      const endAngle = startAngle + angle;
-
-                      // Polar coordinates
-                      const r = 246;
-                      const startRad = (startAngle - 90) * (Math.PI / 180);
-                      const endRad = (endAngle - 90) * (Math.PI / 180);
-
-                      const x1 = r * Math.cos(startRad);
-                      const y1 = r * Math.sin(startRad);
-                      const x2 = r * Math.cos(endRad);
-                      const y2 = r * Math.sin(endRad);
-
-                      const pathData = `M 0 0 L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`;
-                      const midAngle = startAngle + angle / 2;
-
-                      return (
-                        <g key={seg.id}>
-                          {/* Segment Wedge */}
-                          <path
-                            d={pathData}
-                            fill={seg.color}
-                            stroke="#171717"
-                            strokeWidth="1.8"
-                          />
-
-                          {/* Outer Peg / Stud at segment boundary */}
-                          <circle
-                            cx={x1 * 0.96}
-                            cy={y1 * 0.96}
-                            r="3.5"
-                            fill="url(#goldStud)"
-                            stroke="#451a03"
-                            strokeWidth="1"
-                          />
-
-                          {/* Segment Label (Rotated along radial spoke) */}
-                          <g transform={`rotate(${midAngle}) translate(0, -155)`}>
-                            <text
-                              textAnchor="middle"
-                              dominantBaseline="central"
-                              fill={seg.textColor}
-                              fontSize="11"
-                              fontWeight="800"
-                              letterSpacing="0.04em"
-                              fontFamily="Inter, sans-serif"
-                              transform="rotate(90)"
-                              style={{ textShadow: '0 1px 3px rgba(0,0,0,0.95)' }}
-                            >
-                              {seg.label}
-                            </text>
-                          </g>
-
-                          {/* Segment Icon (Standing upright relative to the spoke) */}
-                          <g transform={`rotate(${midAngle}) translate(0, -214)`}>
-                            <text
-                              textAnchor="middle"
-                              dominantBaseline="central"
-                              fontSize="18"
-                              style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.85))' }}
-                            >
-                              {seg.icon}
-                            </text>
-                          </g>
-                        </g>
-                      );
-                    })}
-
-                    {/* Wheel Inner Radial Vignette */}
-                    <circle cx="0" cy="0" r="248" fill="url(#wheelVignette)" pointerEvents="none" />
-                  </g>
-                </svg>
-              </div>
-
-              {/* Center Hub & Embossed Diamond Insignia */}
-              <div className="absolute z-30 w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-b from-neutral-900 via-neutral-950 to-black border-4 border-amber-500/70 shadow-[0_0_35px_rgba(0,0,0,0.95),0_0_20px_rgba(245,158,11,0.35)] flex flex-col items-center justify-center p-2 text-center pointer-events-none">
-                <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-gradient-to-b from-amber-400/20 via-transparent to-amber-500/10 flex items-center justify-center border border-amber-500/30">
-                  <img
-                    src="/diamond_casino_logo.png"
-                    alt="Diamond Emblem"
-                    className="w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-[0_0_12px_rgba(255,215,0,0.6)]"
-                  />
-                </div>
-              </div>
+                Réduire mon délai avec un pass VIP <ChevronRight size={13} />
+              </Link>
             </div>
 
-            {/* Spin Trigger Button & Status Controls */}
-            <div className="mt-8 flex flex-col items-center gap-3 w-full max-w-sm">
-              <button
-                onClick={handleSpin}
-                disabled={economy.maintenanceMode || isSpinning || (!canSpinWheel && isAuthenticated)}
-                className={`w-full py-4 px-8 rounded-2xl font-bold text-sm tracking-wider uppercase transition-all duration-300 shadow-[0_0_35px_rgba(245,158,11,0.3)] flex items-center justify-center gap-3 ${
-                  economy.maintenanceMode
-                    ? 'bg-neutral-900 border border-amber-500/30 text-amber-400 cursor-not-allowed opacity-75'
-                    : isSpinning
-                    ? 'bg-neutral-800 text-neutral-400 cursor-not-allowed border border-white/10'
-                    : !canSpinWheel && isAuthenticated
-                    ? 'bg-neutral-900 border border-white/10 text-neutral-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-black hover:scale-[1.02] active:scale-98 cursor-pointer shadow-[0_0_40px_rgba(251,191,36,0.4)]'
-                }`}
-              >
-                {economy.maintenanceMode ? (
-                  <>
-                    <span className="text-base">🔒</span>
-                    <span>Casino en Maintenance</span>
-                  </>
-                ) : isSpinning ? (
-                  <>
-                    <span className="animate-spin text-lg">⚙️</span>
-                    <span>{spinPhase === 'slowing' ? 'Décélération...' : 'La roue tourne...'}</span>
-                  </>
-                ) : !canSpinWheel && isAuthenticated ? (
-                  <>
-                    <Clock size={18} className="text-amber-400 animate-pulse" />
-                    <span>Disponible dans {timeUntilNextSpin}</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={18} className="text-black" />
-                    <span>Lancer le tirage gratuit</span>
-                  </>
-                )}
-              </button>
-
-              {/* Helper status text */}
-              {!isAuthenticated ? (
-                <p className="text-xs text-neutral-400 text-center font-['Geist_Mono']">
-                  ⚡ Mode démonstration libre. Connectez votre profil citoyen pour créditer vos gains in-game.
-                </p>
-              ) : !canSpinWheel ? (
-                <p className="text-[11px] text-neutral-400 text-center font-['Geist_Mono']">
-                  Délai de rechargement en cours. Revenez dès expiration du compte à rebours.
-                </p>
-              ) : null}
-
-              {/* Developer & Admin Quick Actions */}
-              {(user?.role === 'DÉVELOPPEUR' || user?.role === 'DIRECTEUR CASINO') && (
-                <div className="flex items-center justify-center gap-3 pt-2">
+            {isStaff && (
+              <>
+                <div className="gold-rule" />
+                <div className="flex flex-wrap gap-2">
                   {!canSpinWheel && (
                     <button
                       onClick={resetSpinCooldown}
-                      className="px-3 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-[11px] font-['Geist_Mono'] text-amber-300 flex items-center gap-1.5 cursor-pointer transition-colors"
-                      title="Réinitialise le timer de 24h pour tester le tirage immédiatement"
+                      className="px-3 py-1.5 rounded-lg bg-black/60 hover:bg-neutral-900 border border-white/10 text-[11px] font-['Geist_Mono'] text-[#f5d27a] flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Réinitialise le délai pour tester le tirage immédiatement"
                     >
-                      <RotateCcw size={12} />
-                      <span>Reset Timer (Dev)</span>
+                      <RotateCcw size={12} /> Reset timer
                     </button>
                   )}
                   <Link
                     to="/admin"
-                    className="px-3 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-[11px] font-['Geist_Mono'] text-neutral-400 hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors"
-                    title="Ouvrir la console admin pour configurer les drops"
+                    className="px-3 py-1.5 rounded-lg bg-black/60 hover:bg-neutral-900 border border-white/10 text-[11px] font-['Geist_Mono'] text-neutral-400 hover:text-white flex items-center gap-1.5 transition-colors"
                   >
-                    <SlidersHorizontal size={12} />
-                    <span>Console Admin</span>
+                    <SlidersHorizontal size={12} /> Console admin
                   </Link>
                 </div>
-              )}
+              </>
+            )}
+          </aside>
+
+          {/* ---------- CENTRE: the wheel on its pedestal ---------- */}
+          <section className="order-1 xl:order-2 flex flex-col items-center">
+            <div className="relative w-full max-w-[560px]">
+              <div className="absolute inset-[6%] rounded-full bg-[#d9a93e]/20 blur-3xl" aria-hidden="true" />
+              <FortuneWheel
+                ref={rotorRef}
+                segments={segments}
+                rotation={currentRotationRef.current}
+                mode={wheelMode}
+                pointerRef={pointerRef}
+                className="w-full drop-shadow-[0_40px_60px_rgba(0,0,0,0.9)]"
+              />
             </div>
 
-          </div>
+            {/* Pedestal */}
+            <div className="relative -mt-3 w-[46%] max-w-[240px] h-10 rounded-b-[40%] bg-gradient-to-b from-[#8a5c14] via-[#3b2606] to-[#120c03] border-x border-b border-[#d9a93e]/40 shadow-[0_20px_40px_rgba(0,0,0,0.9)]" aria-hidden="true" />
+            <div className="w-[70%] max-w-[380px] h-4 -mt-1 rounded-[50%] bg-black/80 blur-md" aria-hidden="true" />
 
-          {/* ---------------------------------------------------------- */}
-          {/* RIGHT: INTERACTIVE PRIZE SHOWCASE GALLERY                  */}
-          {/* ---------------------------------------------------------- */}
-          <div className="lg:col-span-5 flex flex-col gap-5">
-            
-            {/* Prize Switcher Tabs */}
-            <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-950/80 border border-white/10 backdrop-blur-md overflow-x-auto no-scrollbar">
-              {[
-                { key: 'vehicle', icon: Car, label: 'Supercar' },
-                { key: 'chips', icon: Coins, label: 'Jetons' },
-                { key: 'cash', icon: DollarSign, label: 'Cash' },
-                { key: 'mystery', icon: Gift, label: 'Mystère' },
-                { key: 'clothing', icon: Shirt, label: 'Couture' },
-              ].map((tab) => {
-                const IconComp = tab.icon;
-                const isSelected = selectedShowcaseTab === tab.key;
+            {/* Spin control */}
+            <div className="mt-6 w-full max-w-sm flex flex-col items-center gap-3">
+              <button
+                onClick={handleSpin}
+                disabled={spinLocked}
+                className={`group relative w-full h-16 rounded-full font-cinzel font-black text-lg tracking-[0.25em] uppercase transition-all duration-300 flex items-center justify-center gap-3 ${
+                  spinLocked
+                    ? 'bg-neutral-950 border border-[#d9a93e]/25 text-neutral-500 cursor-not-allowed'
+                    : 'btn-gold cursor-pointer hover:scale-[1.02] active:scale-[0.98]'
+                }`}
+              >
+                {economy.maintenanceMode ? (
+                  <>
+                    <Lock size={18} /> <span className="text-sm tracking-[0.2em]">En maintenance</span>
+                  </>
+                ) : isSpinning ? (
+                  <span className="text-sm tracking-[0.3em] text-[#e2b54e] animate-pulse">
+                    {spinPhase === 'slowing' ? 'Rien ne va plus…' : 'La roue tourne…'}
+                  </span>
+                ) : !canSpinWheel && isAuthenticated ? (
+                  <>
+                    <Clock size={18} className="text-[#e2b54e]" />
+                    <span className="text-sm tracking-[0.15em] text-neutral-300 font-['Geist_Mono'] normal-case">
+                      Prochain tirage dans {timeUntilNextSpin}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={20} />
+                    <span>Tourner</span>
+                  </>
+                )}
+                {!spinLocked && (
+                  <span className="absolute inset-0 rounded-full ring-2 ring-[#fbe7a6]/50 animate-ping opacity-30 pointer-events-none" />
+                )}
+              </button>
+              <p className="text-[11px] text-neutral-500 font-['Geist_Mono'] text-center">
+                {isAuthenticated
+                  ? canSpinWheel
+                    ? 'Tirage gratuit disponible — bonne chance.'
+                    : 'Votre tirage se recharge. Revenez à la fin du compte à rebours.'
+                  : 'Démo libre : les gains ne sont pas crédités sans connexion.'}
+              </p>
+            </div>
+          </section>
+
+          {/* ---------- RIGHT: prize board ---------- */}
+          <aside className="order-3 deco-panel rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-cinzel text-xs tracking-[0.3em] text-[#e2b54e]">LOTS EN JEU</span>
+              <span className="text-[10px] font-['Geist_Mono'] text-neutral-500">{numSegments} cases</span>
+            </div>
+            <ul className="space-y-2">
+              {rarestSegments.slice(0, 7).map(({ seg, palette }) => {
+                const Icon = segmentIcon(seg);
                 return (
-                  <button
-                    key={tab.key}
-                    onClick={() => {
-                      setSelectedShowcaseTab(tab.key);
-                      if (tab.key === 'vehicle') playEngineRev();
-                    }}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-['Geist_Mono'] font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
-                      isSelected
-                        ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-                        : 'text-neutral-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    <IconComp size={14} />
-                    <span>{tab.label}</span>
-                  </button>
+                  <li key={seg.id} className="flex items-center gap-3">
+                    <span
+                      className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center border border-[#d9a93e]/40"
+                      style={paletteSwatch(palette)}
+                    >
+                      <Icon size={15} className={palette === 'gold' ? 'text-[#1d1303]' : 'text-[#f5d27a]'} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold truncate">{seg.label}</span>
+                        <span className="text-[11px] font-['Geist_Mono'] text-[#f5d27a] tabular-nums">{seg.dropRate}%</span>
+                      </div>
+                      <div className="mt-1 h-1 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-[#8a5c14] to-[#f5d27a]"
+                          style={{ width: `${Math.max(4, (seg.dropRate / maxDropRate) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </li>
                 );
               })}
-            </div>
-
-            {/* Active Prize Showcase Card */}
-            <div className="relative rounded-3xl p-6 sm:p-7 bg-neutral-950/85 border border-amber-500/30 backdrop-blur-xl overflow-hidden group shadow-[0_0_50px_rgba(0,0,0,0.85)]">
-              
-              {/* Background ambient glow */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/[0.08] rounded-full blur-3xl pointer-events-none" />
-
-              {/* Corner Tag */}
-              <div className="absolute top-0 right-0 px-4 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-['Geist_Mono'] font-bold text-[10px] uppercase tracking-widest rounded-bl-2xl shadow-lg flex items-center gap-1.5">
-                <Trophy size={12} />
-                <span>{currentShowcase.category}</span>
-              </div>
-
-              {/* Subtitle */}
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-['Geist_Mono'] text-amber-400 uppercase tracking-widest font-semibold">
-                  {currentShowcase.subtitle}
-                </span>
-              </div>
-
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight">
-                {selectedShowcaseTab === 'vehicle' ? podiumVehicle.name : currentShowcase.title}
-              </h2>
-              
-              <p className="text-xs sm:text-sm text-neutral-300 mb-4 leading-relaxed">
-                {currentShowcase.description}
-              </p>
-
-              {/* High-Resolution AI Showcase Photo */}
-              <div className="relative w-full h-48 sm:h-56 rounded-2xl overflow-hidden border border-white/15 mb-4 group-hover:border-amber-500/50 transition-all duration-500 shadow-2xl">
-                <img
-                  src={selectedShowcaseTab === 'vehicle' ? (podiumVehicle.imageUrl || currentShowcase.image) : currentShowcase.image}
-                  alt={currentShowcase.title}
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
-                
-                {/* Action button overlay */}
-                <button
-                  onClick={() => {
-                    setActiveModalKey(selectedShowcaseTab);
-                    if (selectedShowcaseTab === 'vehicle') playEngineRev();
-                  }}
-                  className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black/95 border border-white/20 text-white text-xs font-['Geist_Mono'] backdrop-blur-md flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105 shadow-xl"
-                >
-                  <Eye size={13} className="text-amber-400" />
-                  <span>Inspecter les détails</span>
-                </button>
-
-                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 border border-white/10 text-amber-300 font-['Geist_Mono'] text-[10px] backdrop-blur-md">
-                  Rotonde VIP // {selectedShowcaseTab.toUpperCase()}
-                </div>
-              </div>
-
-              {/* Specs Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-2xl bg-neutral-900/80 border border-white/10 mb-4 font-['Geist_Mono'] text-center">
-                {currentShowcase.specs.map((spec, sIdx) => (
-                  <div key={sIdx} className={sIdx > 0 ? 'border-l border-white/10' : ''}>
-                    <span className="text-[10px] text-neutral-400 block uppercase">{spec.label}</span>
-                    <span className={`text-xs font-bold ${spec.color || 'text-white'}`}>
-                      {spec.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Live Drop Rate Footer */}
-              <div className="flex items-center justify-between text-xs font-['Geist_Mono'] text-neutral-400 pt-1">
-                <span className="flex items-center gap-1.5">
-                  <Flame size={14} className="text-amber-400" />
-                  <span>Taux de chance à la Roue :</span>
-                </span>
-                <span className="font-bold text-amber-300">
-                  {segments.find((s) => s.type === selectedShowcaseTab)?.dropRate || 2.5}% par lancer
-                </span>
-              </div>
-            </div>
-
-            {/* VIP Cooldown reduction info banner */}
-            <div className="p-4 rounded-2xl bg-neutral-950/70 border border-white/10 flex items-center justify-between text-xs font-['Geist_Mono'] backdrop-blur-md">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={16} className="text-amber-400" />
-                <span className="text-neutral-300">Périodicité des tirages :</span>
-              </div>
-              <span className="text-amber-300 font-medium">Diamond: 8h • Gold: 12h • Citoyen: 24h</span>
-            </div>
-
-          </div>
-
+            </ul>
+            <button
+              onClick={() => setOddsModalOpen(true)}
+              className="mt-4 w-full py-2.5 rounded-lg border border-[#d9a93e]/30 text-xs text-[#f5d27a] hover:bg-[#d9a93e]/10 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              Voir les {numSegments} lots & probabilités <ChevronRight size={13} />
+            </button>
+          </aside>
         </div>
 
+        {/* ============================================================ */}
+        {/* WINNERS TICKER                                               */}
+        {/* ============================================================ */}
+        <div className="mt-14 relative overflow-hidden rounded-full border border-[#d9a93e]/25 bg-black/60 backdrop-blur py-3">
+          <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center">
+            <div className="h-full flex items-center gap-2 pl-5 pr-3 bg-black">
+              <span className="w-2 h-2 rounded-full bg-[#c42a3c] animate-pulse" />
+              <span className="font-cinzel text-[11px] tracking-[0.25em] text-[#e2b54e]">GAGNANTS</span>
+            </div>
+            <div className="h-full w-10 bg-gradient-to-r from-black to-transparent" />
+          </div>
+          <div className="absolute right-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-l from-black to-transparent" />
+          <div className="marquee-track flex w-max gap-10 pl-40 text-xs whitespace-nowrap">
+            {[...recentWinners, ...recentWinners].map((win, idx) => (
+              <span key={`${win.id}-${idx}`} className="inline-flex items-center gap-2 text-neutral-300">
+                <span className="font-semibold text-white">{win.author}</span>
+                <span className="text-[#d9a93e]">◆</span>
+                <span className="text-[#fbe7a6]">{win.prize}</span>
+                <span className="text-neutral-600 font-['Geist_Mono'] text-[10px]">{win.time}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* PRIZE SHOWCASE                                               */}
+        {/* ============================================================ */}
+        <section className="mt-20">
+          <div className="text-center mb-10">
+            <span className="font-cinzel text-xs tracking-[0.4em] text-[#e2b54e]">LA VITRINE</span>
+            <h2 className="mt-2 font-cinzel font-bold text-3xl sm:text-4xl text-gold">Ce que la roue réserve</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
+            {SHOWCASE_ORDER.map((key, idx) => {
+              const asset = PRIZE_ASSETS[key];
+              const isHero = idx === 0;
+              const title = key === 'vehicle' ? podiumVehicle.name : asset.title;
+              const image = key === 'vehicle' ? podiumVehicle.imageUrl || asset.image : asset.image;
+              return (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setActiveModalKey(key);
+                    if (key === 'vehicle') playEngineRev();
+                  }}
+                  className={`group relative text-left rounded-2xl overflow-hidden border border-[#d9a93e]/25 hover:border-[#d9a93e]/70 transition-all duration-500 cursor-pointer bg-neutral-950 ${
+                    isHero
+                      ? 'sm:col-span-2 lg:col-span-4 lg:row-span-2 min-h-[320px] lg:min-h-[480px]'
+                      : idx >= 3
+                        ? 'lg:col-span-3 min-h-[230px]'
+                        : 'lg:col-span-2 min-h-[230px]'
+                  }`}
+                >
+                  <img
+                    src={image}
+                    alt={title}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1200ms] group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                  <div className="absolute top-4 left-4 px-2.5 py-1 rounded-full bg-black/70 border border-[#d9a93e]/40 text-[10px] font-['Geist_Mono'] text-[#f5d27a] tracking-wider">
+                    {dropRateByType(key).toFixed(1)}% de chance
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6">
+                    <div className="text-[10px] font-['Geist_Mono'] tracking-[0.2em] text-[#e2b54e] uppercase mb-1">
+                      {asset.category}
+                    </div>
+                    <h3 className={`font-cinzel font-bold text-white ${isHero ? 'text-2xl sm:text-4xl' : 'text-lg sm:text-xl'}`}>
+                      {title}
+                    </h3>
+                    {isHero && <p className="mt-2 text-sm text-neutral-300 max-w-lg line-clamp-2">{asset.description}</p>}
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#fbe7a6] opacity-80 group-hover:opacity-100 transition-opacity">
+                      <Eye size={13} /> Inspecter
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Cross-link to the games lobby */}
+        <Link
+          to="/jeux"
+          className="mt-16 group flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl felt border border-[#d9a93e]/30 p-6 sm:p-8 hover:border-[#d9a93e]/70 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <span className="w-12 h-12 rounded-full btn-gold flex items-center justify-center">
+              <Dices size={22} />
+            </span>
+            <div>
+              <div className="font-cinzel font-bold text-xl text-white">Les salons de jeux vous attendent</div>
+              <div className="text-sm text-emerald-100/70">Blackjack, roulette, poker, machines à sous et Inside Track.</div>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 font-cinzel text-sm tracking-[0.2em] text-[#f5d27a] group-hover:translate-x-1 transition-transform">
+            VOIR LES JEUX <ChevronRight size={16} />
+          </span>
+        </Link>
       </div>
 
       {/* ============================================================ */}
-      {/* 5. CELEBRATION MODAL (Confetti, Fanfare & AI Prize Reveal)     */}
+      {/* CELEBRATION MODAL                                            */}
       {/* ============================================================ */}
       <AnimatePresence>
         {celebrationOpen && winningSegment && winningAsset && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl">
-            {/* Canvas Confetti Explosion */}
-            <canvas
-              ref={canvasRef}
-              className="absolute inset-0 w-full h-full pointer-events-none z-10"
-            />
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-10" />
+            <div className="absolute w-[700px] h-[700px] rounded-full bg-[conic-gradient(from_0deg,transparent,rgba(245,210,122,0.18),transparent_30%,rgba(245,210,122,0.18),transparent_60%,rgba(245,210,122,0.18),transparent_90%)] slow-spin pointer-events-none" />
 
             <motion.div
               initial={{ opacity: 0, scale: 0.85, y: 30 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.85, y: 30 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-              className="relative z-20 w-full max-w-lg rounded-3xl border border-amber-500/50 bg-neutral-950 p-6 sm:p-8 flex flex-col items-center text-center shadow-[0_0_80px_rgba(245,158,11,0.35)] overflow-hidden"
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', damping: 18, stiffness: 180 }}
+              className="relative z-20 w-full max-w-lg deco-panel rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center overflow-hidden"
             >
-              {/* Confetti & Radial Flare Background */}
-              <div className="absolute inset-0 bg-gradient-to-b from-amber-500/15 via-transparent to-transparent pointer-events-none" />
-
-              {/* Close Icon */}
               <button
                 onClick={() => setCelebrationOpen(false)}
-                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors cursor-pointer"
                 aria-label="Fermer"
               >
                 <X size={16} />
               </button>
 
-              {/* Trophy Header Badge */}
-              <div className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-['Geist_Mono'] text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                <Sparkles size={14} className="text-amber-400" />
-                <span>RÉSULTAT DU TIRAGE OFFICIEL</span>
-              </div>
+              <span className="font-cinzel text-xs tracking-[0.4em] text-[#e2b54e]">FÉLICITATIONS</span>
+              <h3 className="mt-2 font-cinzel font-black text-3xl sm:text-4xl text-gold leading-tight">{winningSegment.label}</h3>
 
-              {/* Hero Prize Graphic with Photorealistic AI Image */}
-              <div className="w-full h-48 rounded-2xl overflow-hidden border border-amber-500/40 my-3 shadow-2xl relative">
+              <div className="relative w-full h-48 rounded-2xl overflow-hidden border border-[#d9a93e]/50 my-5">
                 <img
-                  src={winningSegment.type === 'vehicle' ? (podiumVehicle.imageUrl || winningAsset.image) : winningAsset.image}
+                  src={winningSegment.type === 'vehicle' ? podiumVehicle.imageUrl || winningAsset.image : winningAsset.image}
                   alt={winningSegment.label}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/80 border border-amber-400/40 text-amber-300 font-['Geist_Mono'] text-[10px]">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-full bg-black/80 border border-[#d9a93e]/40 text-[#f5d27a] font-['Geist_Mono'] text-[10px]">
                   {winningAsset.category}
                 </div>
               </div>
 
-              {/* Winning Label */}
-              <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight">
-                {winningSegment.label}
-              </h3>
-
-              {/* Descriptive Gain Message */}
               <p className="text-sm text-neutral-300 mb-6 max-w-sm leading-relaxed">
-                {winningSegment.type === 'vehicle' && 'Félicitations citoyen ! Vous remportez la Grotti Itali RSX ! Les clés et la carte grise officielle vous attendent au garage du Penthouse.'}
-                {winningSegment.type === 'chips' && `Félicitations ! Un crédit officiel de ${Number(winningSegment.value).toLocaleString()} jetons Diamond a été versé à votre solde.`}
-                {winningSegment.type === 'cash' && `Félicitations ! Un montant de $${Number(winningSegment.value).toLocaleString()} a été transféré dans votre portefeuille bancaire RP.`}
-                {winningSegment.type === 'mystery' && `Vous ouvrez le coffre et découvrez un trésor rare : ${winningSegment.value}.`}
-                {winningSegment.type === 'clothing' && `Un habit de grand luxe a été déposé dans votre garde-robe : ${winningSegment.value}.`}
+                {winningSegment.type === 'vehicle' &&
+                  `Vous remportez la ${podiumVehicle.name} ! Les clés et la carte grise vous attendent au garage du Penthouse.`}
+                {winningSegment.type === 'chips' &&
+                  `${Number(winningSegment.value).toLocaleString('fr-FR')} jetons Diamond ont été crédités sur votre solde.`}
+                {winningSegment.type === 'cash' &&
+                  `$${Number(winningSegment.value).toLocaleString('fr-FR')} ont été transférés sur votre compte bancaire RP.`}
+                {winningSegment.type === 'mystery' && `Le coffre s'ouvre et révèle un trésor rare : ${winningSegment.value}.`}
+                {winningSegment.type === 'clothing' && `Une pièce de haute couture rejoint votre garde-robe : ${winningSegment.value}.`}
+                {!isAuthenticated && (
+                  <span className="block mt-2 text-[#e2b54e] text-xs">Mode démo — connectez-vous pour encaisser vos prochains gains.</span>
+                )}
               </p>
 
-              {/* Actions */}
               <div className="w-full flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() => setCelebrationOpen(false)}
-                  className="flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-black font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_25px_rgba(245,158,11,0.4)]"
+                  className="flex-1 py-3.5 px-6 rounded-full btn-gold font-cinzel font-bold text-sm tracking-[0.2em] uppercase cursor-pointer"
                 >
-                  Encaisser mon gain
+                  Encaisser
                 </button>
                 <Link
                   to="/espace-membre"
-                  className="py-3.5 px-6 rounded-2xl bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-white font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
+                  className="py-3.5 px-6 rounded-full border border-[#d9a93e]/40 text-[#fbe7a6] hover:bg-[#d9a93e]/10 text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <span>Espace Membre</span>
-                  <ExternalLink size={13} />
+                  Espace membre <ExternalLink size={13} />
                 </Link>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
       {/* ============================================================ */}
-      {/* 6. MODAL D'INSPECTION DÉTAILLÉE DE CHAQUE LOT                */}
+      {/* PRIZE INSPECTION MODAL                                       */}
       {/* ============================================================ */}
       <AnimatePresence>
         {activeModalKey && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl">
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveModalKey(null)}
+          >
             {(() => {
               const modalData = PRIZE_ASSETS[activeModalKey] || PRIZE_ASSETS.vehicle;
               const ActionIcon = modalData.actionIcon;
-
               return (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="relative w-full max-w-3xl rounded-3xl border border-amber-500/40 bg-neutral-950 p-6 sm:p-8 flex flex-col shadow-[0_0_90px_rgba(245,158,11,0.3)] overflow-hidden max-h-[90vh] overflow-y-auto"
+                  initial={{ opacity: 0, scale: 0.94, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.94 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative w-full max-w-4xl deco-panel rounded-3xl overflow-hidden max-h-[90vh] overflow-y-auto grid md:grid-cols-2"
                 >
                   <button
                     onClick={() => setActiveModalKey(null)}
-                    className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors cursor-pointer z-20"
+                    className="absolute top-4 right-4 p-2 rounded-full bg-black/60 hover:bg-black/90 text-neutral-300 hover:text-white transition-colors cursor-pointer z-20"
                     aria-label="Fermer"
                   >
                     <X size={18} />
                   </button>
 
-                  <div className="flex items-center gap-2 mb-2 font-['Geist_Mono'] text-xs text-amber-400">
-                    <ShieldCheck size={16} />
-                    <span>INSPECTION OFFICIELLE DIAMOND CASINO // {modalData.category}</span>
-                  </div>
-
-                  <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">
-                    {activeModalKey === 'vehicle' ? podiumVehicle.name : modalData.title}
-                  </h2>
-                  <p className="text-xs text-neutral-400 mb-4 font-['Geist_Mono']">
-                    {modalData.subtitle}
-                  </p>
-
-                  {/* Full Image */}
-                  <div className="w-full h-64 sm:h-80 rounded-2xl overflow-hidden border border-white/20 relative mb-6">
+                  <div className="relative min-h-[260px]">
                     <img
-                      src={activeModalKey === 'vehicle' ? (podiumVehicle.imageUrl || modalData.image) : modalData.image}
+                      src={activeModalKey === 'vehicle' ? podiumVehicle.imageUrl || modalData.image : modalData.image}
                       alt={modalData.title}
-                      className="w-full h-full object-cover"
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
-                    <div className="absolute bottom-3 left-3 flex gap-2">
-                      <button
-                        onClick={() => {
-                          if (activeModalKey === 'vehicle') playEngineRev();
-                          else playRatchetTick(0.15);
-                        }}
-                        className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-['Geist_Mono'] font-bold flex items-center gap-1.5 cursor-pointer shadow-lg transition-transform active:scale-95"
-                      >
-                        <ActionIcon size={14} />
-                        <span>{modalData.actionLabel}</span>
-                      </button>
+                    <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-transparent via-transparent to-black/60" />
+                    <button
+                      onClick={() => {
+                        if (activeModalKey === 'vehicle') playEngineRev();
+                        else playRatchetTick(0.15);
+                      }}
+                      className="absolute bottom-4 left-4 px-4 py-2 rounded-full btn-gold text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+                    >
+                      <ActionIcon size={14} /> {modalData.actionLabel}
+                    </button>
+                  </div>
+
+                  <div className="p-6 sm:p-8 flex flex-col">
+                    <div className="flex items-center gap-2 mb-2 font-['Geist_Mono'] text-[11px] text-[#e2b54e] tracking-wider">
+                      <ShieldCheck size={14} /> {modalData.category}
                     </div>
+                    <h2 className="font-cinzel font-bold text-3xl text-white mb-1">
+                      {activeModalKey === 'vehicle' ? podiumVehicle.name : modalData.title}
+                    </h2>
+                    <p className="text-xs text-neutral-500 mb-5 font-['Geist_Mono']">{modalData.subtitle}</p>
+                    <p className="text-sm text-neutral-300 leading-relaxed mb-6">{modalData.description}</p>
+
+                    <dl className="grid grid-cols-2 gap-2 mb-6">
+                      {modalData.specs.map((spec) => (
+                        <div key={spec.label} className="p-3 rounded-xl bg-black/50 border border-[#d9a93e]/15">
+                          <dt className="text-[10px] text-neutral-500 font-['Geist_Mono'] uppercase">{spec.label}</dt>
+                          <dd className={`text-xs font-bold font-['Geist_Mono'] ${spec.color || 'text-white'}`}>{spec.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+
+                    <button
+                      onClick={() => setActiveModalKey(null)}
+                      className="mt-auto w-full py-3 rounded-full border border-[#d9a93e]/40 text-[#fbe7a6] hover:bg-[#d9a93e]/10 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Retour à la roue
+                    </button>
                   </div>
-
-                  {/* Detailed Specs */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-['Geist_Mono'] text-center mb-6">
-                    {modalData.specs.map((spec, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-neutral-900 border border-white/10">
-                        <span className="text-[10px] text-neutral-400 block uppercase">{spec.label}</span>
-                        <span className={`text-xs font-bold ${spec.color || 'text-white'}`}>{spec.value}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed mb-6">
-                    {modalData.description}
-                  </p>
-
-                  <button
-                    onClick={() => setActiveModalKey(null)}
-                    className="w-full py-3.5 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-colors cursor-pointer"
-                  >
-                    Retour à la Roue
-                  </button>
                 </motion.div>
               );
             })()}
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
       {/* ============================================================ */}
-      {/* 7. ODDS & PRIZES TRANSPARENCY MODAL                          */}
+      {/* ODDS & RULES MODAL                                           */}
       {/* ============================================================ */}
       <AnimatePresence>
         {oddsModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl">
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOddsModalOpen(false)}
+          >
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="relative w-full max-w-2xl max-h-[85vh] rounded-3xl border border-white/15 bg-neutral-950 p-6 sm:p-8 flex flex-col shadow-2xl overflow-hidden"
+              exit={{ opacity: 0, scale: 0.94 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-2xl max-h-[85vh] deco-panel rounded-3xl p-6 sm:p-8 flex flex-col overflow-hidden"
             >
               <button
                 onClick={() => setOddsModalOpen(false)}
-                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors cursor-pointer z-10"
                 aria-label="Fermer"
               >
                 <X size={16} />
               </button>
 
-              <div className="flex items-center gap-2 mb-2 font-['Geist_Mono'] text-xs text-amber-400">
-                <ShieldCheck size={16} />
-                <span>RÉGLEMENTATION OFFICIELLE DES TIRAGES // 16 LOTS</span>
-              </div>
-
-              <h2 className="text-2xl font-bold text-white mb-2">
-                Tableau des Probabilités &amp; Dotations
-              </h2>
-              <p className="text-xs text-neutral-400 mb-4">
-                Chaque segment de la Roue est certifié équitable. Les taux de drop sont configurés par la gérance RP du Diamond Casino.
+              <span className="font-cinzel text-xs tracking-[0.35em] text-[#e2b54e]">RÈGLEMENT OFFICIEL</span>
+              <h2 className="mt-1 font-cinzel font-bold text-2xl text-white">Probabilités & dotations</h2>
+              <p className="mt-2 text-xs text-neutral-400">
+                Chaque case est tirée selon les taux configurés par la direction du Diamond Casino. Un tirage gratuit par période de
+                recharge, selon votre statut.
               </p>
 
-              {/* Scrollable list */}
-              <div className="overflow-y-auto space-y-2 pr-1 my-2 max-h-96">
-                {segments.map((seg) => (
-                  <div
-                    key={seg.id}
-                    className="p-3 rounded-xl bg-neutral-900/80 border border-white/5 flex items-center justify-between font-['Geist_Mono'] text-xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{seg.icon}</span>
-                      <div>
-                        <span className="font-bold text-white block">{seg.label}</span>
-                        <span className="text-[10px] text-neutral-400 uppercase">
-                          Type: {seg.type}
-                        </span>
+              <div className="overflow-y-auto mt-5 pr-1 grid sm:grid-cols-2 gap-2">
+                {segments.map((seg, i) => {
+                  const Icon = segmentIcon(seg);
+                  return (
+                    <div key={seg.id} className="p-3 rounded-xl bg-black/50 border border-white/5 flex items-center gap-3">
+                      <span
+                        className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center border border-[#d9a93e]/40"
+                        style={paletteSwatch(palettes[i])}
+                      >
+                        <Icon size={16} className={palettes[i] === 'gold' ? 'text-[#1d1303]' : 'text-[#f5d27a]'} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-white truncate">{seg.label}</div>
+                        <div className="text-[10px] text-neutral-500 font-['Geist_Mono'] truncate">{String(seg.value)}</div>
                       </div>
+                      <span className="font-['Geist_Mono'] text-sm font-bold text-[#f5d27a] tabular-nums">{seg.dropRate}%</span>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-amber-300 block">{seg.dropRate}%</span>
-                      <span className="text-[10px] text-neutral-400">chance</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <button
                 onClick={() => setOddsModalOpen(false)}
-                className="mt-4 w-full py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                className="mt-5 w-full py-3 rounded-full btn-gold font-cinzel font-bold text-sm tracking-[0.2em] uppercase cursor-pointer"
               >
                 Fermer
               </button>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 };

@@ -17,6 +17,7 @@ import { CtaStream } from './components/CtaStream';
 import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
 import { LuckyWheel } from './components/LuckyWheel';
+import { GamesLobby } from './components/GamesLobby';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
 import { DeveloperConsole } from './components/DeveloperConsole';
@@ -95,6 +96,24 @@ function LuckyWheelPage() {
       transition={{ duration: 0.3 }}
     >
       <LuckyWheel />
+      <Footer />
+    </motion.div>
+  );
+}
+
+/**
+ * Games Lobby Route Component (/jeux)
+ */
+function GamesPage() {
+  return (
+    <motion.div
+      key="games-page"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <GamesLobby />
       <Footer />
     </motion.div>
   );
@@ -183,6 +202,12 @@ const luckyWheelRoute = createRoute({
   component: LuckyWheelPage,
 });
 
+const gamesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/jeux',
+  component: GamesPage,
+});
+
 const subscriptionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/abonnements',
@@ -212,6 +237,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   memberPortalRoute,
   luckyWheelRoute,
+  gamesRoute,
   subscriptionsRoute,
   adminRoute,
   devRoute,

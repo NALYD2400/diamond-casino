@@ -9,14 +9,14 @@ export const Gallery: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
         <div>
           <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-1">
-            THE DIAMOND // VAULT ARCHIVE
+            THE DIAMOND // ARCHIVES
           </span>
           <h3 className="text-3xl sm:text-5xl font-semibold tracking-tight">
-            Exclusive Salons & Visual Gallery
+            Salons privés &amp; galerie
           </h3>
         </div>
         <p className="text-neutral-400 text-sm max-w-sm">
-          Curated architectural perspectives and high-roller private salon records. Pure black and white aesthetic.
+          Perspectives architecturales et coulisses des salons High Roller, en noir et blanc.
         </p>
       </div>
 
@@ -29,7 +29,7 @@ export const Gallery: React.FC = () => {
           >
             <img
               src={imgUrl}
-              alt={`Archive record ${i + 1}`}
+              alt={`Archive du casino n°${i + 1}`}
               className="w-full h-full object-cover grayscale transition-transform duration-500 group-hover:scale-110 group-hover:grayscale-0"
               loading="lazy"
             />

@@ -33,8 +33,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import type { MockCitizen, AdminLogEntry } from '../context/CasinoAdminContext';
-import type { CasinoTransaction, CasinoUser } from '../context/CasinoUserContext';
-import { dbFetchBetsHistory, dbFetchAdminLogs, dbAddAdminLog, type SupabaseBetEntry } from '../lib/supabase';
+import { mapTransaction, type CasinoTransaction, type CasinoUser } from '../context/CasinoUserContext';
+import { dbFetchBetsHistory, dbFetchAdminLogs, dbFetchTransactions, type SupabaseBetEntry } from '../lib/supabase';
 import { getDefaultDiscordAvatar } from '../lib/discord';
 
 export type CitizenModalTab = 'profile' | 'transactions' | 'wins' | 'logs';
@@ -44,7 +44,8 @@ interface CitizenProfileSheetProps {
   onClose: () => void;
   onSave: (updated: MockCitizen) => void;
   onUpdateLive?: (updated: MockCitizen) => void;
-  onResetCooldown: (citizenId: string) => void;
+  onResetCooldown: (citizenId: string) => Promise<boolean> | void;
+  onAdjustBalance: (chipsDelta: number, cashDelta: number, reason: string) => Promise<boolean>;
   adminLogs: AdminLogEntry[];
   onAddLog: (action: string, category: 'WHEEL' | 'ECONOMY' | 'CITIZEN' | 'SYSTEM', detail: string) => void;
   showToast: (msg: string) => void;
@@ -57,6 +58,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
   onSave,
   onUpdateLive,
   onResetCooldown,
+  onAdjustBalance,
   adminLogs,
   onAddLog,
   showToast,
@@ -67,22 +69,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
   const [copiedMatricule, setCopiedMatricule] = useState<boolean>(false);
 
   // Editable Draft State
-  const [draft, setDraft] = useState<MockCitizen>(() => {
-    const init = { ...citizen };
-    try {
-      const savedNoteRaw = localStorage.getItem(`diamond_casino_citizen_note_${citizen.citizenId}`);
-      if (savedNoteRaw) {
-        const parsed = JSON.parse(savedNoteRaw);
-        if (parsed?.adminNote) {
-          init.adminNote = parsed.adminNote;
-          init.adminNoteAuthor = parsed.adminNoteAuthor;
-          init.adminNoteDate = parsed.adminNoteDate;
-          init.adminNoteSeverity = parsed.adminNoteSeverity || 'surveillance';
-        }
-      }
-    } catch {}
-    return init;
-  });
+  const [draft, setDraft] = useState<MockCitizen>(() => ({ ...citizen }));
 
   // Transactions State
   const [transactions, setTransactions] = useState<CasinoTransaction[]>([]);
@@ -109,8 +96,6 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
   const [logScope, setLogScope] = useState<'citizen' | 'all'>('citizen');
 
-  // Storage key for citizen transactions
-  const storageKey = `diamond_casino_citizen_tx_${citizen.citizenId}`;
 
   // Fetch real live logs directly from Supabase
   const loadLiveLogs = async () => {
@@ -145,54 +130,38 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
     }
   };
 
+  const loadTransactions = async () => {
+    try {
+      const rows = await dbFetchTransactions(citizen.profileId, 200);
+      setTransactions(rows.map(mapTransaction));
+    } catch {
+      setTransactions([]);
+    }
+  };
+
   // Initial load of transactions, Supabase bets & real audit logs
   useEffect(() => {
-    // 1. Real Transactions (no fake seeding)
-    let loaded: CasinoTransaction[] = [];
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        loaded = JSON.parse(raw);
-      }
-    } catch {
-      loaded = [];
-    }
+    void loadTransactions();
 
-    if (currentUser && (currentUser.citizenId === citizen.citizenId || currentUser.id === citizen.citizenId)) {
-      const userTx = currentUser.transactions || [];
-      const map = new Map<string, CasinoTransaction>();
-      [...userTx, ...loaded].forEach((t) => map.set(t.id, t));
-      loaded = Array.from(map.values());
-    }
-
-    setTransactions(loaded);
-
-    // 2. Fetch Bets / Wins from Supabase
     setIsLoadingBets(true);
-    const targetIdent = citizen.citizenId || citizen.discordId;
-    dbFetchBetsHistory(targetIdent, 100)
-      .then((records) => {
-        setBets(records);
-      })
-      .catch(() => {
-        setBets([]);
-      })
-      .finally(() => {
-        setIsLoadingBets(false);
-      });
+    dbFetchBetsHistory(citizen.profileId, 100)
+      .then(setBets)
+      .catch(() => setBets([]))
+      .finally(() => setIsLoadingBets(false));
 
-    // 3. Fetch Real Live Logs directly from Supabase
-    loadLiveLogs();
-  }, [citizen.citizenId, citizen.discordId]);
+    void loadLiveLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [citizen.profileId]);
 
-  const displayDiscordId = draft.discordId || (draft.citizenId.length >= 16 ? draft.citizenId : '1015312426169923665');
+  const displayDiscordId = draft.discordId || '';
   const matricule = draft.citizenId.startsWith('test_') ? '#test' : `#${draft.citizenId}`;
   const displayName = `${draft.rpFirstName} ${draft.rpLastName}`.trim();
-  const avatar = draft.avatarUrl || getDefaultDiscordAvatar(displayDiscordId);
+  const avatar = draft.avatarUrl || getDefaultDiscordAvatar(displayDiscordId || draft.citizenId);
 
   const handleCopyDiscordId = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(displayDiscordId);
+    if (!displayDiscordId) return;
+    navigator.clipboard.writeText(displayDiscordId).catch(() => {});
     setCopiedId(true);
     showToast(`ID Discord ${displayDiscordId} copié`);
     setTimeout(() => setCopiedId(false), 2000);
@@ -200,7 +169,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
 
   const handleCopyMatricule = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(draft.citizenId);
+    navigator.clipboard.writeText(draft.citizenId).catch(() => {});
     setCopiedMatricule(true);
     showToast(`Matricule #${draft.citizenId} copié`);
     setTimeout(() => setCopiedMatricule(false), 2000);
@@ -249,25 +218,25 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
   };
 
   const formatDate = (dateStr?: string | number | null) => {
-    if (!dateStr) return '20/09/2026';
+    if (!dateStr) return '—';
     try {
       const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '20/09/2026';
+      if (isNaN(d.getTime())) return '—';
       return d.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
       });
     } catch {
-      return '20/09/2026';
+      return '—';
     }
   };
 
   const formatDateTime = (dateStr?: string | number | null) => {
-    if (!dateStr) return '20/09/2026 12:00';
+    if (!dateStr) return '—';
     try {
       const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '20/09/2026 12:00';
+      if (isNaN(d.getTime())) return '—';
       return d.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: 'short',
@@ -276,87 +245,42 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
         minute: '2-digit',
       });
     } catch {
-      return '20/09/2026 12:00';
+      return '—';
     }
   };
 
-  // Reset Wheel Cooldown for this citizen
-  const handleUnlockWheel = () => {
-    onResetCooldown(draft.citizenId);
-    const updatedDraft = {
-      ...draft,
-      wheelCooldownRemaining: 'Disponible',
-      lastSpinTimestamp: null,
-    };
-    setDraft(updatedDraft);
-    onUpdateLive?.(updatedDraft);
-    onAddLog(
-      'Déblocage Roue Fiche',
-      'WHEEL',
-      `Cooldown Roue réinitialisé depuis la fiche #${draft.citizenId} (${displayName})`
-    );
+  // Reset Wheel Cooldown for this citizen (logged server-side)
+  const handleUnlockWheel = async () => {
+    const ok = await onResetCooldown(draft.citizenId);
+    if (ok === false) return;
+    setDraft((d) => ({ ...d, wheelCooldownRemaining: 'Disponible', lastSpinTimestamp: null }));
     showToast(`Tirage débloqué pour ${displayName} !`);
   };
 
-  // Add Manual Deposit / Transaction
-  const handleCreateTransaction = () => {
-    const amt = Number(depositAmount);
+  // Manual balance operation (server-side, recorded as a transaction)
+  const handleCreateTransaction = async () => {
+    const amt = Math.floor(Number(depositAmount));
     if (!amt || amt <= 0 || isNaN(amt)) {
       showToast('Veuillez entrer un montant valide');
       return;
     }
 
-    let type: CasinoTransaction['type'] = 'deposit';
     let label = depositNote.trim();
-    let category: CasinoTransaction['category'] = 'Caisse Casino';
-    let amountChips: number | undefined = undefined;
-    let amountCash: number | undefined = undefined;
-    let updatedDraft = { ...draft };
-
+    let chipsDelta = amt;
     if (depositType === 'withdrawal') {
-      type = 'withdrawal';
       label = label || 'Débit / Retrait de Jetons';
-      amountChips = -amt;
-      updatedDraft.chips = Math.max(0, (updatedDraft.chips || 0) - amt);
+      chipsDelta = -amt;
     } else if (depositType === 'bonus') {
-      type = 'bonus';
       label = label || 'Bonus / Gratification Direction';
-      category = 'Bonus';
-      amountChips = amt;
-      updatedDraft.chips = (updatedDraft.chips || 0) + amt;
     } else {
-      type = 'deposit';
       label = label || 'Achat / Crédit de Jetons Casino';
-      amountChips = amt;
-      updatedDraft.chips = (updatedDraft.chips || 0) + amt;
     }
 
-    setDraft(updatedDraft);
-    onUpdateLive?.(updatedDraft);
+    const ok = await onAdjustBalance(chipsDelta, 0, label);
+    if (!ok) return;
 
-    const newTx: CasinoTransaction = {
-      id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      type,
-      label,
-      amountChips,
-      amountCash,
-      date: new Date().toISOString(),
-      status: 'CONFIRMÉ',
-      category,
-    };
-
-    const updated = [newTx, ...transactions];
-    setTransactions(updated);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-    } catch {}
-
-    onAddLog(
-      'Transaction Citoyen',
-      'ECONOMY',
-      `${label} (${amt.toLocaleString()}) pour #${draft.citizenId} (${displayName})`
-    );
-
+    setDraft((d) => ({ ...d, chips: Math.max(0, (d.chips || 0) + chipsDelta) }));
+    await loadTransactions();
     setDepositAmount('');
     setDepositNote('');
     setShowDepositForm(false);
@@ -370,13 +294,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
 
     const severity = customSeverity || adminNoteSeverity;
     const author = currentUser?.rpFirstName ? `${currentUser.rpFirstName} ${currentUser.rpLastName}` : 'Console Admin';
-    const now = new Date().toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const now = new Date().toISOString();
 
     const severityTag = severity.toUpperCase();
     const detail = `[${severityTag}] Fiche #${draft.citizenId} (${displayName}): ${note}`;
@@ -392,17 +310,6 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
     setDraft(newDraft);
     onUpdateLive?.(newDraft);
 
-    try {
-      localStorage.setItem(
-        `diamond_casino_citizen_note_${draft.citizenId}`,
-        JSON.stringify({
-          adminNote: note,
-          adminNoteAuthor: author,
-          adminNoteDate: now,
-          adminNoteSeverity: severity,
-        })
-      );
-    } catch {}
 
     const newEntry: AdminLogEntry = {
       id: `log_note_${Date.now()}`,
@@ -415,12 +322,6 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
 
     setLiveLogs((prev) => [newEntry, ...prev]);
     onAddLog('Note Administrative', 'CITIZEN', detail);
-    dbAddAdminLog({
-      action: 'Note Administrative',
-      category: 'CITIZEN',
-      detail,
-      author,
-    }).catch(() => {});
 
     setAdminNote('');
     setShowNoteEditor(false);
@@ -450,9 +351,6 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
     setDraft(newDraft);
     onUpdateLive?.(newDraft);
 
-    try {
-      localStorage.removeItem(`diamond_casino_citizen_note_${draft.citizenId}`);
-    } catch {}
 
     const detail = `Note administrative levée pour #${draft.citizenId} (${displayName})${previousNote ? ` (Ancienne: "${previousNote}")` : ''}`;
     const newEntry: AdminLogEntry = {
@@ -466,35 +364,18 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
 
     setLiveLogs((prev) => [newEntry, ...prev]);
     onAddLog('Note Résolue', 'CITIZEN', detail);
-    dbAddAdminLog({
-      action: 'Note Résolue',
-      category: 'CITIZEN',
-      detail,
-      author,
-    }).catch(() => {});
 
     showToast(`Note administrative levée pour ${displayName}.`);
   };
 
   // Close safely preserving any live adjustments
   const handleClose = () => {
-    if (JSON.stringify(draft) !== JSON.stringify(citizen)) {
-      onUpdateLive?.(draft);
-    }
     onClose();
   };
 
   // Save all profile changes
   const handleSaveAll = () => {
     onSave(draft);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(transactions));
-      if (draft.citizenId !== citizen.citizenId) {
-        localStorage.setItem(`diamond_casino_citizen_tx_${draft.citizenId}`, JSON.stringify(transactions));
-      }
-    } catch {}
-    showToast(`Fiche de ${displayName} mise à jour avec succès.`);
-    onClose();
   };
 
   // Filtered transactions
@@ -561,29 +442,15 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
         id: b.id || `bet_${Math.random()}`,
         label: b.result_data?.segment || (b.win_amount > 0 ? `Gain ${b.win_amount.toLocaleString()} jetons` : 'Tirage Roue'),
         type: b.result_data?.type || 'chips',
-        value: b.result_data?.value || b.win_amount,
-        date: b.result_data?.timestamp || b.created_at || new Date().toISOString(),
-        source: 'Supabase OxMySQL',
+        value: (b.result_data?.value as string | number | undefined) ?? b.win_amount,
+        date: b.created_at,
+        source: 'Historique des tirages',
       });
-    });
-
-    // From transactions of type spin_reward
-    transactions.forEach((t) => {
-      if (t.type === 'spin_reward') {
-        list.push({
-          id: t.id,
-          label: t.label,
-          type: 'chips',
-          value: t.amountChips ? `${t.amountChips.toLocaleString()} Jetons` : 'Lot Gagné',
-          date: t.date,
-          source: 'Journal Caisse',
-        });
-      }
     });
 
     // Sort by date descending
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [bets, transactions]);
+  }, [bets]);
 
   // Filtered Logs for this citizen or full casino audit trail
   const citizenLogs = useMemo(() => {
@@ -1118,13 +985,10 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                       onChange={(e) => setDraft({ ...draft, role: e.target.value })}
                       className="w-full h-11 px-3.5 rounded-xl bg-neutral-900 border border-white/10 text-white font-mono uppercase focus:outline-none focus:border-white cursor-pointer"
                     >
-                      <option value="PROPRIÉTAIRE FONDATEUR" className="bg-black">👑 PROPRIÉTAIRE FONDATEUR</option>
-                      <option value="DÉVELOPPEUR" className="bg-black">💻 DÉVELOPPEUR</option>
-                      <option value="ADMINISTRATEUR" className="bg-black">🛡️ ADMINISTRATEUR</option>
-                      <option value="VIP DIAMOND" className="bg-black">💎 VIP DIAMOND</option>
-                      <option value="HIGH ROLLER" className="bg-black">⭐ HIGH ROLLER</option>
-                      <option value="DIRECTEUR CASINO" className="bg-black">🎩 DIRECTEUR CASINO</option>
-                      <option value="MEMBRE" className="bg-black">🌲 CITOYEN / MEMBRE</option>
+                      <option value="FONDATEUR" className="bg-black">FONDATEUR</option>
+                      <option value="DÉVELOPPEUR" className="bg-black">DÉVELOPPEUR</option>
+                      <option value="DIRECTEUR CASINO" className="bg-black">DIRECTEUR CASINO</option>
+                      <option value="MEMBRE" className="bg-black">CITOYEN / MEMBRE</option>
                     </select>
                   </div>
 

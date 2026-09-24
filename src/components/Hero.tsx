@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
-import { Disc, User, Sparkles } from 'lucide-react';
+import { Disc, User } from 'lucide-react';
 import { fadeUp } from '../constants/animations';
+import { apiSubscribeEvents } from '../lib/supabase';
 
-interface HeroProps {
-  onNavigateToWheel?: () => void;
-  onNavigateToMemberPortal?: () => void;
-}
-
-export const Hero: React.FC<HeroProps> = ({ onNavigateToWheel, onNavigateToMemberPortal }) => {
+export const Hero: React.FC = () => {
   const [emailInput, setEmailInput] = useState<string>('');
-  const [subscribed, setSubscribed] = useState<boolean>(false);
+  const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput) return;
-    setSubscribed(true);
-    setTimeout(() => {
+    const email = emailInput.trim();
+    if (!email || status === 'sending') return;
+    setStatus('sending');
+    try {
+      await apiSubscribeEvents(email);
+      setStatus('done');
       setEmailInput('');
-      setSubscribed(false);
-    }, 4000);
+    } catch (err) {
+      setErrorMessage((err as Error).message);
+      setStatus('error');
+    }
   };
 
   return (
@@ -65,7 +67,6 @@ export const Hero: React.FC<HeroProps> = ({ onNavigateToWheel, onNavigateToMembe
         >
           <Link
             to="/roue-de-la-fortune"
-            onClick={() => onNavigateToWheel?.()}
             className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 transition-transform duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 shadow-[0_0_30px_rgba(245,158,11,0.35)] cursor-pointer"
           >
             <Disc size={17} />
@@ -74,7 +75,6 @@ export const Hero: React.FC<HeroProps> = ({ onNavigateToWheel, onNavigateToMembe
 
           <Link
             to="/espace-membre"
-            onClick={() => onNavigateToMemberPortal?.()}
             className="liquid-glass border border-white/20 hover:bg-white/10 text-white font-semibold text-xs sm:text-sm tracking-wide rounded-full px-7 sm:px-8 py-4 transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.1)]"
           >
             <User size={16} />
@@ -88,21 +88,33 @@ export const Hero: React.FC<HeroProps> = ({ onNavigateToWheel, onNavigateToMembe
           onSubmit={handleSubscribe}
           className="liquid-glass rounded-full p-2 max-w-lg w-full flex items-center justify-between shadow-[0_0_40px_rgba(255,255,255,0.06)]"
         >
+          <label htmlFor="hero-email" className="sr-only">Adresse e-mail</label>
           <input
+            id="hero-email"
             type="email"
             required
+            maxLength={254}
+            autoComplete="email"
             value={emailInput}
-            onChange={(e) => setEmailInput(e.target.value)}
+            onChange={(e) => {
+              setEmailInput(e.target.value);
+              if (status !== 'idle' && status !== 'sending') setStatus('idle');
+            }}
             placeholder="Recevoir les alertes événements RP"
-            className="bg-transparent border-none outline-none px-6 text-sm sm:text-base text-white placeholder:text-neutral-500 flex-1 font-['Inter_Tight']"
+            className="bg-transparent border-none outline-none px-4 sm:px-6 text-sm sm:text-base text-white placeholder:text-neutral-500 flex-1 min-w-0 font-['Inter_Tight']"
           />
           <button
             type="submit"
-            className="bg-white text-black font-bold text-xs tracking-wider uppercase rounded-full px-6 sm:px-8 py-3.5 transition-transform duration-200 hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
+            disabled={status === 'sending'}
+            className="bg-white text-black font-bold text-xs tracking-wider uppercase rounded-full px-5 sm:px-8 py-3.5 transition-transform duration-200 hover:scale-105 active:scale-95 shrink-0 cursor-pointer disabled:opacity-60"
           >
-            {subscribed ? "ENVOYÉ" : "S'INSCRIRE"}
+            {status === 'sending' ? 'ENVOI…' : status === 'done' ? 'INSCRIT ✓' : "S'INSCRIRE"}
           </button>
         </motion.form>
+        <p className="mt-3 h-5 text-xs font-['Geist_Mono'] text-center" role="status" aria-live="polite">
+          {status === 'done' && <span className="text-emerald-400">Inscription confirmée. À très vite au Diamond.</span>}
+          {status === 'error' && <span className="text-red-400">{errorMessage}</span>}
+        </p>
       </div>
     </section>
   );

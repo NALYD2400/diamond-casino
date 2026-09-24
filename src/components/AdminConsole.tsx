@@ -71,6 +71,11 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
     updateEconomy,
     citizens,
     updateCitizen,
+    adjustCitizenBalance,
+    setCitizenVip,
+    vipRequests,
+    rejectVipRequest,
+    lastError,
     resetCitizenWheelCooldown,
     resetAllWheelCooldowns,
     deleteCitizen,
@@ -81,7 +86,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
     totalSpinsCount,
   } = useCasinoAdmin();
 
-  const { user, claimWheelReward, subscribeVipTier, resetSpinCooldown } = useCasinoUser();
+  const { user, isLoading: isUserLoading } = useCasinoUser();
 
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     if (initialTab) return initialTab;
@@ -125,51 +130,35 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
   const [quickMoneyAmount, setQuickMoneyAmount] = useState<string>('');
   const [quickMoneyReason, setQuickMoneyReason] = useState<string>('');
 
-  const handleApplyQuickMoney = (explicitDelta?: number) => {
+  const handleApplyQuickMoney = async (explicitDelta?: number) => {
     if (!quickMoneyCitizen) return;
 
-    let amt = explicitDelta !== undefined ? explicitDelta : Math.max(0, parseInt(quickMoneyAmount) || 0);
+    const amt = explicitDelta !== undefined ? explicitDelta : Math.max(0, parseInt(quickMoneyAmount) || 0);
     if (!amt || amt <= 0 || isNaN(amt)) {
       showToast('Veuillez entrer un montant valide supérieur à 0');
       return;
     }
 
-    const currentVal = quickMoneyCitizen.chips || 0;
-    const sign = quickMoneyOperation === 'add' ? 1 : -1;
-    const delta = sign * amt;
-    const newVal = Math.max(0, currentVal + delta);
-    const actualDelta = newVal - currentVal;
-
-    updateCitizen(quickMoneyCitizen.citizenId, { chips: newVal });
-
-    const opDisplay = actualDelta >= 0 ? `+${actualDelta.toLocaleString()}` : `${actualDelta.toLocaleString()}`;
-    const reasonText = quickMoneyReason.trim() ? ` — Motif: ${quickMoneyReason.trim()}` : '';
-
-    addLog(
-      'Ajustement Jetons',
-      'ECONOMY',
-      `${opDisplay} ⛁ Jetons pour #${quickMoneyCitizen.citizenId} (${quickMoneyCitizen.rpFirstName} ${quickMoneyCitizen.rpLastName})${reasonText}`
+    const delta = (quickMoneyOperation === 'add' ? 1 : -1) * amt;
+    const ok = await adjustCitizenBalance(
+      quickMoneyCitizen.profileId,
+      delta,
+      0,
+      quickMoneyReason.trim() || `Ajustement console (${delta > 0 ? '+' : ''}${delta.toLocaleString('fr-FR')} jetons)`,
     );
+    if (!ok) return;
 
-    try {
-      const txKey = `diamond_casino_citizen_tx_${quickMoneyCitizen.citizenId}`;
-      const existingTx = JSON.parse(localStorage.getItem(txKey) || '[]');
-      const newTx = {
-        id: `tx_quick_${Date.now()}`,
-        type: actualDelta >= 0 ? 'chips_buy' : 'withdrawal',
-        label: quickMoneyReason.trim() || `Ajustement Jetons Console (${opDisplay} ⛁)`,
-        amountChips: actualDelta,
-        category: 'Ajustement Console',
-        date: new Date().toISOString(),
-      };
-      localStorage.setItem(txKey, JSON.stringify([newTx, ...existingTx]));
-    } catch {}
-
-    showToast(`Solde #${quickMoneyCitizen.citizenId} mis à jour : ${newVal.toLocaleString()} ⛁ Jetons (${opDisplay})`);
+    showToast(`Solde #${quickMoneyCitizen.citizenId} mis à jour (${delta > 0 ? '+' : ''}${delta.toLocaleString('fr-FR')} jetons)`);
     setQuickMoneyCitizen(null);
     setQuickMoneyAmount('');
     setQuickMoneyReason('');
   };
+
+  // Surface server-side refusals (RLS / role checks) as toasts
+  useEffect(() => {
+    if (lastError) showToast(lastError.message);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastError]);
 
   const [vaultActionAmount, setVaultActionAmount] = useState<string>('');
   const [simResults, setSimResults] = useState<{ total: number; counts: Record<number, number> } | null>(null);
@@ -178,9 +167,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
 
   // Dev tab specific states
   const [isPinging, setIsPinging] = useState<boolean>(false);
-  const [webhookStatus, setWebhookStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [customChipsAmount, setCustomChipsAmount] = useState<string>('50000');
-  const [rawSqlInput, setRawSqlInput] = useState<string>('SELECT count(*) FROM casino_profiles;');
   const [queryOutput, setQueryOutput] = useState<string | null>(null);
   const [isQuerying, setIsQuerying] = useState<boolean>(false);
   const [storageUsage, setStorageUsage] = useState<number>(0);
@@ -208,14 +195,16 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
       const counts: Record<number, number> = {};
       segments.forEach((s) => (counts[s.id] = 0));
 
-      const totalWeight = segments.reduce((acc, s) => acc + (s.dropRate > 0 ? s.dropRate : 1), 0);
+      // Same weighting as the server (spin_wheel): a 0 % segment never wins
+      const weightOf = (s: WheelSegmentConfig) => Math.max(0, Number(s.dropRate) || 0);
+      const totalWeight = segments.reduce((acc, s) => acc + weightOf(s), 0);
 
       for (let i = 0; i < spins; i++) {
         let rand = Math.random() * totalWeight;
-        let chosenId = segments[0].id;
+        let chosenId = segments[segments.length - 1].id;
         for (let j = 0; j < segments.length; j++) {
-          const w = segments[j].dropRate > 0 ? segments[j].dropRate : 1;
-          if (rand < w) {
+          const w = totalWeight > 0 ? weightOf(segments[j]) : 1;
+          if (w > 0 && rand < w) {
             chosenId = segments[j].id;
             break;
           }
@@ -260,80 +249,64 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
     }
   };
 
-  const handleTestWebhook = () => {
-    setWebhookStatus('testing');
-    setTimeout(() => {
-      setWebhookStatus('success');
-      showToast('Webhook Discord testé : Ping envoyé avec succès.');
-      setTimeout(() => setWebhookStatus('idle'), 4000);
-    }, 600);
+  const handleAddCustomChips = async (explicit?: number) => {
+    const amt = explicit ?? Number(customChipsAmount);
+    if (!user || !amt || amt <= 0) return;
+    const ok = await adjustCitizenBalance(user.id, amt, 0, 'Injection Développeur (test)');
+    if (ok) showToast(`+${amt.toLocaleString('fr-FR')} jetons crédités.`);
   };
 
-  const handleAddCustomChips = () => {
-    const amt = Number(customChipsAmount);
-    if (!amt || amt <= 0) return;
-    claimWheelReward({ type: 'chips', value: amt, label: 'Injection Développeur' });
-    showToast(`+${amt.toLocaleString()} jetons injectés.`);
-  };
-
-  const handleSetVipTier = (tier: 'SILVER' | 'GOLD' | 'DIAMOND') => {
-    subscribeVipTier(tier);
-    showToast(`Statut VIP activé : ${tier}`);
+  const handleSetVipTier = async (tier: 'SILVER' | 'GOLD' | 'DIAMOND') => {
+    if (!user) return;
+    const ok = await setCitizenVip(user.id, tier, false);
+    if (ok) showToast(`Statut VIP activé : ${tier}`);
   };
 
   const handleExecuteQuery = async () => {
     setIsQuerying(true);
     setQueryOutput(null);
     try {
-      const { count, error } = await supabase
-        .from('casino_profiles')
-        .select('*', { count: 'exact', head: true });
-
-      if (error) {
-        setQueryOutput(`[ERROR] ${error.message}\nCode: ${error.code}`);
-      } else {
-        setQueryOutput(
-          JSON.stringify(
-            {
-              status: 200,
-              query: rawSqlInput,
-              executedAt: new Date().toISOString(),
-              result: {
-                total_registered_profiles: count || 0,
-                table: 'casino_profiles',
-                connection: 'OxMySQL / PostgreSQL Pool Connected',
-                engine_latency: `${healthData?.latencyMs || 42}ms`,
-              },
-            },
-            null,
-            2
-          )
-        );
-      }
-    } catch (e: any) {
-      setQueryOutput(`[EXCEPTION] ${e.message || 'Network error'}`);
+      const tables = ['profiles', 'bets_history', 'casino_transactions', 'admin_logs', 'casino_settings'] as const;
+      const counts = await Promise.all(
+        tables.map(async (table) => {
+          const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
+          return [table, error ? `ERREUR : ${error.message}` : count ?? 0] as const;
+        }),
+      );
+      setQueryOutput(
+        JSON.stringify(
+          {
+            executedAt: new Date().toISOString(),
+            latencyMs: healthData?.latencyMs ?? null,
+            rowsVisibleWithYourRole: Object.fromEntries(counts),
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (e) {
+      setQueryOutput(`[EXCEPTION] ${(e as Error).message || 'Erreur réseau'}`);
     } finally {
       setIsQuerying(false);
     }
   };
 
   const handleClearCache = () => {
-    const auth = localStorage.getItem('diamond_casino_auth_token');
-    const known = localStorage.getItem('diamond_casino_known_discord_profiles_v1');
-    localStorage.clear();
-    if (auth) localStorage.setItem('diamond_casino_auth_token', auth);
-    if (known) localStorage.setItem('diamond_casino_known_discord_profiles_v1', known);
-    showToast('Cache nettoyé.');
-    setTimeout(() => window.location.reload(), 800);
+    // Only this app's own preferences: never the Supabase session
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('diamond_')) localStorage.removeItem(key);
+    }
+    showToast('Cache local nettoyé.');
   };
 
   const handleDownloadFullDump = () => {
     const dump = {
       generatedAt: new Date().toISOString(),
-      user,
+      user: user ? { ...user, transactions: user.transactions.length } : null,
       economy,
+      wheel: { cooldownHours: wheelCooldownHours, segments },
       healthData,
-      localStorageDump: { ...localStorage },
     };
     const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -439,6 +412,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
       return '20/09/2026';
     }
   };
+
+  if (isUserLoading) {
+    return (
+      <div className="w-full h-screen bg-black text-neutral-400 flex items-center justify-center font-['Geist_Mono'] text-xs tracking-[3px] uppercase">
+        Vérification des accès…
+      </div>
+    );
+  }
 
   if (!hasAdminPermissions(user)) {
     return (
@@ -670,10 +651,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               </div>
               <div className="hidden md:flex flex-col min-w-0">
                 <span className="text-xs font-bold text-white truncate leading-tight">
-                  {user?.rpFirstName ? `${user.rpFirstName} ${user.rpLastName}` : 'Antonio Depresto'}
+                  {user ? `${user.rpFirstName} ${user.rpLastName}` : ''}
                 </span>
                 <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mt-0.5">
-                  {user?.role || 'DÉVELOPPEUR'}
+                  {user?.role}
                 </span>
               </div>
             </div>
@@ -715,6 +696,46 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                   </button>
                 </div>
               </div>
+
+              {/* Pending VIP requests */}
+              {vipRequests.length > 0 && (
+                <div className="p-5 rounded-2xl bg-amber-500/[0.04] border border-amber-500/25 flex flex-col gap-3">
+                  <div className="flex items-center gap-2 text-amber-300 text-xs font-bold uppercase tracking-wider">
+                    <Crown size={14} /> Demandes VIP en attente ({vipRequests.length})
+                  </div>
+                  {vipRequests.map((req) => (
+                    <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-black/40 border border-white/5">
+                      <div className="text-xs">
+                        <span className="text-white font-semibold">
+                          {req.citizen ? `${req.citizen.rpFirstName} ${req.citizen.rpLastName}` : 'Citoyen'}
+                        </span>
+                        <span className="text-neutral-500 font-mono"> #{req.citizen?.citizenId ?? '?'}</span>
+                        <span className="text-neutral-400"> — carte </span>
+                        <span className="text-amber-300 font-bold">{req.tier}</span>
+                        <span className="text-neutral-500"> · {new Date(req.createdAt).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            if (await setCitizenVip(req.profileId, req.tier, true)) showToast(`VIP ${req.tier} activé (paiement validé).`);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-white text-black text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-200 cursor-pointer"
+                        >
+                          Valider
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (await rejectVipRequest(req.id)) showToast('Demande VIP refusée.');
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-white/15 text-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-white/10 cursor-pointer"
+                        >
+                          Refuser
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* 4 Primary KPI Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -882,9 +903,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                     <span>{isSimulating ? 'Calcul...' : 'Simuler 1 000 Spins'}</span>
                   </button>
                   <button
-                    onClick={() => {
-                      resetAllWheelCooldowns();
-                      showToast('Tous les cooldowns de roue ont été réinitialisés.');
+                    onClick={async () => {
+                      if (await resetAllWheelCooldowns()) showToast('Tous les cooldowns de roue ont été réinitialisés.');
                     }}
                     className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-medium text-neutral-200 hover:text-white transition-colors flex items-center gap-2 cursor-pointer"
                   >
@@ -1770,24 +1790,17 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                     </div>
                   </div>
 
-                  {/* Webhook Discord */}
+                  {/* Discord OAuth */}
                   <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
                     <div className="flex items-center gap-3">
                       <Radio size={16} className="text-neutral-400" />
-                      <span className="text-neutral-300">Webhook Discord Rôles</span>
+                      <span className="text-neutral-300">Connexion Discord (Supabase Auth)</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleTestWebhook}
-                        disabled={webhookStatus === 'testing'}
-                        className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-[10px] uppercase tracking-wider text-neutral-300 hover:text-white transition-colors cursor-pointer"
-                      >
-                        {webhookStatus === 'testing' ? 'Envoi...' : 'Tester Ping'}
-                      </button>
-                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white/10 text-white border border-white/20">
-                        CONNECTÉ (Synchro active)
-                      </span>
-                    </div>
+                    <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                      user?.isDiscordSynced ? 'bg-white/10 text-white border border-white/20' : 'bg-amber-400/20 text-amber-400 border border-amber-400/30'
+                    }`}>
+                      {user?.isDiscordSynced ? 'COMPTE LIÉ' : 'NON LIÉ'}
+                    </span>
                   </div>
 
                   {/* Mode Maintenance */}
@@ -1851,7 +1864,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                         placeholder="Montant"
                       />
                       <button
-                        onClick={handleAddCustomChips}
+                        onClick={() => handleAddCustomChips()}
                         className="px-5 h-11 rounded-xl bg-white text-black font-semibold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-colors cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                       >
                         Injecter
@@ -1862,10 +1875,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                       {[10000, 50000, 250000].map((amt) => (
                         <button
                           key={amt}
-                          onClick={() => {
-                            claimWheelReward({ type: 'chips', value: amt, label: 'Injection Développeur' });
-                            showToast(`+${amt.toLocaleString()} jetons crédités.`);
-                          }}
+                          onClick={() => handleAddCustomChips(amt)}
                           className="py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-neutral-300 hover:text-white transition-colors text-center cursor-pointer"
                         >
                           +{amt.toLocaleString()}
@@ -1934,9 +1944,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                         <span className="text-[11px] text-neutral-500">Débloquer mon spin immédiatement</span>
                       </div>
                       <button
-                        onClick={() => {
-                          resetSpinCooldown();
-                          showToast('Cooldown réinitialisé !');
+                        onClick={async () => {
+                          if (user && (await resetCitizenWheelCooldown(user.id))) showToast('Cooldown réinitialisé !');
                         }}
                         className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
                       >
@@ -1975,20 +1984,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                     className="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 transition-colors flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                   >
                     <Zap size={13} />
-                    <span>{isQuerying ? 'Exécution...' : 'Tester Requête'}</span>
+                    <span>{isQuerying ? 'Exécution...' : 'Diagnostic Tables'}</span>
                   </button>
                 </div>
 
                 <div className="space-y-3 font-mono text-xs">
-                  <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-neutral-400">
-                    <span className="text-white font-bold">&gt;</span>
-                    <input
-                      type="text"
-                      value={rawSqlInput}
-                      onChange={(e) => setRawSqlInput(e.target.value)}
-                      className="flex-1 bg-transparent text-white outline-none"
-                    />
-                  </div>
+                  <p className="text-neutral-500">
+                    Compte les lignes visibles avec votre rôle (les règles RLS s'appliquent).
+                  </p>
 
                   {queryOutput && (
                     <pre className="p-4 rounded-xl bg-black border border-white/10 text-neutral-300 overflow-x-auto text-[11px] leading-relaxed max-h-60">
@@ -2355,10 +2358,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                   Annuler
                 </button>
                 <button
-                  onClick={() => {
-                    deleteCitizen(deletingCitizen.citizenId);
-                    showToast(`Citoyen #${deletingCitizen.citizenId} supprimé.`);
+                  onClick={async () => {
+                    const target = deletingCitizen;
                     setDeletingCitizen(null);
+                    if (await deleteCitizen(target.profileId)) showToast(`Citoyen #${target.citizenId} supprimé.`);
                   }}
                   className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold uppercase tracking-wider transition-colors shadow-[0_0_20px_rgba(239,68,68,0.3)] cursor-pointer"
                 >
@@ -2376,17 +2379,19 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
           <CitizenProfileSheet
             citizen={editingCitizen}
             onClose={() => setEditingCitizen(null)}
-            onSave={(updated) => {
-              updateCitizen(editingCitizen.citizenId, updated);
-              setEditingCitizen(null);
+            onSave={async (updated) => {
+              if (await updateCitizen(editingCitizen.profileId, updated)) {
+                showToast(`Fiche de ${updated.rpFirstName} ${updated.rpLastName} mise à jour.`);
+                setEditingCitizen(null);
+              }
             }}
             onUpdateLive={(updated) => {
-              updateCitizen(editingCitizen.citizenId, updated);
-              setEditingCitizen((prev) => (prev ? { ...prev, ...updated } : null));
+              void updateCitizen(editingCitizen.profileId, updated);
             }}
-            onResetCooldown={(cid) => {
-              resetCitizenWheelCooldown(cid);
-            }}
+            onResetCooldown={() => resetCitizenWheelCooldown(editingCitizen.profileId)}
+            onAdjustBalance={(chipsDelta, cashDelta, reason) =>
+              adjustCitizenBalance(editingCitizen.profileId, chipsDelta, cashDelta, reason)
+            }
             adminLogs={logs}
             onAddLog={addLog}
             showToast={showToast}

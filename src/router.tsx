@@ -16,16 +16,15 @@ import { Gallery } from './components/Gallery';
 import { CtaStream } from './components/CtaStream';
 import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
-import { LuckyWheel } from './components/LuckyWheel';
-import { GamesLobby } from './components/GamesLobby';
+import { WheelOfFortune } from './components/WheelOfFortune';
+import { GamesCatalog } from './components/GamesCatalog';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
-import { DeveloperConsole } from './components/DeveloperConsole';
 import { NotFound } from './components/NotFound';
 
 /**
  * Root Layout Component
- * Renders Navbar on all views except full-screen MemberPortal, AdminConsole and DeveloperConsole
+ * Renders Navbar on all views except the full-screen member portal and staff consoles
  */
 function RootComponent() {
   const location = useLocation();
@@ -84,7 +83,7 @@ function MemberPortalPage() {
 }
 
 /**
- * Lucky Wheel Route Component (/roue-de-la-fortune)
+ * Fortune Wheel Route Component (/roue-de-la-fortune)
  */
 function LuckyWheelPage() {
   return (
@@ -95,14 +94,14 @@ function LuckyWheelPage() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <LuckyWheel />
+      <WheelOfFortune />
       <Footer />
     </motion.div>
   );
 }
 
 /**
- * Games Lobby Route Component (/jeux)
+ * Games Catalog Route Component (/jeux)
  */
 function GamesPage() {
   return (
@@ -113,7 +112,7 @@ function GamesPage() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <GamesLobby />
+      <GamesCatalog />
       <Footer />
     </motion.div>
   );
@@ -154,7 +153,7 @@ function AdminRoutePage() {
 }
 
 /**
- * Developer Console Route Component (/dev)
+ * Developer Console Route Component (/dev) — staff console opened on its Dev tab
  */
 function DeveloperRoutePage() {
   return (
@@ -165,7 +164,7 @@ function DeveloperRoutePage() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
     >
-      <DeveloperConsole />
+      <AdminConsole initialTab="dev" />
     </motion.div>
   );
 }

@@ -39,6 +39,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   const { 
     user, 
     isAuthenticated, 
+    isLoading,
+    authError,
     pendingDiscordUser,
     loginWithDiscordOAuth,
     completeRPRegistration,
@@ -247,15 +249,17 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
     };
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (authError) showToast(authError);
+  }, [authError]);
+
   // Primary Action: Trigger official Discord OAuth flow
   const handleConnectDiscord = async () => {
     setIsRedirecting(true);
     showToast('Connexion Discord en cours...');
     try {
-      await loginWithDiscordOAuth();
+      await loginWithDiscordOAuth(); // redirects to Discord on success
     } catch {
-      showToast('Erreur de connexion Discord.');
-    } finally {
       setIsRedirecting(false);
     }
   };
@@ -324,7 +328,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   };
 
   // Profile Edition Save
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError(null);
 
@@ -353,14 +357,18 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
     const formattedFirst = cleanFirst.charAt(0).toUpperCase() + cleanFirst.slice(1);
     const formattedLast = cleanLast.charAt(0).toUpperCase() + cleanLast.slice(1);
 
-    updateProfile({
-      rpFirstName: formattedFirst,
-      rpLastName: formattedLast,
-      citizenId: cleanId,
-      phoneNumber: cleanPhone,
-    });
-    setIsEditingModalOpen(false);
-    showToast('Profil citoyen mis à jour et synchronisé.');
+    try {
+      await updateProfile({
+        rpFirstName: formattedFirst,
+        rpLastName: formattedLast,
+        citizenId: cleanId,
+        phoneNumber: cleanPhone,
+      });
+      setIsEditingModalOpen(false);
+      showToast('Profil citoyen mis à jour et synchronisé.');
+    } catch (err) {
+      setEditError((err as Error).message || 'Mise à jour refusée par le serveur.');
+    }
   };
 
   // Filtered transactions for the client console ledger
@@ -375,10 +383,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
       if (txFilter === 'ALL') return true;
       if (txFilter === 'WHEEL') return tx.category === 'Roue de la Fortune' || tx.type === 'spin_reward';
-      if (txFilter === 'VIP') return tx.category === 'Abonnement VIP' || tx.type === 'vip_subscription';
-      if (txFilter === 'GAMES') {
-        return tx.category === 'Jeux' || tx.category === 'Caisse Casino' || tx.category === 'Bonus' || tx.type === 'bet' || tx.type === 'deposit' || tx.type === 'withdrawal' || tx.type === 'transfer';
-      }
+      if (txFilter === 'VIP') return tx.category === 'Abonnement VIP';
+      if (txFilter === 'GAMES') return tx.category === 'Jeux' || tx.category === 'Caisse Casino';
       return true;
     });
   }, [user?.transactions, txFilter, txSearchQuery]);
@@ -388,6 +394,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // =========================================================================
   // VIEW A : UNAUTHENTICATED USERS (LOGIN & FIRST-TIME ONBOARDING SPLIT VIEW)
   // =========================================================================
+  if (isLoading) {
+    return (
+      <div className="w-full min-h-screen bg-black flex items-center justify-center font-['Geist_Mono'] text-xs tracking-[3px] uppercase text-neutral-400">
+        Connexion à votre suite…
+      </div>
+    );
+  }
+
   if (!isAuthenticated || !user) {
     return (
       <div className="w-full min-h-screen bg-black p-3 sm:p-6 flex items-center justify-center font-sans">
@@ -1174,9 +1188,13 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                               })}
                             </span>
                           </div>
-                          {tx.amountChips && tx.amountChips !== 0 ? (
+                          {tx.amountChips !== 0 ? (
                             <span className={`font-mono font-bold text-xs shrink-0 ${tx.amountChips > 0 ? 'text-white' : 'text-red-400'}`}>
                               {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
+                            </span>
+                          ) : tx.amountCash !== 0 ? (
+                            <span className={`font-mono font-bold text-xs shrink-0 ${tx.amountCash > 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                              {tx.amountCash > 0 ? '+' : '-'}${Math.abs(tx.amountCash).toLocaleString()}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-white/10 text-neutral-300 shrink-0">
@@ -1348,13 +1366,17 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       </div>
 
                       <div className="text-right shrink-0 flex flex-col items-end gap-1">
-                        {tx.amountChips && tx.amountChips !== 0 ? (
+                        {tx.amountChips !== 0 ? (
                           <span className={`font-mono font-bold text-sm ${tx.amountChips > 0 ? 'text-white' : 'text-red-400'}`}>
                             {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
                           </span>
+                        ) : tx.amountCash !== 0 ? (
+                          <span className={`font-mono font-bold text-sm ${tx.amountCash > 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                            {tx.amountCash > 0 ? '+' : '-'}${Math.abs(tx.amountCash).toLocaleString()}
+                          </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold uppercase bg-white/10 text-neutral-300 border border-white/20">
-                            RÉCOMPENSE SPÉCIALE
+                            {tx.type === 'vip_request' ? 'DEMANDE VIP' : 'LOT SPÉCIAL'}
                           </span>
                         )}
                         <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold uppercase bg-white/10 text-neutral-300 border border-white/20">
@@ -1782,8 +1804,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   type="button"
                   onClick={() => {
                     setIsLogoutModalOpen(false);
-                    logout();
-                    showToast('Session fermée avec succès.');
+                    void logout();
                   }}
                   className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-xs shadow-lg shadow-red-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >

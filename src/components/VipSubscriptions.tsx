@@ -177,7 +177,8 @@ const FallingBills = () => {
 };
 
 export const VipSubscriptions: React.FC = () => {
-  const { user, isAuthenticated, subscribeVipTier } = useCasinoUser();
+  const { user, isAuthenticated, requestVip, pendingVipTier } = useCasinoUser();
+  const [submittingTier, setSubmittingTier] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -185,13 +186,21 @@ export const VipSubscriptions: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleSubscribe = (tier: 'SILVER' | 'GOLD' | 'DIAMOND') => {
+  // VIP cards are paid: the request is recorded and activated by the management after payment
+  const handleSubscribe = async (tier: 'SILVER' | 'GOLD' | 'DIAMOND') => {
     if (!isAuthenticated) {
-      showToast('Connectez votre profil Discord sur l\'Espace Membre pour souscrire.');
+      showToast("Connectez votre profil Discord sur l'Espace Membre pour souscrire.");
       return;
     }
-    subscribeVipTier(tier);
-    showToast(`Félicitations ! Vous avez souscrit à l'abonnement ${tier} avec succès.`);
+    setSubmittingTier(tier);
+    try {
+      await requestVip(tier);
+      showToast(`Demande ${tier} envoyée. La direction l'activera après votre paiement.`);
+    } catch (err) {
+      showToast((err as Error).message);
+    } finally {
+      setSubmittingTier(null);
+    }
   };
 
   return (
@@ -261,6 +270,7 @@ export const VipSubscriptions: React.FC = () => {
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-20 items-stretch">
         {TIERS.map((tier) => {
           const isCurrentTier = user?.vipTier === tier.id;
+          const isPendingTier = pendingVipTier === tier.id;
           const isFeatured = tier.id === 'GOLD';
 
           return (
@@ -318,10 +328,12 @@ export const VipSubscriptions: React.FC = () => {
               <div className="relative z-10">
                 <button
                   onClick={() => handleSubscribe(tier.id)}
-                  disabled={isCurrentTier}
+                  disabled={isCurrentTier || isPendingTier || !!pendingVipTier || submittingTier !== null}
                   className={`w-full py-3.5 px-6 rounded-2xl font-semibold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
-                    isCurrentTier
+                    isCurrentTier || isPendingTier
                       ? 'bg-neutral-800 text-neutral-400 border border-white/10 cursor-default'
+                      : pendingVipTier
+                      ? 'bg-neutral-900 text-neutral-500 border border-white/10 cursor-not-allowed'
                       : tier.id === 'GOLD'
                       ? 'bg-neutral-900 border border-white/30 text-white hover:bg-neutral-800 active:scale-95'
                       : tier.id === 'DIAMOND'
@@ -334,10 +346,12 @@ export const VipSubscriptions: React.FC = () => {
                       <Check size={14} />
                       Abonnement Actif
                     </>
+                  ) : isPendingTier ? (
+                    <>En attente de validation</>
                   ) : (
                     <>
                       <Crown size={14} />
-                      Souscrire {tier.name}
+                      {submittingTier === tier.id ? 'Envoi…' : `Demander ${tier.name}`}
                     </>
                   )}
                 </button>

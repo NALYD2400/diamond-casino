@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, Disc, Crown, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Disc, Bomb, Sparkles } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { fadeUp } from '../constants/animations';
 
@@ -30,22 +30,25 @@ export const Discovery: React.FC = () => {
 
       {/* 3 Casino Attraction Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-        {/* Card 1: Tables VIP */}
-        <motion.div
-          {...fadeUp(0.2)}
-          className="liquid-glass rounded-2xl p-8 flex flex-col items-center text-center group hover:bg-white/[0.04] transition-colors"
+        {/* Card 1: Jeu des Mines VIP */}
+        <Link
+          to="/mines"
+          className="liquid-glass rounded-2xl p-8 flex flex-col items-center text-center group hover:bg-white/[0.06] hover:border-amber-500/40 transition-all duration-300 block"
         >
-          <div className="w-24 h-24 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 text-amber-400">
-            <Crown size={38} />
+          <div className="w-24 h-24 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(245,158,11,0.3)] transition-all duration-300 text-amber-400">
+            <Bomb size={38} />
           </div>
-          <h3 className="font-bold text-xl text-white mb-2">Blackjack &amp; Roulette VIP</h3>
+          <div className="flex items-center gap-1.5 mb-2">
+            <h3 className="font-bold text-xl text-white group-hover:text-amber-300 transition-colors">Jeu des Mines VIP</h3>
+            <ArrowUpRight size={18} className="text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
           <p className="text-neutral-400 text-sm leading-relaxed mb-4">
-            Tables privées High Roller, croupiers en direct et ambiance feutrée pour les joueurs d'exception.
+            Déminez la grille 5x5, révélez les diamants cachés et encaissez au bon moment. RTP 98.5% certifié.
           </p>
           <span className="font-['Geist_Mono'] text-xs text-amber-400/80 tracking-wider uppercase mt-auto">
-            SALON 01 // HIGH ROLLER
+            JEU 01 // DÉMINEUR CASINO ➔
           </span>
-        </motion.div>
+        </Link>
 
         {/* Card 2: Roue de la fortune */}
         <Link

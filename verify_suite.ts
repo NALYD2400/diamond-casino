@@ -10,6 +10,14 @@ import {
 } from './src/lib/security';
 import { getDefaultDiscordAvatar, parseDiscordUserFromSession, hasAdminPermissions } from './src/lib/discord';
 import { supabase, dbCheckHealth, apiRecentWheelWins, apiSubscribeEvents, CasinoApiError } from './src/lib/supabase';
+import {
+  calculateMultiplier,
+  getNextStepProbability,
+  generateBoard,
+  getMultiplierLadder,
+  STRATEGY_PRESETS,
+  sha256Hex,
+} from './src/components/mines/minesMath';
 
 type TestCase = [string, boolean | Promise<boolean>];
 
@@ -92,6 +100,65 @@ async function main() {
     })()],
   ]);
 
+  await runGroup('MINES GAME LOGIC & MATHEMATICS', [
+    ['calculateMultiplier returns 1 for 0 gems', calculateMultiplier(3, 0) === 1],
+    ['calculateMultiplier increases strictly monotonically with gems', (() => {
+      const m1 = calculateMultiplier(3, 1);
+      const m2 = calculateMultiplier(3, 2);
+      const m3 = calculateMultiplier(3, 3);
+      const m4 = calculateMultiplier(3, 4);
+      return m1 < m2 && m2 < m3 && m3 < m4;
+    })()],
+    ['calculateMultiplier calculates accurate 3-mines 4-gems multiplier (~1.71x)', (() => {
+      const m = calculateMultiplier(3, 4);
+      return m >= 1.69 && m <= 1.73;
+    })()],
+    ['getNextStepProbability reflects true surviving gem percentage', (() => {
+      const p0 = getNextStepProbability(3, 0); // 22 / 25 = 88%
+      const p1 = getNextStepProbability(3, 1); // 21 / 24 = 87.5%
+      return p0 === 88 && p1 === 87.5;
+    })()],
+    ['generateBoard produces exactly the requested number of mines in a 25-tile grid', (async () => {
+      const b = await generateBoard(5);
+      const minesCount = b.board.filter(Boolean).length;
+      return b.board.length === 25 && minesCount === 5 && typeof b.serverSeed === 'string' && typeof b.hash === 'string';
+    })()],
+    ['calculateMultiplier boundary 24 mines 1 gem yields ~24.62x', (() => {
+      const m = calculateMultiplier(24, 1);
+      return m >= 24.6 && m <= 24.7;
+    })()],
+    ['calculateMultiplier boundary 1 mine 24 gems yields ~24.62x', (() => {
+      const m = calculateMultiplier(1, 24);
+      return m >= 24.6 && m <= 24.7;
+    })()],
+    ['getMultiplierLadder produces exact number of steps (25 - mines)', (() => {
+      const l3 = getMultiplierLadder(3);
+      const l10 = getMultiplierLadder(10);
+      const l24 = getMultiplierLadder(24);
+      return l3.length === 22 && l10.length === 15 && l24.length === 1;
+    })()],
+    ['getNextStepProbability boundary at last diamond is 0% when no safe tiles left', (() => {
+      const pZero = getNextStepProbability(3, 22);
+      return pZero === 0;
+    })()],
+    ['all strategy presets have valid mines and recommended diamonds', (() => {
+      return STRATEGY_PRESETS.every(
+        (p) => p.mines >= 1 && p.mines <= 24 && p.recommendedGems <= 25 - p.mines && p.expectedMultiplier > 1,
+      );
+    })()],
+    ['generateBoard provably fair commitment hash verifies with sha256Hex', (async () => {
+      const b = await generateBoard(4);
+      const boardStr = b.board.map((m) => (m ? 'M' : 'D')).join('');
+      const computed = await sha256Hex(`${b.serverSeed}:${boardStr}`);
+      return computed === b.hash;
+    })()],
+    ['sha256Hex produces consistent hash string', (async () => {
+      const h1 = await sha256Hex('test_diamond_casino');
+      const h2 = await sha256Hex('test_diamond_casino');
+      return h1 === h2 && h1.length >= 8;
+    })()],
+  ]);
+
   const health = await dbCheckHealth();
   console.log(`\nSupabase: ${health.online ? 'ONLINE' : 'OFFLINE'} (${health.latencyMs}ms, ${health.version || health.error})`);
   if (!health.online) {
@@ -121,6 +188,7 @@ async function main() {
       })()],
       ['cannot write admin logs', isRefused(() => supabase.from('admin_logs').insert({ action: 'x', category: 'SYSTEM' }))],
       ['cannot spin the wheel', isRefused(() => supabase.rpc('spin_wheel'))],
+      ['cannot play mines without auth', isRefused(() => supabase.rpc('play_mines_game', { p_bet: 100, p_win: 200, p_multiplier: 2, p_mines: 3, p_gems: 1 }))],
       ['cannot call staff functions', isRefused(() => supabase.rpc('admin_reset_cooldown', { p_profile_id: null }))],
       ['cannot adjust balances via RPC', isRefused(() =>
         supabase.rpc('admin_adjust_balance', { p_profile_id: '00000000-0000-0000-0000-000000000000', p_chips_delta: 1000, p_cash_delta: 0, p_reason: 'x' }),

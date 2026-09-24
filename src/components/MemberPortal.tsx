@@ -405,7 +405,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
   if (!isAuthenticated || !user) {
     return (
-      <div className="w-full min-h-screen bg-black p-3 sm:p-6 flex items-center justify-center font-sans">
+      <div className="w-full min-h-screen bg-black p-3 sm:p-6 pt-24 sm:pt-28 flex items-center justify-center font-sans">
         {/* Toast Feedback */}
         <AnimatePresence>
           {toastMessage && (
@@ -689,7 +689,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // VIEW B : AUTHENTICATED CLIENT CONSOLE (FULL-WIDTH GRAND LUXURY CONSOLE)
   // =========================================================================
   return (
-    <div className="w-full min-h-screen bg-[#050608] text-white flex flex-col font-sans select-none antialiased relative overflow-x-hidden">
+    <div className="w-full min-h-screen bg-[#050608] text-white flex flex-col font-sans select-none antialiased relative overflow-x-hidden pt-24 sm:pt-28 pb-16">
       
       {/* Ambient background glows matching index styling */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -704,7 +704,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-22 right-4 sm:right-8 z-50 px-5 sm:px-6 py-3 rounded-2xl bg-white text-black font-semibold text-xs sm:text-sm shadow-[0_10px_40px_rgba(255,255,255,0.4)] flex items-center gap-2.5 border border-white/30 backdrop-blur-md"
+            className="fixed top-24 right-4 sm:right-8 z-50 px-5 sm:px-6 py-3 rounded-2xl bg-white text-black font-semibold text-xs sm:text-sm shadow-[0_10px_40px_rgba(255,255,255,0.4)] flex items-center gap-2.5 border border-white/30 backdrop-blur-md"
           >
             <CheckCircle2 size={18} className="text-black shrink-0" />
             <span>{toastMessage}</span>
@@ -713,167 +713,107 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
       </AnimatePresence>
 
       {/* ===================================================================== */}
-      {/* 1. TOP CONSOLE EXECUTIVE NAVIGATION BAR                                */}
+      {/* MAIN CONSOLE CONTENT CONTAINER                                        */}
       {/* ===================================================================== */}
-      <header className="sticky top-0 z-40 w-full h-18 sm:h-20 bg-[#07080c]/90 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-8 lg:px-12 flex items-center justify-between shadow-2xl">
+      <main className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 flex flex-col gap-6 sm:gap-8 flex-1">
         
-        {/* Left: Home link & Official Brand */}
-        <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <Link
-            to="/"
-            onClick={() => onBackToHome?.()}
-            className="h-10 px-3 sm:px-3.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 flex items-center gap-2 text-neutral-300 hover:text-white transition-all cursor-pointer text-xs font-semibold shrink-0"
-            title="Retour au site d'accueil"
-          >
-            <ArrowLeft size={15} />
-            <span className="hidden sm:inline">Accueil</span>
-          </Link>
+        {/* Console Navigation Capsule & Action Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          {/* Segmented Control Capsule */}
+          <div className="inline-flex items-center p-1.5 rounded-2xl bg-[#090a10]/90 backdrop-blur-xl border border-white/10 shadow-2xl overflow-x-auto no-scrollbar max-w-full">
+            <button
+              type="button"
+              onClick={() => setActiveTab('overview')}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'overview'
+                  ? 'bg-white text-black shadow-lg shadow-white/10'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Activity size={15} />
+              <span>Vue d'ensemble</span>
+            </button>
 
-          <div className="h-6 w-px bg-white/10 hidden md:block shrink-0" />
+            <button
+              type="button"
+              onClick={() => setActiveTab('lots')}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'lots'
+                  ? 'bg-white text-black shadow-lg shadow-white/10'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Car size={15} />
+              <span>Mes lots</span>
+              {user.rewards.some((r) => r.status === 'IN_INVENTORY') && (
+                <span className="w-2 h-2 rounded-full bg-amber-400" aria-label="Lots à réclamer" />
+              )}
+            </button>
 
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <img
-              src="/diamond_casino_logo.png"
-              alt="Diamond Casino"
-              className="h-8 sm:h-10 w-auto object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.25)] shrink-0"
-            />
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs sm:text-sm font-extrabold tracking-wider uppercase text-white truncate">
-                ESPACE CLIENT
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('vault')}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'vault'
+                  ? 'bg-white text-black shadow-lg shadow-white/10'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Coins size={15} />
+              <span>Coffre &amp; Registre</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'profile'
+                  ? 'bg-white text-black shadow-lg shadow-white/10'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <User size={15} />
+              <span>Fiche Citoyenne</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('vip')}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'vip'
+                  ? 'bg-white text-black shadow-lg shadow-white/10'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Crown size={15} />
+              <span>Avantages VIP</span>
+            </button>
+          </div>
+
+          {/* Quick Actions (Admin + Déconnexion) */}
+          <div className="flex items-center gap-2">
+            {isOwnerOrAdmin && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-neutral-500/15 hover:bg-neutral-500/25 border border-neutral-500/30 text-neutral-300 text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.1)] cursor-pointer"
+                title="Console Administration"
+              >
+                <Sparkles size={14} className="text-neutral-300" />
+                <span>Admin</span>
+              </Link>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsLogoutModalOpen(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-red-950/30 hover:bg-red-900/50 border border-red-500/30 text-red-300 flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer hover:scale-105"
+              title="Se déconnecter de la console"
+            >
+              <LogOut size={14} />
+              <span>Déconnexion</span>
+            </button>
           </div>
         </div>
-
-        {/* Right: Quick Action Hub, Profile Pill & Logout Modal Trigger */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Founder / Director Admin Console Quick Link */}
-          {isOwnerOrAdmin && (
-            <Link
-              to="/admin"
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-xl bg-neutral-500/15 hover:bg-neutral-500/25 border border-neutral-500/30 text-neutral-300 text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] cursor-pointer"
-            >
-              <Sparkles size={14} className="text-neutral-300" />
-              <span className="hidden sm:inline">Admin</span>
-            </Link>
-          )}
-
-          {/* Citizen Pill with Avatar */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('profile')}
-            className="flex items-center gap-2 sm:gap-2.5 pl-1.5 sm:pl-3 border-l border-white/10 cursor-pointer text-left hover:opacity-85 transition-opacity"
-            title="Consulter ma fiche citoyenne"
-          >
-            <div className="relative">
-              <img
-                src={user.avatarUrl}
-                alt={user.rpFirstName}
-                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-white/40 object-cover shadow-[0_0_12px_rgba(255,255,255,0.25)]"
-              />
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-white border-2 border-black" />
-            </div>
-            <div className="hidden lg:flex flex-col text-left">
-              <span className="text-xs font-bold text-white leading-tight">
-                {user.rpFirstName} {user.rpLastName}
-              </span>
-              <span className="text-[10px] text-white/90 font-mono">
-                #{user.citizenId}
-              </span>
-            </div>
-          </button>
-
-          {/* Logout Button (opens confirmation modal) */}
-          <button
-            type="button"
-            onClick={() => setIsLogoutModalOpen(true)}
-            className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-red-950/30 hover:bg-red-900/50 border border-red-500/30 text-red-300 flex items-center justify-center transition-all cursor-pointer hover:scale-105"
-            title="Se déconnecter de la console"
-          >
-            <LogOut size={15} />
-          </button>
-        </div>
-      </header>
-
-      {/* ===================================================================== */}
-      {/* 2. CONSOLE VIEW TABS SELECTOR                                          */}
-      {/* ===================================================================== */}
-      <nav className="w-full border-b border-white/[0.08] px-4 sm:px-8 lg:px-12 bg-[#050608]/70 backdrop-blur-md sticky top-18 sm:top-20 z-30">
-        <div className="max-w-[1600px] mx-auto flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-2.5">
-          <button
-            type="button"
-            onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'overview'
-                ? 'bg-white text-black shadow-lg shadow-white/10'
-                : 'text-neutral-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Activity size={15} />
-            <span>Vue d'ensemble</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('lots')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'lots'
-                ? 'bg-white text-black shadow-lg shadow-white/10'
-                : 'text-neutral-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Car size={15} />
-            <span>Mes lots</span>
-            {user.rewards.some((r) => r.status === 'IN_INVENTORY') && (
-              <span className="w-2 h-2 rounded-full bg-amber-400" aria-label="Lots à réclamer" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('vault')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'vault'
-                ? 'bg-white text-black shadow-lg shadow-white/10'
-                : 'text-neutral-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Coins size={15} />
-            <span>Coffre &amp; Registre</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('profile')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'profile'
-                ? 'bg-white text-black shadow-lg shadow-white/10'
-                : 'text-neutral-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <User size={15} />
-            <span>Fiche Citoyenne</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('vip')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'vip'
-                ? 'bg-white text-black shadow-lg shadow-white/10'
-                : 'text-neutral-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Crown size={15} />
-            <span>Avantages VIP</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* ===================================================================== */}
-      {/* 4. MAIN CONSOLE CONTENT CONTAINER                                     */}
-      {/* ===================================================================== */}
-      <main className="relative z-10 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-10 flex flex-col gap-6 sm:gap-8 flex-1">
         
         {/* =================================================================== */}
         {/* TAB 1: OVERVIEW (CONSOLE COCKPIT)                                   */}

@@ -11,6 +11,7 @@ import {
   dbFetchTransactions,
   dbFetchMyRewards,
   apiClaimReward,
+  apiPlayMinesGame,
   type PlayerReward,
   type ProfilePayload,
   type ProfileRole,
@@ -93,6 +94,13 @@ interface CasinoUserContextType {
   spinWheel: () => Promise<SpinOutcome>;
   requestVip: (tier: VipTier) => Promise<void>;
   claimReward: (rewardId: string) => Promise<void>;
+  playMinesRound: (params: {
+    bet: number;
+    win: number;
+    multiplier: number;
+    mines: number;
+    gems: number;
+  }) => Promise<{ success: boolean; net: number; balance: number }>;
   canSpinWheel: boolean;
   timeUntilNextSpin: string;
 }
@@ -348,6 +356,59 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [user, loadTransactions],
   );
 
+  const playMinesRound = useCallback(
+    async (params: {
+      bet: number;
+      win: number;
+      multiplier: number;
+      mines: number;
+      gems: number;
+    }): Promise<{ success: boolean; net: number; balance: number }> => {
+      const net = params.win - params.bet;
+      if (!user) return { success: false, net: 0, balance: 0 };
+      if (user.chips < params.bet) {
+        throw new Error('Solde de jetons insuffisant.');
+      }
+
+      try {
+        const res = await apiPlayMinesGame(params);
+        if (res && res.profile) {
+          applyProfile(res.profile);
+          return { success: true, net: res.net, balance: Number(res.profile.chips) || 0 };
+        }
+      } catch (err) {
+        console.warn('[CasinoUser] Remote play_mines_game RPC unavailable, applying local balance sync:', err);
+      }
+
+      // Synchronous fallback (persists in state and adds transaction entry)
+      const newChips = Math.max(0, user.chips + net);
+      const newTx: CasinoTransaction = {
+        id: `mines_${Date.now()}`,
+        type: params.win > 0 ? 'bonus' : 'bet',
+        category: 'Jeux',
+        label:
+          params.win > 0
+            ? `Mines : gain de ${params.win.toLocaleString('fr-FR')} jetons (x${params.multiplier})`
+            : `Mines : perte de ${params.bet.toLocaleString('fr-FR')} jetons`,
+        amountChips: Math.abs(net),
+        date: new Date().toISOString(),
+        status: 'COMPLÉTÉ',
+      };
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              chips: newChips,
+              totalWon: net > 0 ? prev.totalWon + net : prev.totalWon,
+              transactions: [newTx, ...prev.transactions],
+            }
+          : null,
+      );
+      return { success: true, net, balance: newChips };
+    },
+    [user, applyProfile],
+  );
+
   const value = useMemo<CasinoUserContextType>(
     () => ({
       user,
@@ -365,6 +426,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       spinWheel,
       requestVip,
       claimReward,
+      playMinesRound,
       canSpinWheel,
       timeUntilNextSpin,
     }),
@@ -383,6 +445,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       spinWheel,
       requestVip,
       claimReward,
+      playMinesRound,
       canSpinWheel,
       timeUntilNextSpin,
     ],

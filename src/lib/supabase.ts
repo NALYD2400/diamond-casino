@@ -235,6 +235,26 @@ export const apiRequestVip = (tier: VipTier) => rpc<{ status: string; tier: VipT
 
 export const apiRecentWheelWins = (limit = 8) => rpc<WheelWin[]>('recent_wheel_wins', { p_limit: limit });
 
+export interface MinesRoundResult {
+  profile: ProfilePayload;
+  net: number;
+}
+
+export const apiPlayMinesGame = (p: {
+  bet: number;
+  win: number;
+  multiplier: number;
+  mines: number;
+  gems: number;
+}) =>
+  rpc<MinesRoundResult>('play_mines_game', {
+    p_bet: Math.trunc(p.bet),
+    p_win: Math.trunc(p.win),
+    p_multiplier: Number(p.multiplier.toFixed(4)),
+    p_mines: p.mines,
+    p_gems: p.gems,
+  });
+
 export const apiSubscribeEvents = (email: string) => rpc<null>('subscribe_events', { p_email: email });
 
 export async function dbFetchTransactions(profileId: string, limit = 50): Promise<SupabaseTransaction[]> {

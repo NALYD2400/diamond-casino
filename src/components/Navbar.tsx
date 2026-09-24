@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isHome = currentPath === '/' || propCurrentView === 'landing';
   const isWheel = currentPath === '/roue-de-la-fortune' || propCurrentView === 'lucky-wheel';
   const isVip = currentPath === '/abonnements';
-  const isGames = currentPath === '/jeux';
+  const isMines = currentPath === '/mines' || currentPath === '/jeux';
   const isMember = currentPath === '/espace-membre' || propCurrentView === 'member-portal';
 
   const handleSectionScroll = (sectionId: string) => {
@@ -78,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               to="/"
               onClick={() => setCurrentView?.('landing')}
               className={`font-medium transition-colors cursor-pointer ${
-                isHome && !isWheel && !isVip && !isMember && !isGames
+                isHome && !isWheel && !isVip && !isMember && !isMines
                   ? 'text-white font-semibold'
                   : 'text-white/70 hover:text-white'
               }`}
@@ -87,12 +87,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </Link>
             
             <Link
-              to="/jeux"
-              className={`font-medium transition-colors cursor-pointer ${
-                isGames ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+              to="/mines"
+              className={`font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                isMines ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
               }`}
             >
-              Jeux
+              <span>Mines</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 tracking-wider">
+                JEU
+              </span>
             </Link>
 
             {/* Clean Roue de la Fortune Nav Link */}
@@ -148,7 +151,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setMenuOpen(false);
                 setCurrentView?.('member-portal');
               }}
-              className="flex items-center gap-2.5 bg-neutral-900 border border-white/20 text-white rounded-full px-4 sm:px-5 py-2 hover:border-amber-400/80 transition-all cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+              className={`flex items-center gap-2.5 bg-neutral-900 border text-white rounded-full px-4 sm:px-5 py-2 hover:border-amber-400/80 transition-all cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.1)] ${
+                isMember ? 'border-amber-400 ring-1 ring-amber-400/40' : 'border-white/20'
+              }`}
             >
               <img
                 src={user.avatarUrl}
@@ -210,11 +215,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               Accueil
             </Link>
             <Link
-              to="/jeux"
+              to="/mines"
               onClick={() => setMenuOpen(false)}
-              className="text-left text-lg font-medium text-white/90 hover:text-white"
+              className="text-left text-lg font-medium text-white/90 hover:text-white flex items-center justify-between"
             >
-              Jeux
+              <span>Jeu des Mines</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                NOUVEAU
+              </span>
             </Link>
             <Link
               to="/roue-de-la-fortune"
@@ -243,7 +251,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               className="text-left text-lg font-medium text-white/90 hover:text-white border-t border-white/10 pt-3 flex items-center gap-2"
             >
-              <User size={18} /> Espace Membre (Connexion Discord)
+              <User size={18} /> {isAuthenticated && user ? `Espace Client (${user.rpFirstName})` : 'Espace Membre (Connexion Discord)'}
             </Link>
           </motion.div>
         )}

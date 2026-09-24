@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
-import { Disc, User } from 'lucide-react';
+import { Disc, User, Bomb } from 'lucide-react';
 import { fadeUp } from '../constants/animations';
 import { apiSubscribeEvents } from '../lib/supabase';
 
@@ -71,6 +71,14 @@ export const Hero: React.FC = () => {
           >
             <Disc size={17} />
             Tourner la Roue de la Fortune
+          </Link>
+
+          <Link
+            to="/mines"
+            className="liquid-glass border border-amber-500/30 hover:border-amber-400/60 hover:bg-amber-500/10 text-amber-300 font-semibold text-xs sm:text-sm tracking-wide rounded-full px-7 sm:px-8 py-4 transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.15)]"
+          >
+            <Bomb size={16} />
+            Jeu des Mines
           </Link>
 
           <Link

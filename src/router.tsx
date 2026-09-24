@@ -17,7 +17,7 @@ import { CtaStream } from './components/CtaStream';
 import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
 import { WheelOfFortune } from './components/WheelOfFortune';
-import { GamesCatalog } from './components/GamesCatalog';
+import { MinesGame } from './components/MinesGame';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
 import { NotFound } from './components/NotFound';
@@ -28,7 +28,7 @@ import { NotFound } from './components/NotFound';
  */
 function RootComponent() {
   const location = useLocation();
-  const hideNavbar = location.pathname === '/espace-membre' || location.pathname === '/admin' || location.pathname === '/dev';
+  const hideNavbar = location.pathname === '/admin' || location.pathname === '/dev';
 
   React.useEffect(() => {
     window.scrollTo(0, 0);
@@ -101,18 +101,18 @@ function LuckyWheelPage() {
 }
 
 /**
- * Games Catalog Route Component (/jeux)
+ * Mines Game Route Component (/mines and /jeux)
  */
-function GamesPage() {
+function MinesPage() {
   return (
     <motion.div
-      key="games-page"
+      key="mines-page"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <GamesCatalog />
+      <MinesGame />
       <Footer />
     </motion.div>
   );
@@ -201,10 +201,16 @@ const luckyWheelRoute = createRoute({
   component: LuckyWheelPage,
 });
 
+const minesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/mines',
+  component: MinesPage,
+});
+
 const gamesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/jeux',
-  component: GamesPage,
+  component: MinesPage,
 });
 
 const subscriptionsRoute = createRoute({
@@ -236,6 +242,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   memberPortalRoute,
   luckyWheelRoute,
+  minesRoute,
   gamesRoute,
   subscriptionsRoute,
   adminRoute,

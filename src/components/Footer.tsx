@@ -21,8 +21,8 @@ export const Footer: React.FC = () => {
       </Link>
 
       <div className="flex flex-wrap items-center gap-6 sm:gap-8 text-xs font-['Geist_Mono'] text-neutral-400">
-        <Link to="/jeux" className="hover:text-amber-400 transition-colors">
-          JEUX
+        <Link to="/mines" className="hover:text-amber-400 transition-colors">
+          JEU DES MINES
         </Link>
         <Link to="/roue-de-la-fortune" className="hover:text-amber-400 transition-colors">
           ROUE DE LA FORTUNE

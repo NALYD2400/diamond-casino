@@ -99,7 +99,7 @@ export const Stat: React.FC<{
         'text-2xl font-bold font-mono tracking-tight truncate',
         tone === 'good' && 'text-emerald-400',
         tone === 'bad' && 'text-rose-400',
-        tone === 'gold' && 'text-amber-300',
+        tone === 'gold' && 'text-white',
         tone === 'default' && 'text-white',
       )}
     >
@@ -120,9 +120,9 @@ export const Badge: React.FC<{ children: React.ReactNode; tone?: 'neutral' | 'go
       tone === 'neutral' && 'bg-white/5 border-white/10 text-neutral-300',
       tone === 'good' && 'bg-emerald-500/10 border-emerald-400/25 text-emerald-300',
       tone === 'bad' && 'bg-rose-500/10 border-rose-400/25 text-rose-300',
-      tone === 'warn' && 'bg-amber-500/10 border-amber-400/25 text-amber-300',
+      tone === 'warn' && 'bg-white/10 border-white/20 text-neutral-200',
       tone === 'info' && 'bg-sky-500/10 border-sky-400/25 text-sky-300',
-      tone === 'gold' && 'bg-yellow-500/10 border-yellow-400/25 text-yellow-300',
+      tone === 'gold' && 'bg-white/10 border-white/20 text-white',
       tone === 'violet' && 'bg-violet-500/10 border-violet-400/25 text-violet-300',
       className,
     )}
@@ -289,8 +289,8 @@ export const SaveBar: React.FC<{ dirty: boolean; saving: boolean; onSave: () => 
   label = 'Modifications non enregistrées',
 }) =>
   dirty ? (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/30 bg-amber-500/[0.06] px-4 py-2.5">
-      <span className="text-xs font-medium text-amber-200">{label}</span>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/[0.04] px-4 py-2.5">
+      <span className="text-xs font-medium text-white">{label}</span>
       <div className="flex gap-2">
         <Button variant="subtle" size="sm" onClick={onReset} disabled={saving}>
           Annuler

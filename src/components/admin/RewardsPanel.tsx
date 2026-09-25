@@ -323,7 +323,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
           </select>
           <VehiclePicker selectedModel={grantVehicle?.model} onSelect={setGrantVehicle} className="max-h-56" />
           {grantVehicle && (
-            <p className="text-xs text-amber-300 flex items-center gap-2">
+            <p className="text-xs text-white flex items-center gap-2">
               <Check size={13} /> {vehicleDisplayName(grantVehicle.manufacturer, grantVehicle.model)}
               <button type="button" onClick={() => setGrantVehicle(null)} className="text-neutral-500 hover:text-white cursor-pointer" aria-label="Retirer le véhicule">
                 <X size={12} />
@@ -373,7 +373,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
             <div>
               <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                 <div
-                  className="h-full bg-amber-400 transition-all"
+                  className="h-full bg-white transition-all"
                   style={{ width: `${(importProgress.done / importProgress.total) * 100}%` }}
                 />
               </div>

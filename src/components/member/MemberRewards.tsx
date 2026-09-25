@@ -42,7 +42,7 @@ export const MemberRewards: React.FC<MemberRewardsProps> = ({ showToast }) => {
           </p>
         </div>
         {toClaim > 0 && (
-          <span className="px-3 py-1.5 rounded-full text-xs font-bold border border-amber-400/30 bg-amber-500/10 text-amber-300 self-start sm:self-auto">
+          <span className="px-3 py-1.5 rounded-full text-xs font-bold border border-white/20 bg-white/10 text-white self-start sm:self-auto">
             {toClaim} lot{toClaim > 1 ? 's' : ''} à réclamer
           </span>
         )}
@@ -50,7 +50,7 @@ export const MemberRewards: React.FC<MemberRewardsProps> = ({ showToast }) => {
 
       {rewards.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-10 flex flex-col items-center text-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+          <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
             <Gift size={24} />
           </div>
           <div>
@@ -59,7 +59,7 @@ export const MemberRewards: React.FC<MemberRewardsProps> = ({ showToast }) => {
           </div>
           <Link
             to="/roue-de-la-fortune"
-            className="rounded-full px-6 py-3 text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-black flex items-center gap-2"
+            className="rounded-full px-6 py-3 text-xs font-bold uppercase tracking-wider bg-white hover:bg-neutral-200 text-black flex items-center gap-2 transition-colors"
           >
             <Disc size={15} /> Tourner la roue
           </Link>

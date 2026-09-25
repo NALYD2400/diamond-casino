@@ -76,7 +76,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
               className={cx(
                 'flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-[13px]',
                 a.tone === 'bad' && 'border-rose-500/30 bg-rose-500/[0.06] text-rose-200',
-                a.tone === 'warn' && 'border-amber-400/30 bg-amber-500/[0.06] text-amber-200',
+                a.tone === 'warn' && 'border-white/20 bg-white/[0.05] text-neutral-200',
                 a.tone === 'info' && 'border-sky-400/25 bg-sky-500/[0.05] text-sky-200',
               )}
             >
@@ -104,7 +104,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
         <Stat
           label="Jetons chez les joueurs"
           value={fmtChips(t?.chips_players_only)}
-          tone="gold"
+          tone="default"
           icon={<Coins size={16} />}
           hint={`${fmt(t?.chips_in_circulation)} en comptant le staff`}
         />
@@ -163,7 +163,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
                           </span>
                         )}
                       </td>
-                      <td className="px-5 py-3 text-right font-mono text-amber-300">{fmt(g.biggest_win)}</td>
+                      <td className="px-5 py-3 text-right font-mono text-white">{fmt(g.biggest_win)}</td>
                     </tr>
                   ))}
               </tbody>
@@ -182,13 +182,13 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
                 {dashboard!.daily.map((d) => (
                   <div key={d.day} className="flex-1 min-w-0 h-full flex items-end gap-px group relative" title={`${d.day} · misé ${fmt(d.wagered)} · payé ${fmt(d.paid)} · ${fmt(d.rounds)} parties`}>
                     <div className="flex-1 bg-white/70 rounded-t-sm" style={{ height: `${(Number(d.wagered) / maxDaily) * 100}%` }} />
-                    <div className="flex-1 bg-amber-400/80 rounded-t-sm" style={{ height: `${(Number(d.paid) / maxDaily) * 100}%` }} />
+                    <div className="flex-1 bg-white/30 rounded-t-sm" style={{ height: `${(Number(d.paid) / maxDaily) * 100}%` }} />
                   </div>
                 ))}
               </div>
               <div className="flex items-center gap-4 mt-3 text-[11px] text-neutral-400">
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-white/70" /> Misé par les joueurs</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400/80" /> Payé par le casino (roue incluse)</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-white/30" /> Payé par le casino (roue incluse)</span>
               </div>
             </>
           )}

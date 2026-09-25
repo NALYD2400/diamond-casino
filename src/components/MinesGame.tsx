@@ -497,7 +497,7 @@ export const MinesGame: React.FC = () => {
               disabled={phase !== 'idle' || !isAuthenticated}
               title={isAuthenticated ? 'Jouer avec vos jetons' : 'Connectez-vous pour jouer avec vos jetons'}
               className={`px-3 py-1 rounded-full transition-colors ${
-                mode === 'real' ? 'bg-[#ffd45a] text-[#140c22]' : 'text-white/70 hover:text-white'
+                mode === 'real' ? 'bg-white text-black font-bold' : 'text-white/70 hover:text-white'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               JETONS
@@ -506,7 +506,7 @@ export const MinesGame: React.FC = () => {
               onClick={() => phase === 'idle' && setMode('demo')}
               disabled={phase !== 'idle'}
               className={`px-3 py-1 rounded-full transition-colors ${
-                mode === 'demo' ? 'bg-white text-[#140c22]' : 'text-white/70 hover:text-white'
+                mode === 'demo' ? 'bg-white text-black font-bold' : 'text-white/70 hover:text-white'
               }`}
             >
               DÉMO
@@ -532,7 +532,7 @@ export const MinesGame: React.FC = () => {
                       key={s.step}
                       className={`flex-1 max-w-[76px] rounded-md border-2 border-[#140c22] text-center py-[0.6%] leading-tight font-['Oswald'] font-bold transition-colors ${
                         now
-                          ? 'mn-step-now bg-[linear-gradient(180deg,#fff4b0,#ffc42e)] text-[#140c22] shadow-[0_3px_0_#140c22,0_0_16px_rgba(255,212,90,0.6)]'
+                          ? 'mn-step-now bg-[linear-gradient(180deg,#ffffff,#cbd5e1)] text-black shadow-[0_3px_0_#140c22,0_0_16px_rgba(255,255,255,0.6)]'
                           : done
                             ? 'bg-[linear-gradient(180deg,#5ee8ff,#1386b8)] text-[#07203a] shadow-[0_3px_0_#140c22]'
                             : 'bg-black/55 text-white/80 shadow-[0_3px_0_#140c22]'
@@ -541,7 +541,7 @@ export const MinesGame: React.FC = () => {
                       <div className="text-[clamp(10px,2.6cqw,17px)]">
                         x{s.multiplier >= 1000 ? fmt(Math.round(s.multiplier)) : s.multiplier.toFixed(2)}
                       </div>
-                      <div className={`text-[clamp(8px,1.7cqw,11px)] ${now ? 'text-[#140c22]/70' : done ? 'text-[#07203a]/70' : 'text-white/45'}`}>
+                      <div className={`text-[clamp(8px,1.7cqw,11px)] ${now ? 'text-black/70' : done ? 'text-[#07203a]/70' : 'text-white/45'}`}>
                         {s.step} 💎
                       </div>
                     </div>
@@ -559,7 +559,7 @@ export const MinesGame: React.FC = () => {
                 {['top-[1%] left-[1%]', 'top-[1%] right-[1%]', 'bottom-[1%] left-[1%]', 'bottom-[1%] right-[1%]'].map((pos) => (
                   <span
                     key={pos}
-                    className={`absolute ${pos} w-[2.2%] aspect-square rounded-full border-2 border-[#140c22] bg-[radial-gradient(circle_at_35%_30%,#fff4b0,#ffc42e_55%,#8a5a10)]`}
+                    className={`absolute ${pos} w-[2.2%] aspect-square rounded-full border-2 border-[#140c22] bg-[radial-gradient(circle_at_35%_30%,#ffffff,#cbd5e1_55%,#475569)]`}
                   />
                 ))}
 
@@ -635,7 +635,7 @@ export const MinesGame: React.FC = () => {
             <MinesPanel className="flex" mines={minesCount} locked={phase !== 'idle'} onChange={changeMines} bare />
             <button
               onClick={() => setMinesOpen(false)}
-              className="mt-4 w-full font-['Oswald'] font-bold text-lg py-2.5 rounded-lg bg-[linear-gradient(180deg,#fff4b0,#ffc42e)] text-[#140c22] border-[3px] border-[#140c22] shadow-[0_4px_0_#140c22]"
+              className="mt-4 w-full font-['Oswald'] font-bold text-lg py-2.5 rounded-lg bg-[linear-gradient(180deg,#ffffff,#cbd5e1)] text-black border-[3px] border-[#140c22] shadow-[0_4px_0_#140c22]"
             >
               VALIDER
             </button>
@@ -662,7 +662,7 @@ export const MinesGame: React.FC = () => {
               />
             </div>
             <div className="mt-5">
-              <div className="flex items-center gap-2 font-['Oswald'] font-bold text-[#ffd45a] text-sm tracking-wider mb-2">
+              <div className="flex items-center gap-2 font-['Oswald'] font-bold text-white text-sm tracking-wider mb-2">
                 <History size={15} /> DERNIÈRES MANCHES
               </div>
               {history.length === 0 ? (
@@ -689,7 +689,7 @@ export const MinesGame: React.FC = () => {
         {infoOpen && (
           <Modal title="RÈGLES DU JEU" onClose={() => setInfoOpen(false)} wide>
             <div className="grid sm:grid-cols-3 gap-3 text-xs text-white/85 leading-relaxed">
-              <RuleCard art={<Pickaxe className="w-full h-full text-[#ffd45a]" />} title="1. Mise & mines">
+              <RuleCard art={<Pickaxe className="w-full h-full text-white" />} title="1. Mise & mines">
                 Choisissez votre mise et le nombre de mines cachées (1 à 24) parmi les 25 blocs.
               </RuleCard>
               <RuleCard art={<GemArt className="w-full h-full" />} title="2. Creusez">
@@ -700,7 +700,7 @@ export const MinesGame: React.FC = () => {
               </RuleCard>
             </div>
 
-            <h4 className="font-['Luckiest_Guy'] text-lg text-[#ffd45a] text-center mt-5 mb-2 tracking-wide">
+            <h4 className="font-['Luckiest_Guy'] text-lg text-white text-center mt-5 mb-2 tracking-wide">
               GAINS AVEC {mines} MINE{mines > 1 ? 'S' : ''} · MISE {fmt(phase === 'idle' ? bet : roundBet)}
             </h4>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 max-h-48 overflow-y-auto pr-1">
@@ -716,7 +716,7 @@ export const MinesGame: React.FC = () => {
             </div>
 
             <div className="mt-5 rounded-lg bg-black/30 p-3 text-xs text-white/80">
-              <div className="flex items-center gap-2 font-['Oswald'] font-bold text-[#ffd45a] text-sm tracking-wider mb-1.5">
+              <div className="flex items-center gap-2 font-['Oswald'] font-bold text-white text-sm tracking-wider mb-1.5">
                 <ShieldCheck size={15} /> ÉQUITÉ PROUVABLE
               </div>
               <p className="text-white/60 mb-2">
@@ -845,7 +845,7 @@ const ResultPlaque: React.FC<{ result: RoundResult }> = ({ result }) => (
         </>
       ) : (
         <>
-          <div className="font-['Luckiest_Guy'] text-[clamp(30px,8cqw,56px)] leading-none text-[#fff4b0] [-webkit-text-stroke:2px_#140c22] drop-shadow-[0_3px_0_#140c22]">
+          <div className="font-['Luckiest_Guy'] text-[clamp(30px,8cqw,56px)] leading-none text-white [-webkit-text-stroke:2px_#140c22] drop-shadow-[0_3px_0_#140c22]">
             BOOM !
           </div>
           <div className="font-['Oswald'] font-bold text-[clamp(14px,3.4cqw,22px)] text-white mt-1">-{fmt(result.bet)}</div>
@@ -873,7 +873,7 @@ const MinesPanel: React.FC<{ className?: string; mines: number; locked: boolean;
         <div className="w-10 h-10 shrink-0">
           <BombArt className="w-full h-full" />
         </div>
-        <div className="font-['Oswald'] font-bold text-[#ffd45a] text-sm tracking-wider leading-tight">
+        <div className="font-['Oswald'] font-bold text-white text-sm tracking-wider leading-tight">
           MINES
           <div className="text-[10px] text-white/60 tracking-normal font-semibold">{locked ? 'Verrouillé pendant la manche' : 'Plus de mines, plus de gains'}</div>
         </div>
@@ -904,7 +904,7 @@ const MinesPanel: React.FC<{ className?: string; mines: number; locked: boolean;
             onClick={() => onChange(n)}
             disabled={locked}
             className={`py-1.5 rounded-md border-2 border-[#140c22] font-['Oswald'] font-bold text-xs transition-colors disabled:opacity-40 ${
-              mines === n ? 'bg-[#ffd45a] text-[#140c22]' : 'bg-[#2a2044] text-white hover:bg-[#3a2c5c]'
+              mines === n ? 'bg-white text-black font-bold' : 'bg-[#2a2044] text-white hover:bg-[#3a2c5c]'
             }`}
           >
             {n}
@@ -918,7 +918,7 @@ const MinesPanel: React.FC<{ className?: string; mines: number; locked: boolean;
         </div>
         <div className="rounded-md bg-black/35 py-1.5">
           <div className="text-[10px] text-white/55 tracking-wider">1ER COUP</div>
-          <div className="text-lg font-bold text-[#ffd45a] leading-none">{first} %</div>
+          <div className="text-lg font-bold text-white leading-none">{first} %</div>
         </div>
       </div>
     </div>
@@ -927,10 +927,10 @@ const MinesPanel: React.FC<{ className?: string; mines: number; locked: boolean;
 
 const InfoCard: React.FC<{ title: string; value: string; sub?: string; tone?: 'good' | 'mid' | 'bad' }> = ({ title, value, sub, tone }) => (
   <div className="rounded-lg bg-black/50 backdrop-blur p-3 text-center border border-white/10">
-    <div className="font-['Oswald'] font-bold text-[#ffd45a] text-xs tracking-wider">{title}</div>
+    <div className="font-['Oswald'] font-bold text-neutral-300 text-xs tracking-wider">{title}</div>
     <div
       className={`font-['Oswald'] font-bold text-xl ${
-        tone === 'good' ? 'text-[#5effa8]' : tone === 'mid' ? 'text-[#ffd45a]' : tone === 'bad' ? 'text-[#ff6a5a]' : 'text-white'
+        tone === 'good' ? 'text-white font-bold' : tone === 'mid' ? 'text-neutral-300' : tone === 'bad' ? 'text-neutral-500' : 'text-white'
       }`}
     >
       {value}
@@ -989,12 +989,12 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
             </div>
             <div className="leading-tight min-w-0 font-['Oswald'] font-bold tracking-wide">
               <div className="text-[13px] sm:text-base whitespace-nowrap">
-                <span className="text-[#ffd45a]">SOLDE </span>
+                <span className="text-neutral-400">SOLDE </span>
                 <span className="text-white">{fmt(p.credit)}</span>
                 {p.demo && <span className="ml-1 text-[10px] text-white/50 align-middle">DÉMO</span>}
               </div>
               <div className="text-[13px] sm:text-base whitespace-nowrap">
-                <span className="text-[#ffd45a]">MISE </span>
+                <span className="text-neutral-400">MISE </span>
                 <span className="text-white">{fmt(p.bet)}</span>
               </div>
               <button
@@ -1002,7 +1002,7 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
                 disabled={p.phase !== 'idle'}
                 className="lg:hidden block text-[13px] whitespace-nowrap underline decoration-dotted underline-offset-2 disabled:no-underline"
               >
-                <span className="text-[#ffd45a]">MINES </span>
+                <span className="text-neutral-400">MINES </span>
                 <span className="text-white">{p.mines}</span>
               </button>
             </div>
@@ -1010,7 +1010,7 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
 
           {/* Centre */}
           <div className="col-span-2 sm:col-span-1 order-first sm:order-none flex flex-col items-center pb-1 min-w-0">
-            <div className="h-5 font-['Oswald'] font-bold tracking-wide text-[#ffd45a] text-xs sm:text-sm truncate max-w-full">{p.status}</div>
+            <div className="h-5 font-['Oswald'] font-bold tracking-wide text-white text-xs sm:text-sm truncate max-w-full">{p.status}</div>
             <div
               className={`font-['Oswald'] font-bold text-center whitespace-nowrap text-[15px] sm:text-2xl ${
                 p.win > 0 ? 'text-[#5ee8ff] drop-shadow-[0_0_10px_rgba(94,232,255,0.6)]' : 'text-white'
@@ -1041,7 +1041,7 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
                     ? 'mn-cash-btn bg-[linear-gradient(180deg,#b0ffd8,#2fd08a_55%,#0f7a4a)] text-[#062a18]'
                     : waiting
                       ? 'bg-[linear-gradient(180deg,#4a3e6a,#2a2044)] text-white/70 shadow-[0_5px_0_#140c22]'
-                      : 'bg-[linear-gradient(180deg,#fff4b0,#ffc42e_55%,#c07a08)] text-[#140c22] shadow-[0_5px_0_#140c22] hover:brightness-110 disabled:opacity-60'
+                      : 'bg-[linear-gradient(180deg,#ffffff,#e2e8f0_55%,#94a3b8)] text-black shadow-[0_5px_0_#140c22] hover:brightness-110 disabled:opacity-60'
                 }`}
               >
                 {cash ? (
@@ -1148,7 +1148,7 @@ const BigWinOverlay: React.FC<{ amount: number; mult: number; onClick: () => voi
       >
         {label}
       </div>
-      <div className="relative mt-3 font-['Oswald'] font-bold text-[clamp(22px,4vw,40px)] text-[#ffd45a] drop-shadow-[0_3px_0_#140c22]">x{fmt(mult)}</div>
+      <div className="relative mt-3 font-['Oswald'] font-bold text-[clamp(22px,4vw,40px)] text-white drop-shadow-[0_3px_0_#140c22]">x{fmt(mult)}</div>
       <div className="relative mt-1 font-['Oswald'] font-bold text-[clamp(36px,7vw,84px)] text-white drop-shadow-[0_5px_0_#140c22]">
         {fmt(Math.floor(amount))}
       </div>
@@ -1166,7 +1166,7 @@ const Modal: React.FC<{ title: string; onClose: () => void; children: React.Reac
       <button onClick={onClose} aria-label="Fermer" className="absolute top-3 right-3 text-white/80 hover:text-white">
         <X size={20} />
       </button>
-      <h3 className="font-['Luckiest_Guy'] text-2xl tracking-wide text-[#ffd45a] text-center mb-4 pr-6">{title}</h3>
+      <h3 className="font-['Luckiest_Guy'] text-2xl tracking-wide text-white text-center mb-4 pr-6">{title}</h3>
       {children}
     </div>
   </div>
@@ -1187,7 +1187,7 @@ const RuleCard: React.FC<{ art: React.ReactNode; title: string; children: React.
   <div className="rounded-lg bg-black/30 p-3">
     <div className="flex items-center gap-2 mb-1.5">
       <div className="w-9 h-9 shrink-0">{art}</div>
-      <b className="text-[#ffd45a] font-['Oswald'] text-sm tracking-wide">{title}</b>
+      <b className="text-white font-['Oswald'] text-sm tracking-wide">{title}</b>
     </div>
     <p>{children}</p>
   </div>

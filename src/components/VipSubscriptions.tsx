@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
 import { 
   Crown, 
-  Sparkles, 
   Coins, 
   Check, 
   Star, 
@@ -400,11 +399,11 @@ export const VipSubscriptions: React.FC = () => {
                         tier.id === 'DIAMOND'
                           ? 'bg-gradient-to-r from-white via-neutral-200 to-white text-black hover:brightness-110 shadow-[0_0_30px_rgba(255,255,255,0.4)]'
                           : tier.id === 'GOLD'
-                          ? 'bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_25px_rgba(251,191,36,0.3)]'
+                          ? 'bg-neutral-200 hover:bg-white text-black shadow-[0_0_25px_rgba(255,255,255,0.3)]'
                           : 'bg-white hover:bg-neutral-200 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]'
                       }`}
                     >
-                      <Sparkles size={14} />
+                      <Crown size={14} />
                       {submittingTier === tier.id ? 'Activation…' : `S'abonner (${tier.priceChips.toLocaleString('fr-FR')} jetons)`}
                     </button>
 
@@ -529,7 +528,7 @@ export const VipSubscriptions: React.FC = () => {
                   disabled={submittingTier !== null}
                   className="flex-1 py-3.5 px-6 rounded-2xl bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(255,255,255,0.3)] active:scale-95 cursor-pointer disabled:opacity-50"
                 >
-                  <Sparkles size={14} />
+                  <Check size={14} />
                   {submittingTier ? 'Paiement en cours…' : 'Confirmer et Payer'}
                 </button>
                 <button

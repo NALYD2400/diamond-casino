@@ -70,7 +70,7 @@ export const SlotIcon: React.FC<SlotIconProps> = ({
 
           {/* Floating Glowing Multiplier Badge (x2 or x3) */}
           <div className="absolute -bottom-1 -right-1 flex items-center justify-center">
-            <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-black font-black font-['Geist_Mono'] text-[11px] border border-white shadow-[0_0_12px_rgba(251,191,36,0.8)]">
+            <span className="px-1.5 py-0.5 rounded-full bg-white text-black font-black font-['Geist_Mono'] text-[11px] border border-white shadow-[0_0_12px_rgba(255,255,255,0.8)]">
               x{wildMultiplier >= 2 ? wildMultiplier : 2}
             </span>
           </div>
@@ -115,7 +115,7 @@ export const SlotIcon: React.FC<SlotIconProps> = ({
           </svg>
           {/* BONUS ribbon banner at bottom */}
           <div className="absolute -bottom-1 inset-x-0 flex justify-center">
-            <span className="px-2 py-0.2 rounded-md bg-gradient-to-r from-red-600 via-rose-500 to-red-600 text-white font-black font-['Geist_Mono'] text-[9px] tracking-wider border border-amber-300 shadow-[0_0_10px_rgba(244,63,94,0.7)]">
+            <span className="px-2 py-0.2 rounded-md bg-gradient-to-r from-red-600 via-rose-500 to-red-600 text-white font-black font-['Geist_Mono'] text-[9px] tracking-wider border border-white/40 shadow-[0_0_10px_rgba(244,63,94,0.7)]">
               BONUS
             </span>
           </div>
@@ -456,12 +456,12 @@ export const SlotIcon: React.FC<SlotIconProps> = ({
       {id === 'wild' && (
         <div className="relative flex items-center justify-center">
           <svg viewBox="0 0 64 64" fill="none" className={className}>
-            <polygon points="32,6 58,32 32,58 6,32" fill="#18181b" stroke="#fbbf24" strokeWidth="2.5" />
+            <polygon points="32,6 58,32 32,58 6,32" fill="#18181b" stroke="#ffffff" strokeWidth="2.5" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-[12px] font-black font-['Geist_Mono'] text-white">WILD</span>
             {wildMultiplier > 1 && (
-              <span className="text-[9px] font-bold font-mono px-1 bg-amber-400 text-black rounded">
+              <span className="text-[9px] font-bold font-mono px-1 bg-white text-black rounded">
                 x{wildMultiplier}
               </span>
             )}

@@ -137,7 +137,7 @@ export const GamesPanel: React.FC<{ showToast: (m: string) => void; goTo: (t: Ad
               <div className="grid grid-cols-5 gap-2 text-center">
                 {minesExamples.map((e) => (
                   <div key={e.mines}>
-                    <div className="font-mono text-sm font-bold text-amber-300">x{fmt(e.mult, 2)}</div>
+                    <div className="font-mono text-sm font-bold text-white">x{fmt(e.mult, 2)}</div>
                     <div className="text-[10px] text-neutral-500 leading-tight">
                       {e.mines} mine{e.mines > 1 ? 's' : ''}
                       <br />

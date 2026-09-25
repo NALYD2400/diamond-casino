@@ -189,7 +189,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
             >
               <item.icon size={14} />
               {item.label}
-              {!!badges[item.id] && <span className="ml-0.5 px-1.5 rounded-full bg-amber-400 text-black text-[10px]">{badges[item.id]}</span>}
+              {!!badges[item.id] && <span className="ml-0.5 px-1.5 rounded-full bg-white text-black text-[10px] font-bold">{badges[item.id]}</span>}
             </button>
           ))}
         </div>
@@ -219,7 +219,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
                         <span className={cx('block text-[11px] leading-tight truncate', active ? 'text-black/60' : 'text-neutral-500')}>{item.description}</span>
                       </span>
                       {!!badges[item.id] && (
-                        <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-400 text-black text-[11px] font-bold flex items-center justify-center">
+                        <span className="min-w-5 h-5 px-1.5 rounded-full bg-white text-black text-[11px] font-bold flex items-center justify-center">
                           {badges[item.id]}
                         </span>
                       )}

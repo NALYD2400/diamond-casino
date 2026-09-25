@@ -128,7 +128,7 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
               ))}
             </div>
             <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 text-[12px] text-neutral-400">
-              Coût moyen d'un tirage pour le casino : <b className="text-amber-300 font-mono">{fmt(expectedChips)} jetons</b> (+ les lots
+              Coût moyen d'un tirage pour le casino : <b className="text-white font-mono">{fmt(expectedChips)} jetons</b> (+ les lots
               non monétaires). Soit ≈ <b className="text-white font-mono">{fmt(expectedChips * spinsPerDay * 30)}</b> jetons créés par joueur
               actif et par mois au délai standard.
             </div>
@@ -230,7 +230,7 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                       <Badge tone={seg.type === 'chips' ? 'gold' : seg.type === 'vehicle' ? 'info' : 'violet'}>{TYPE_LABEL[seg.type]}</Badge>
                     </td>
                     <td className="px-3 py-2.5 text-neutral-300 text-[13px]">
-                      {seg.type === 'chips' ? <span className="font-mono text-amber-300">{fmt(Number(seg.value))} jetons</span> : String(seg.value)}
+                      {seg.type === 'chips' ? <span className="font-mono text-white">{fmt(Number(seg.value))} jetons</span> : String(seg.value)}
                     </td>
                     <td className="px-3 py-2.5">
                       <NumberInput
@@ -243,7 +243,7 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                          <div className={cx('h-full rounded-full', seg.type === 'chips' ? 'bg-amber-400' : 'bg-sky-400')} style={{ width: `${Math.min(100, pct * 3)}%` }} />
+                          <div className={cx('h-full rounded-full', seg.type === 'chips' ? 'bg-white' : 'bg-neutral-400')} style={{ width: `${Math.min(100, pct * 3)}%` }} />
                         </div>
                         <span className="font-mono text-xs text-white w-12 text-right">{fmt(pct, 1)} %</span>
                       </div>
@@ -281,7 +281,7 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
             Somme des poids : <b className="font-mono text-white">{fmt(totalWeight, 2)}</b>
           </span>
           <span>
-            Jetons gagnés en moyenne par tirage : <b className="font-mono text-amber-300">{fmt(expectedChips)}</b>
+            Jetons gagnés en moyenne par tirage : <b className="font-mono text-white">{fmt(expectedChips)}</b>
           </span>
           <span>
             Chance d'un lot non monétaire : <b className="font-mono text-sky-300">{fmt(draft.filter((s) => s.type !== 'chips').reduce((a, s) => a + chance(s), 0), 1)} %</b>

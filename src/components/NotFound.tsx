@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Sparkles } from 'lucide-react';
+import { RefreshCw, Disc } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 
 interface NotFoundProps {
@@ -80,7 +80,7 @@ export const NotFound: React.FC<NotFoundProps> = ({ onReturn }) => {
             onClick={onReturn}
             className="liquid-glass px-8 py-3.5 rounded-full text-white text-xs font-semibold uppercase tracking-wider hover:bg-white/10 transition-colors text-center flex items-center justify-center gap-2"
           >
-            <Sparkles size={14} /> Explore Features
+            <Disc size={14} /> Explore Features
           </Link>
         </div>
       </section>

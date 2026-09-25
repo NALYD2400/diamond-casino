@@ -182,7 +182,7 @@ export const PlayersPanel: React.FC<{ showToast: (m: string) => void }> = ({ sho
                       </div>
                       {c.vipExpiresAt && <div className="text-[10px] text-neutral-500 mt-1">VIP jusqu'au {fmtDate(c.vipExpiresAt, false)}</div>}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono text-amber-300 font-semibold">{fmt(c.chips)}</td>
+                    <td className="px-3 py-3 text-right font-mono text-white font-semibold">{fmt(c.chips)}</td>
                     <td className="px-3 py-3 text-right font-mono text-neutral-400">{fmt(c.totalWagered)}</td>
                     <td className="px-3 py-3">
                       <Badge tone={c.wheelCooldownRemaining === 'Disponible' ? 'good' : 'neutral'}>
@@ -229,7 +229,7 @@ export const PlayersPanel: React.FC<{ showToast: (m: string) => void }> = ({ sho
         <Modal title="Supprimer ce compte ?" onClose={() => setDeleting(null)}>
           <p className="text-sm text-neutral-300">
             La fiche de <b className="text-white">{deleting.rpFirstName} {deleting.rpLastName}</b> (#{deleting.citizenId}) et son solde de{' '}
-            <b className="text-amber-300">{fmt(deleting.chips)} jetons</b> seront supprimés définitivement. Son historique de parties est
+            <b className="text-white">{fmt(deleting.chips)} jetons</b> seront supprimés définitivement. Son historique de parties est
             conservé de façon anonyme.
           </p>
           <div className="flex justify-end gap-2 mt-5">
@@ -305,7 +305,7 @@ const MoneyModal: React.FC<{
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-white/10 px-4 py-3">
           <span className="text-xs text-neutral-400">Solde actuel</span>
-          <span className="font-mono text-lg font-bold text-amber-300">{fmt(citizen.chips)} ⛁</span>
+          <span className="font-mono text-lg font-bold text-white">{fmt(citizen.chips)} ⛁</span>
         </div>
         <Segmented
           value={op}

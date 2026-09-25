@@ -4,7 +4,6 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { 
   ArrowLeft, 
   Crown, 
-  Sparkles, 
   LogOut, 
   Edit3, 
   Disc, 
@@ -548,7 +547,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
                 <div className="mb-5">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase bg-white/10 text-neutral-300 border border-white/20 mb-2">
-                    <Sparkles size={12} className="text-white" />
+                    <User size={12} className="text-white" />
                     Création de Profil Citoyen
                   </span>
                   <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
@@ -722,7 +721,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               <Car size={15} />
               <span>Mes lots</span>
               {user.rewards.some((r) => r.status === 'IN_INVENTORY') && (
-                <span className="w-2 h-2 rounded-full bg-amber-400" aria-label="Lots à réclamer" />
+                <span className="w-2 h-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" aria-label="Lots à réclamer" />
               )}
             </button>
 
@@ -774,7 +773,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-neutral-500/15 hover:bg-neutral-500/25 border border-neutral-500/30 text-neutral-300 text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.1)] cursor-pointer"
                 title="Console Administration"
               >
-                <Sparkles size={14} className="text-neutral-300" />
                 <span>Admin</span>
               </Link>
             )}
@@ -811,7 +809,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <span className="px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase bg-white/10 border border-white/25 text-neutral-300 inline-flex items-center gap-1.5">
-                      <Sparkles size={12} className="text-white" />
+                      <User size={12} className="text-white" />
                       CITOYEN RECONNU #{user.citizenId}
                     </span>
 
@@ -993,7 +991,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                           : 'bg-white/10 hover:bg-white/15 text-white border border-white/15'
                       }`}
                     >
-                      <Sparkles size={14} className={canSpinWheel ? 'text-black' : 'text-white'} />
+                      <Disc size={14} className={canSpinWheel ? 'text-black' : 'text-white'} />
                       <span>{canSpinWheel ? 'Tourner la Roue' : 'Voir le Podium'}</span>
                     </Link>
                   </div>
@@ -1277,7 +1275,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                           ) : tx.type === 'vip_subscription' ? (
                             <Crown size={16} className="text-neutral-300" />
                           ) : (
-                            <Sparkles size={16} className="text-neutral-300" />
+                            <Coins size={16} className="text-neutral-300" />
                           )}
                         </div>
                         <div className="min-w-0">

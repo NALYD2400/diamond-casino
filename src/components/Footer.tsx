@@ -21,18 +21,18 @@ export const Footer: React.FC = () => {
       </Link>
 
       <div className="flex flex-wrap items-center gap-6 sm:gap-8 text-xs font-['Geist_Mono'] text-neutral-400">
-        <Link to="/jeux" className="hover:text-amber-400 transition-colors">
+        <Link to="/jeux" className="hover:text-white transition-colors">
           JEUX DE CASINO
         </Link>
-        <Link to="/mines" className="hover:text-amber-400 transition-colors">
+        <Link to="/mines" className="hover:text-white transition-colors">
           JEU DES MINES
         </Link>
-        <Link to="/roue-de-la-fortune" className="hover:text-amber-400 transition-colors">
+        <Link to="/roue-de-la-fortune" className="hover:text-white transition-colors">
           ROUE DE LA FORTUNE
         </Link>
         <Link 
           to="/abonnements"
-          className="hover:text-amber-400 transition-colors"
+          className="hover:text-white transition-colors"
         >
           ABONNEMENTS VIP
         </Link>
@@ -45,7 +45,7 @@ export const Footer: React.FC = () => {
         {isAdmin && (
           <Link 
             to="/admin"
-            className="hover:text-amber-400 text-neutral-400 transition-colors"
+            className="hover:text-white text-neutral-400 transition-colors"
           >
             CONSOLE GÉRANCE
           </Link>

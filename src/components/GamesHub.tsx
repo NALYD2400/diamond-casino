@@ -12,7 +12,6 @@ import {
   Play,
   Search,
   ShieldCheck,
-  Sparkles,
   Spade,
   TrendingUp,
 } from 'lucide-react';
@@ -110,19 +109,19 @@ const MinesCover: React.FC = () => (
 );
 
 const WheelCover: React.FC = () => (
-  <div className="absolute inset-0 overflow-hidden bg-[#1a0f00]">
+  <div className="absolute inset-0 overflow-hidden bg-neutral-950">
     <img src="/podium_supercar.jpg" alt="" className="absolute inset-0 w-full h-full object-cover opacity-55" />
     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
     <div
-      className="absolute left-1/2 top-[14%] -translate-x-1/2 w-[70%] aspect-square rounded-full border-[5px] border-[#ffcf3f] shadow-[0_0_30px_rgba(255,190,40,0.55)]"
+      className="absolute left-1/2 top-[14%] -translate-x-1/2 w-[70%] aspect-square rounded-full border-[5px] border-white shadow-[0_0_30px_rgba(255,255,255,0.35)]"
       style={{
         background:
-          'repeating-conic-gradient(#b8860b 0deg 22.5deg, #111 22.5deg 45deg, #e0a526 45deg 67.5deg, #2a2a2a 67.5deg 90deg)',
+          'repeating-conic-gradient(#555555 0deg 22.5deg, #111111 22.5deg 45deg, #888888 45deg 67.5deg, #222222 67.5deg 90deg)',
       }}
     >
-      <div className="absolute inset-[38%] rounded-full bg-[#ffcf3f] border-4 border-black" />
+      <div className="absolute inset-[38%] rounded-full bg-white border-4 border-black" />
     </div>
-    <div className="absolute inset-x-0 bottom-[7%] text-center font-black tracking-tight text-[#ffcf3f] text-[clamp(16px,2vw,24px)] leading-tight drop-shadow">
+    <div className="absolute inset-x-0 bottom-[7%] text-center font-black tracking-tight text-white text-[clamp(16px,2vw,24px)] leading-tight drop-shadow">
       ROUE DE LA
       <br />
       FORTUNE
@@ -204,7 +203,7 @@ const GAMES: GameTile[] = [
 
 const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'all', label: 'Tous les jeux', icon: <LayoutGrid size={15} /> },
-  { id: 'slots', label: 'Machines à sous', icon: <Sparkles size={15} /> },
+  { id: 'slots', label: 'Machines à sous', icon: <Dices size={15} /> },
   { id: 'originals', label: 'Originals', icon: <Gem size={15} /> },
   { id: 'rewards', label: 'Récompenses', icon: <Disc size={15} /> },
 ];
@@ -225,13 +224,13 @@ const Tile: React.FC<{ game: GameTile; index: number }> = ({ game, index }) => {
       >
         {game.cover}
         {game.tag && (
-          <span className="absolute top-2 left-2 z-10 rounded-md bg-[#ffcf3f] px-1.5 py-0.5 text-[10px] font-extrabold text-[#1a1000]">
+          <span className="absolute top-2 left-2 z-10 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-extrabold text-black">
             {game.tag}
           </span>
         )}
         {available ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-all group-hover:opacity-100 backdrop-blur-[2px]">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ffcf3f] text-[#1a1000] shadow-[0_0_25px_rgba(255,207,63,0.6)]">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-black shadow-[0_0_25px_rgba(255,255,255,0.6)]">
               <Play size={24} fill="currentColor" className="ml-1" />
             </span>
           </div>
@@ -290,12 +289,12 @@ export const GamesHub: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 rounded-lg bg-neutral-900 border border-white/10 px-3 py-2">
-                  <Coins size={16} className="text-[#ffcf3f]" />
+                  <Coins size={16} className="text-white" />
                   <span className="font-['Geist_Mono'] text-sm font-bold text-white">{user.chips.toLocaleString('fr-FR')}</span>
                 </div>
                 <Link
                   to="/espace-membre"
-                  className="rounded-lg bg-[#ffcf3f] px-4 py-2 text-sm font-bold text-[#1a1000] hover:bg-[#ffd966] transition-colors"
+                  className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-black hover:bg-neutral-200 transition-colors"
                 >
                   Portefeuille
                 </Link>
@@ -308,7 +307,7 @@ export const GamesHub: React.FC = () => {
               </div>
               <Link
                 to="/espace-membre"
-                className="flex items-center gap-1 rounded-lg bg-[#ffcf3f] px-4 py-2 text-sm font-bold text-[#1a1000] hover:bg-[#ffd966] transition-colors"
+                className="flex items-center gap-1 rounded-lg bg-white px-4 py-2 text-sm font-bold text-black hover:bg-neutral-200 transition-colors"
               >
                 Connexion <ChevronRight size={15} />
               </Link>
@@ -329,7 +328,7 @@ export const GamesHub: React.FC = () => {
               <DogSymbol id="rottweiler" />
             </div>
             <div className="relative z-10 flex h-full max-w-[62%] sm:max-w-[52%] flex-col justify-center p-5 sm:p-8">
-              <span className="mb-2 w-fit rounded-md bg-[#3b1d0e] px-2 py-0.5 text-[11px] font-extrabold text-[#ffcf3f]">
+              <span className="mb-2 w-fit rounded-md bg-[#3b1d0e] px-2 py-0.5 text-[11px] font-extrabold text-white">
                 NOUVELLE MACHINE
               </span>
               <h2 className="dh-font-xl text-3xl sm:text-5xl leading-none text-[#ffb300] [-webkit-text-stroke:2px_#3b1d0e] drop-shadow-[0_4px_0_#3b1d0e]">
@@ -352,7 +351,7 @@ export const GamesHub: React.FC = () => {
               <img src="/podium_supercar.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-500 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
               <div className="relative p-5">
-                <div className="text-[11px] font-extrabold text-[#ffcf3f]">TOUS LES JOURS</div>
+                <div className="text-[11px] font-extrabold text-white">TOUS LES JOURS</div>
                 <div className="text-xl font-extrabold text-white">Roue de la Fortune</div>
                 <div className="mt-1 text-xs text-neutral-300">Un tour offert, la supercar du podium en jeu.</div>
               </div>
@@ -397,7 +396,6 @@ export const GamesHub: React.FC = () => {
 
         {/* Grille */}
         <div className="mt-6 mb-3 flex items-center gap-2">
-          <Sparkles size={18} className="text-[#ffcf3f]" />
           <h3 className="text-lg font-bold text-white">{CATEGORIES.find((c) => c.id === category)?.label}</h3>
           <span className="text-sm text-neutral-400">({filtered.length})</span>
         </div>
@@ -421,7 +419,7 @@ export const GamesHub: React.FC = () => {
             { icon: <Play size={18} />, t: 'Mode démo', d: 'Essayez les jeux sans miser vos jetons.' },
           ].map((f) => (
             <div key={f.t} className="flex items-start gap-3 rounded-xl bg-neutral-950/80 border border-white/10 p-4">
-              <span className="mt-0.5 text-[#ffcf3f]">{f.icon}</span>
+              <span className="mt-0.5 text-white">{f.icon}</span>
               <div>
                 <div className="text-sm font-bold text-white">{f.t}</div>
                 <div className="text-xs text-neutral-400">{f.d}</div>

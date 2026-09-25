@@ -88,7 +88,7 @@ export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onS
                 type="button"
                 onClick={() => onSelect(v)}
                 className={`w-full flex items-center gap-3 p-2.5 text-left transition-colors cursor-pointer ${
-                  active ? 'bg-amber-500/15' : 'hover:bg-white/5'
+                  active ? 'bg-white/10' : 'hover:bg-white/5'
                 }`}
               >
                 <div className="w-16 h-10 rounded-lg overflow-hidden bg-neutral-900 shrink-0 flex items-center justify-center text-neutral-600">
@@ -99,7 +99,7 @@ export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onS
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-semibold truncate ${active ? 'text-amber-300' : 'text-white'}`}>
+                  <p className={`text-sm font-semibold truncate ${active ? 'text-white' : 'text-white'}`}>
                     {vehicleDisplayName(v.manufacturer, v.model)}
                   </p>
                   <p className="text-[11px] font-mono text-neutral-500 truncate">

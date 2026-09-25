@@ -11,7 +11,7 @@ export const Architecture: React.FC = () => {
             PRESTIGE &amp; INFRASTRUCTURE
           </span>
           <h2 className="text-4xl sm:text-6xl font-semibold text-white tracking-[-0.03em]">
-            L'excellence d'un complexe d'exception à <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">Los Santos</span>
+            L'excellence d'un complexe d'exception à <span className="font-['Instrument_Serif'] font-normal italic text-white">Los Santos</span>
           </h2>
         </div>
       </div>
@@ -53,7 +53,7 @@ export const Architecture: React.FC = () => {
           },
         ].map((item, idx) => (
           <motion.div key={item.title} {...fadeUp(0.1 * idx)} className="flex flex-col border-l border-white/10 pl-5">
-            <span className="font-['Geist_Mono'] text-xs text-amber-400/80 mb-2">{item.num}</span>
+            <span className="font-['Geist_Mono'] text-xs text-neutral-400 mb-2">{item.num}</span>
             <h3 className="font-semibold text-lg text-white mb-2">{item.title}</h3>
             <p className="text-neutral-400 text-sm leading-relaxed">{item.desc}</p>
           </motion.div>

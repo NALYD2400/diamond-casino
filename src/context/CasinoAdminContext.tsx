@@ -162,7 +162,7 @@ interface CasinoAdminContextType {
 }
 
 export const DEFAULT_SEGMENTS: WheelSegmentConfig[] = [
-  { id: 0, label: 'VÉHICULE PODIUM', type: 'vehicle', value: 'Grotti Itali RSX', color: '#fbbf24', textColor: '#000000', icon: '🏎️', dropRate: 1.5 },
+  { id: 0, label: 'VÉHICULE PODIUM', type: 'vehicle', value: 'Grotti Itali RSX', color: '#ffffff', textColor: '#000000', icon: '🏎️', dropRate: 1.5 },
   { id: 1, label: '50 000 JETONS', type: 'chips', value: 50000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 3.5 },
   { id: 2, label: '75 000 JETONS', type: 'chips', value: 75000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 3.5 },
   { id: 3, label: 'MYSTÈRE DIAMOND', type: 'mystery', value: 'Montre Vacheron Royale', color: '#6d28d9', textColor: '#ffffff', icon: '🎁', dropRate: 4.0 },
@@ -171,7 +171,7 @@ export const DEFAULT_SEGMENTS: WheelSegmentConfig[] = [
   { id: 6, label: 'VÊTEMENT VIP', type: 'clothing', value: 'Costume Sur-Mesure Diamond', color: '#2563eb', textColor: '#ffffff', icon: '👔', dropRate: 6.0 },
   { id: 7, label: '10 000 JETONS', type: 'chips', value: 10000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 14.5 },
   { id: 8, label: '5 000 JETONS', type: 'chips', value: 5000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 14.5 },
-  { id: 9, label: 'CHAMPAGNE VIP', type: 'mystery', value: 'Bouteille Diamond Reserve', color: '#b45309', textColor: '#ffffff', icon: '🍾', dropRate: 5.0 },
+  { id: 9, label: 'CHAMPAGNE VIP', type: 'mystery', value: 'Bouteille Diamond Reserve', color: '#262626', textColor: '#ffffff', icon: '🍾', dropRate: 5.0 },
   { id: 10, label: '35 000 JETONS', type: 'chips', value: 35000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 5.0 },
   { id: 11, label: '20 000 JETONS', type: 'chips', value: 20000, color: '#171717', textColor: '#ffffff', icon: '🪙', dropRate: 7.0 },
   { id: 12, label: 'PASS HIGH ROLLER', type: 'mystery', value: 'Accès Salon Privé VIP', color: '#4f46e5', textColor: '#ffffff', icon: '🔑', dropRate: 2.0 },

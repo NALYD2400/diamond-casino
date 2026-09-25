@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, Disc, Bomb, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Disc, Bomb, Crown } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { fadeUp } from '../constants/animations';
 
@@ -18,7 +18,7 @@ export const Discovery: React.FC = () => {
           {...fadeUp(0.1)}
           className="text-4xl sm:text-6xl lg:text-7xl font-semibold text-white tracking-[-0.03em] mb-6"
         >
-          L'art du jeu à son <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">apogée.</span>
+          L'art du jeu à son <span className="font-['Instrument_Serif'] font-normal italic text-white">apogée.</span>
         </motion.h2>
         <motion.p
           {...fadeUp(0.15)}
@@ -33,19 +33,19 @@ export const Discovery: React.FC = () => {
         {/* Card 1: Jeu des Mines VIP */}
         <Link
           to="/mines"
-          className="liquid-glass rounded-2xl p-8 flex flex-col items-center text-center group hover:bg-white/[0.06] hover:border-amber-500/40 transition-all duration-300 block"
+          className="liquid-glass rounded-2xl p-8 flex flex-col items-center text-center group hover:bg-white/[0.06] hover:border-white/30 transition-all duration-300 block"
         >
-          <div className="w-24 h-24 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(245,158,11,0.3)] transition-all duration-300 text-amber-400">
+          <div className="w-24 h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all duration-300 text-white">
             <Bomb size={38} />
           </div>
           <div className="flex items-center gap-1.5 mb-2">
-            <h3 className="font-bold text-xl text-white group-hover:text-amber-300 transition-colors">Jeu des Mines VIP</h3>
-            <ArrowUpRight size={18} className="text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <h3 className="font-bold text-xl text-white group-hover:text-neutral-200 transition-colors">Jeu des Mines VIP</h3>
+            <ArrowUpRight size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <p className="text-neutral-400 text-sm leading-relaxed mb-4">
             Déminez la grille 5x5, révélez les diamants cachés et encaissez au bon moment. RTP 98.5% certifié.
           </p>
-          <span className="font-['Geist_Mono'] text-xs text-amber-400/80 tracking-wider uppercase mt-auto">
+          <span className="font-['Geist_Mono'] text-xs text-neutral-400 tracking-wider uppercase mt-auto">
             JEU 01 // DÉMINEUR CASINO ➔
           </span>
         </Link>
@@ -53,19 +53,19 @@ export const Discovery: React.FC = () => {
         {/* Card 2: Roue de la fortune */}
         <Link
           to="/roue-de-la-fortune"
-          className="liquid-glass rounded-2xl p-8 flex flex-col items-center text-center group hover:bg-white/[0.06] hover:border-amber-500/40 transition-all duration-300 block"
+          className="liquid-glass rounded-2xl p-8 flex flex-col items-center text-center group hover:bg-white/[0.06] hover:border-white/30 transition-all duration-300 block"
         >
-          <div className="w-24 h-24 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(245,158,11,0.3)] transition-all duration-300 text-amber-400">
+          <div className="w-24 h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all duration-300 text-white">
             <Disc size={38} />
           </div>
           <div className="flex items-center gap-1.5 mb-2">
-            <h3 className="font-bold text-xl text-white group-hover:text-amber-300 transition-colors">Roue de la Fortune</h3>
-            <ArrowUpRight size={18} className="text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <h3 className="font-bold text-xl text-white group-hover:text-neutral-200 transition-colors">Roue de la Fortune</h3>
+            <ArrowUpRight size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <p className="text-neutral-400 text-sm leading-relaxed mb-4">
             1 tirage quotidien gratuit offert à chaque citoyen. Remportez la Supercar exposée sur le podium central.
           </p>
-          <span className="font-['Geist_Mono'] text-xs text-amber-400/80 tracking-wider uppercase mt-auto">
+          <span className="font-['Geist_Mono'] text-xs text-neutral-400 tracking-wider uppercase mt-auto">
             LOT 02 // VÉHICULE PODIUM ➔
           </span>
         </Link>
@@ -75,14 +75,14 @@ export const Discovery: React.FC = () => {
           {...fadeUp(0.4)}
           className="liquid-glass rounded-2xl p-8 flex flex-col items-center text-center group hover:bg-white/[0.04] transition-colors"
         >
-          <div className="w-24 h-24 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 text-cyan-400">
-            <Sparkles size={38} />
+          <div className="w-24 h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 text-white">
+            <Crown size={38} />
           </div>
           <h3 className="font-bold text-xl text-white mb-2">Penthouse &amp; Rooftop</h3>
           <p className="text-neutral-400 text-sm leading-relaxed mb-4">
             Héliport réservé, champagne grand cru, piscine à débordement et vue panoramique imprenable sur Los Santos.
           </p>
-          <span className="font-['Geist_Mono'] text-xs text-cyan-400/80 tracking-wider uppercase mt-auto">
+          <span className="font-['Geist_Mono'] text-xs text-neutral-400 tracking-wider uppercase mt-auto">
             SUITE 03 // ROOFTOP VIP
           </span>
         </motion.div>

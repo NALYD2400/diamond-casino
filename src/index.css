@@ -100,19 +100,19 @@ html, body {
 
 @keyframes pip-breathe {
   0%, 100% { opacity: 0.3; fill: #64748b; }
-  50% { opacity: 0.85; fill: #fbbf24; }
+  50% { opacity: 0.85; fill: #ffffff; }
 }
 @keyframes pip-sweep {
-  0% { opacity: 1; fill: #fef08a; }
+  0% { opacity: 1; fill: #ffffff; }
   30%, 100% { opacity: 0.2; fill: #475569; }
 }
 @keyframes pip-glow {
-  0%, 100% { opacity: 0.4; fill: #d97706; }
-  50% { opacity: 1; fill: #fde68a; }
+  0%, 100% { opacity: 0.4; fill: #94a3b8; }
+  50% { opacity: 1; fill: #ffffff; }
 }
 
 /* Backward compatibility for bulb class */
-.wheel-bulb { fill: #fde68a; }
+.wheel-bulb { fill: #ffffff; }
 .wheel-idle .wheel-bulb { animation: pip-breathe 3s ease-in-out infinite; }
 .wheel-spinning .wheel-bulb { animation: pip-sweep 0.75s linear infinite; animation-delay: calc(var(--i) * -0.023s); }
 .wheel-won .wheel-bulb { animation: pip-glow 0.8s ease-in-out infinite; }

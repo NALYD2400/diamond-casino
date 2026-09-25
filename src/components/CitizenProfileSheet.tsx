@@ -11,7 +11,6 @@ import {
   ShieldAlert,
   Code,
   Trees,
-  Sparkles,
   Phone,
   Calendar,
   History,
@@ -187,8 +186,8 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
     }
     if (r.includes('FOND') || r.includes('PROPRIÉTAIRE') || r.includes('OWNER')) {
       return (
-        <span className="bg-[#281a06] text-[#eab308] border border-[#ca8a04]/40 font-semibold px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1.5 shadow-[0_0_12px_rgba(234,179,8,0.25)]">
-          <Crown size={12} className="text-amber-400" />
+        <span className="bg-white/10 text-white border border-white/20 font-semibold px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1.5 shadow-[0_0_12px_rgba(255,255,255,0.15)]">
+          <Crown size={12} className="text-white" />
           Fondateur
         </span>
       );
@@ -204,7 +203,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
     if (r.includes('VIP') || r.includes('ROLLER')) {
       return (
         <span className="bg-[#2e1065] text-[#c084fc] border border-[#7e22ce]/40 font-semibold px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1.5 shadow-[0_0_12px_rgba(192,132,252,0.25)]">
-          <Sparkles size={12} className="text-purple-400" />
+          <Crown size={12} className="text-purple-400" />
           {role}
         </span>
       );
@@ -552,11 +551,11 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
       case 'surveillance':
       default:
         return {
-          bg: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
-          badgeBg: 'bg-amber-400 text-black',
+          bg: 'bg-white/10 border-white/20 text-white',
+          badgeBg: 'bg-white text-black',
           label: 'SURVEILLANCE',
           icon: AlertTriangle,
-          border: 'border-amber-500/40',
+          border: 'border-white/30',
         };
     }
   };
@@ -770,17 +769,17 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                 <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col justify-between gap-4 shadow-inner">
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wider text-neutral-400 font-mono flex items-center gap-1.5">
-                      <Coins size={14} className="text-amber-400" />
+                      <Coins size={14} className="text-white" />
                       Solde Jetons de Casino
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-white border border-white/20 font-bold">
                       ⛁ JETONS
                     </span>
                   </div>
 
                   <div>
                     <div className="text-2xl sm:text-3xl font-bold text-white font-mono tracking-tight">
-                      {draft.chips.toLocaleString()} <span className="text-sm font-normal text-amber-400">⛁</span>
+                      {draft.chips.toLocaleString()} <span className="text-sm font-normal text-neutral-400">⛁</span>
                     </div>
                     <span className="text-[11px] text-neutral-500 mt-0.5 block">
                       Jetons disponibles pour la roulette, tables de jeux et tournois
@@ -792,7 +791,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                 <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col justify-between gap-4 shadow-inner">
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wider text-neutral-400 font-mono flex items-center gap-1.5">
-                      <Disc size={14} className="text-amber-400" />
+                      <Disc size={14} className="text-white" />
                       Roue de la Fortune
                     </span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-neutral-400 border border-white/5">
@@ -806,7 +805,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                         className={`w-2.5 h-2.5 rounded-full ${
                           draft.wheelCooldownRemaining === 'Disponible' || !draft.lastSpinTimestamp
                             ? 'bg-emerald-400 animate-pulse'
-                            : 'bg-amber-400'
+                            : 'bg-neutral-500'
                         }`}
                       />
                       <span className="text-lg font-bold text-white">
@@ -829,7 +828,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                       onClick={handleUnlockWheel}
                       className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs text-white font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                     >
-                      <Unlock size={14} className="text-amber-400" />
+                      <Unlock size={14} className="text-white" />
                       <span>Débloquer le Tirage Immédiatement</span>
                     </button>
                   </div>
@@ -840,13 +839,13 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
               <div className="p-5 sm:p-6 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col gap-4 shadow-sm">
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-amber-400" />
+                    <FileText size={16} className="text-white" />
                     <h3 className="text-xs font-bold uppercase tracking-wider text-white">
                       Dossier & Note Administrative
                     </h3>
                   </div>
                   {activeNote ? (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold uppercase">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/15 text-white border border-white/30 font-bold uppercase">
                       NOTE ACTIVE
                     </span>
                   ) : (
@@ -1057,7 +1056,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                       value={draft.chips}
                       onChange={(e) => setDraft({ ...draft, chips: Math.max(0, parseInt(e.target.value) || 0) })}
                       placeholder="0"
-                      className="w-full h-11 px-3.5 rounded-xl bg-neutral-900 border border-white/10 text-white font-mono focus:outline-none focus:border-amber-400 transition-colors"
+                      className="w-full h-11 px-3.5 rounded-xl bg-neutral-900 border border-white/10 text-white font-mono focus:outline-none focus:border-white/40 transition-colors"
                     />
                   </div>
                 </div>
@@ -1077,7 +1076,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                   <span className="text-[11px] font-mono uppercase text-neutral-400 block mb-1">
                     Total Jetons Acquis / Gagnés
                   </span>
-                  <div className="text-2xl font-bold font-mono text-amber-400">
+                  <div className="text-2xl font-bold font-mono text-white">
                     +{totalChipsAcquired.toLocaleString()} ⛁
                   </div>
                   <span className="text-[10px] text-neutral-500 mt-1 block">Flux de jetons entrants</span>
@@ -1176,7 +1175,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                           value={depositAmount}
                           onChange={(e) => setDepositAmount(e.target.value)}
                           placeholder="Montant (ex: 25000)"
-                          className="w-full h-10 px-3 rounded-xl bg-black border border-white/10 text-white font-mono focus:outline-none focus:border-amber-400"
+                          className="w-full h-10 px-3 rounded-xl bg-black border border-white/10 text-white font-mono focus:outline-none focus:border-white/40"
                         />
                       </div>
 
@@ -1287,7 +1286,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                   <span className="text-[11px] font-mono uppercase text-neutral-400 block mb-1">
                     Véhicules Podium Gagnés
                   </span>
-                  <div className="text-2xl font-bold font-mono text-amber-400">
+                  <div className="text-2xl font-bold font-mono text-white">
                     {combinedWins.filter((w) => w.type === 'vehicle' || w.label.toUpperCase().includes('VÉHICULE')).length}
                   </div>
                   <span className="text-[10px] text-neutral-500 mt-1 block">Gros lots de prestige</span>
@@ -1309,7 +1308,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-white/10 pb-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                    <Trophy size={14} className="text-amber-400" />
+                    <Trophy size={14} className="text-white" />
                     Historique des Gains & Tirages
                   </h3>
                   <span className="text-[10px] font-mono text-neutral-500">
@@ -1337,7 +1336,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                       className="p-4 rounded-2xl bg-neutral-900/60 border border-white/5 hover:border-white/15 flex items-center justify-between gap-4 text-xs transition-colors"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center shrink-0">
                           <Disc size={18} />
                         </div>
                         <div className="min-w-0">
@@ -1377,7 +1376,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
               <div className="p-5 rounded-2xl bg-neutral-900/60 border border-white/10 flex flex-col gap-4 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
                   <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-amber-400" />
+                    <FileText size={16} className="text-white" />
                     <span className="text-xs font-bold uppercase tracking-wider text-white">
                       Consigner une Note au Dossier du Joueur
                     </span>
@@ -1391,7 +1390,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] font-mono text-neutral-400 mr-1">Statut :</span>
                   {[
-                    { id: 'surveillance', label: '⚠️ Surveillance', color: 'border-amber-400/40 text-amber-300 bg-amber-400/10' },
+                    { id: 'surveillance', label: '⚠️ Surveillance', color: 'border-white/30 text-white bg-white/10' },
                     { id: 'warning', label: '🚨 Avertissement', color: 'border-rose-400/40 text-rose-300 bg-rose-400/10' },
                     { id: 'info', label: '📝 Remarque', color: 'border-sky-400/40 text-sky-300 bg-sky-400/10' },
                     { id: 'vip', label: '⭐ VIP / Confiance', color: 'border-purple-400/40 text-purple-300 bg-purple-400/10' },
@@ -1559,9 +1558,9 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                     const cat = log.category;
                     const catBadge =
                       isNoteLog
-                        ? 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                        ? 'bg-white/20 text-white border-white/40'
                         : cat === 'WHEEL'
-                        ? 'bg-amber-400/10 text-amber-400 border-amber-400/20'
+                        ? 'bg-white/10 text-white border-white/20'
                         : cat === 'CITIZEN'
                         ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20'
                         : cat === 'ECONOMY'
@@ -1578,7 +1577,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                         key={`log_${log.id || idx}_${idx}`}
                         className={`p-3.5 rounded-2xl border transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs ${
                           isNoteLog
-                            ? 'bg-amber-500/[0.08] border-amber-500/30 shadow-sm'
+                            ? 'bg-white/[0.06] border-white/25 shadow-sm'
                             : 'bg-neutral-900/60 border-white/5 hover:border-white/15'
                         }`}
                       >
@@ -1587,7 +1586,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                             {isNoteLog ? '📝 NOTE' : log.category}
                           </span>
                           <div className="min-w-0">
-                            <div className={`font-semibold break-words ${isNoteLog ? 'text-amber-200 text-sm' : 'text-white'}`}>
+                            <div className={`font-semibold break-words ${isNoteLog ? 'text-white text-sm' : 'text-white'}`}>
                               {isNoteLog ? `« ${cleanDetail} »` : cleanDetail}
                             </div>
                             <span className="text-[11px] text-neutral-500">{log.action}</span>

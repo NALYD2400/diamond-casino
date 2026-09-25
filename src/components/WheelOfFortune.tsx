@@ -12,7 +12,6 @@ import {
   Loader2,
   ShieldCheck,
   Shirt,
-  Sparkles,
   User,
   Volume2,
   VolumeX,
@@ -261,20 +260,20 @@ export const WheelOfFortune: React.FC = () => {
   if (maintenance) {
     statusBadge = {
       label: 'Maintenance',
-      dotClass: 'bg-amber-400',
-      textClass: 'text-amber-400',
+      dotClass: 'bg-neutral-400',
+      textClass: 'text-neutral-400',
     };
   } else if (isAuthenticated && canSpinWheel) {
     statusBadge = {
       label: 'Tirage disponible',
-      dotClass: 'bg-emerald-400 animate-pulse',
-      textClass: 'text-emerald-400',
+      dotClass: 'bg-white animate-pulse',
+      textClass: 'text-white',
     };
   } else if (isAuthenticated) {
     statusBadge = {
       label: 'Cooldown actif',
-      dotClass: 'bg-amber-400',
-      textClass: 'text-amber-300',
+      dotClass: 'bg-neutral-500',
+      textClass: 'text-neutral-300',
     };
   }
 
@@ -376,7 +375,7 @@ export const WheelOfFortune: React.FC = () => {
             {/* User Identity / Discord Connection */}
             {isLoading ? (
               <div className="flex items-center gap-3 py-4 text-neutral-400 text-sm">
-                <Loader2 size={16} className="animate-spin text-amber-400" />
+                <Loader2 size={16} className="animate-spin text-white" />
                 Chargement de votre profil citoyen…
               </div>
             ) : isAuthenticated && user ? (
@@ -393,14 +392,14 @@ export const WheelOfFortune: React.FC = () => {
                     </p>
                     <p className="font-['Geist_Mono'] text-xs text-neutral-400 truncate">
                       #{user.citizenId}
-                      {user.vipTier && <span className="text-amber-400"> · VIP {user.vipTier}</span>}
+                      {user.vipTier && <span className="text-white font-semibold"> · VIP {user.vipTier}</span>}
                     </p>
                   </div>
                 </div>
 
                 {user.isBooster ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-['Geist_Mono'] font-semibold tracking-wider uppercase bg-purple-500/15 border border-purple-500/30 text-purple-300 shrink-0">
-                    <Zap size={11} className="text-purple-400" /> Booster
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-['Geist_Mono'] font-semibold tracking-wider uppercase bg-white/10 border border-white/20 text-neutral-200 shrink-0">
+                    <Zap size={11} className="text-white" /> Booster
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-['Geist_Mono'] font-medium tracking-wider uppercase bg-white/5 border border-white/10 text-neutral-400 shrink-0">
@@ -419,7 +418,7 @@ export const WheelOfFortune: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5">
                   <span className="font-['Geist_Mono'] text-[10px] tracking-[1.5px] uppercase text-neutral-400 block mb-1 flex items-center gap-1.5">
-                    <Coins size={12} className="text-amber-400" /> Jetons
+                    <Coins size={12} className="text-white" /> Jetons
                   </span>
                   <p className="font-semibold text-lg sm:text-xl tabular-nums text-white">
                     {user.chips.toLocaleString('fr-FR')}
@@ -428,16 +427,16 @@ export const WheelOfFortune: React.FC = () => {
 
                 <Link
                   to="/espace-membre"
-                  className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 hover:border-amber-400/40 hover:bg-white/[0.04] transition-all group"
+                  className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 hover:border-white/30 hover:bg-white/[0.04] transition-all group"
                   title="Voir mes récompenses"
                 >
                   <span className="font-['Geist_Mono'] text-[10px] tracking-[1.5px] uppercase text-neutral-400 block mb-1 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
-                      <Gift size={12} className="text-amber-400" /> Inventaire
+                      <Gift size={12} className="text-white" /> Inventaire
                     </span>
-                    <ArrowUpRight size={12} className="text-neutral-500 group-hover:text-amber-400 transition-colors" />
+                    <ArrowUpRight size={12} className="text-neutral-500 group-hover:text-white transition-colors" />
                   </span>
-                  <p className="font-semibold text-lg sm:text-xl tabular-nums text-amber-400">
+                  <p className="font-semibold text-lg sm:text-xl tabular-nums text-white">
                     {user.rewards.filter((r) => r.status === 'IN_INVENTORY' || r.status === 'CLAIMED').length} lot(s)
                   </p>
                 </Link>
@@ -448,7 +447,7 @@ export const WheelOfFortune: React.FC = () => {
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col justify-between gap-2">
               <div className="flex items-center justify-between text-xs text-neutral-400 font-['Geist_Mono']">
                 <span className="flex items-center gap-1.5 uppercase tracking-wider">
-                  <Clock size={12} className="text-amber-400" /> Cooldown
+                  <Clock size={12} className="text-white" /> Cooldown
                 </span>
                 <span>
                   {isAuthenticated && user ? `1 tirage / ${user.cooldownHours}h` : '1 tirage / 24h'}
@@ -467,9 +466,9 @@ export const WheelOfFortune: React.FC = () => {
             </div>
 
             {/* Discord Booster & VIP Perk Banner (/boost) */}
-            <div className="p-3.5 rounded-xl border border-white/10 bg-gradient-to-r from-amber-500/[0.04] to-purple-500/[0.04] flex items-center justify-between gap-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shrink-0 text-amber-400">
+                <div className="w-7 h-7 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-white">
                   <Zap size={14} />
                 </div>
                 <div className="min-w-0">
@@ -482,7 +481,7 @@ export const WheelOfFortune: React.FC = () => {
 
               <Link
                 to="/abonnements"
-                className="shrink-0 font-['Geist_Mono'] text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors uppercase tracking-wider flex items-center gap-1"
+                className="shrink-0 font-['Geist_Mono'] text-[11px] font-semibold text-white hover:text-neutral-300 transition-colors uppercase tracking-wider flex items-center gap-1"
               >
                 Pass <ArrowUpRight size={12} />
               </Link>
@@ -494,7 +493,7 @@ export const WheelOfFortune: React.FC = () => {
                 type="button"
                 onClick={handleSpin}
                 disabled={spinDisabled}
-                className="w-full rounded-xl py-3.5 sm:py-4 text-xs sm:text-sm font-bold tracking-widest uppercase transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-black shadow-[0_0_24px_rgba(245,158,11,0.25)] hover:shadow-[0_0_32px_rgba(245,158,11,0.4)] hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:shadow-none disabled:active:scale-100"
+                className="w-full rounded-xl py-3.5 sm:py-4 text-xs sm:text-sm font-bold tracking-widest uppercase transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer bg-white hover:bg-neutral-200 text-black shadow-[0_0_24px_rgba(255,255,255,0.25)] hover:shadow-[0_0_32px_rgba(255,255,255,0.4)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:shadow-none disabled:active:scale-100"
               >
                 {phase === 'requesting' && <Loader2 size={16} className="animate-spin text-black" />}
                 {phase === 'requesting'
@@ -539,7 +538,7 @@ export const WheelOfFortune: React.FC = () => {
               DOTATIONS EN JEU &amp; PROBABILITÉS
             </span>
             <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">
-              Ce que la roue vous <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">réserve</span>
+              Ce que la roue vous <span className="font-['Instrument_Serif'] font-normal italic text-white">réserve</span>
             </h2>
           </div>
           <p className="text-neutral-400 text-xs sm:text-sm max-w-md">
@@ -561,7 +560,7 @@ export const WheelOfFortune: React.FC = () => {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
             <div className="absolute top-4 left-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-['Geist_Mono'] font-bold uppercase tracking-wider bg-amber-400 text-black shadow-lg">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-['Geist_Mono'] font-bold uppercase tracking-wider bg-white text-black shadow-lg">
                 <Crown size={12} /> Lot 01 // Podium
               </span>
             </div>
@@ -590,12 +589,12 @@ export const WheelOfFortune: React.FC = () => {
                 return (
                   <li key={seg.id} className="py-2.5 flex items-center gap-3">
                     <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/10 flex items-center justify-center shrink-0">
-                      <Icon size={14} className={isSpecial ? 'text-amber-400' : 'text-neutral-400'} />
+                      <Icon size={14} className={isSpecial ? 'text-white' : 'text-neutral-400'} />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className={`text-xs sm:text-sm font-medium truncate ${isSpecial ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={`text-xs sm:text-sm font-medium truncate ${isSpecial ? 'text-white font-semibold' : 'text-neutral-300'}`}>
                           {seg.label}
                         </span>
                         <span className="font-['Geist_Mono'] text-xs text-neutral-400 tabular-nums shrink-0">
@@ -605,7 +604,7 @@ export const WheelOfFortune: React.FC = () => {
                       <div className="h-1 rounded-full bg-white/5 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            seg.type === 'vehicle' ? 'bg-amber-400' : isSpecial ? 'bg-amber-500/70' : 'bg-neutral-500'
+                            seg.type === 'vehicle' ? 'bg-white' : isSpecial ? 'bg-neutral-300' : 'bg-neutral-600'
                           }`}
                           style={{ width: `${Math.max(2, (chance / maxChance) * 100)}%` }}
                         />
@@ -634,7 +633,7 @@ export const WheelOfFortune: React.FC = () => {
               RÈGLEMENT &amp; AVANTAGES
             </span>
             <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-8">
-              Équité, transparence &amp; <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">avantages.</span>
+              Équité, transparence &amp; <span className="font-['Instrument_Serif'] font-normal italic text-white">avantages.</span>
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -644,7 +643,7 @@ export const WheelOfFortune: React.FC = () => {
                   {...fadeUp(0.06 * idx)}
                   className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col justify-between"
                 >
-                  <span className="font-['Geist_Mono'] text-xs text-amber-400 font-bold mb-1.5">{rule.num}</span>
+                  <span className="font-['Geist_Mono'] text-xs text-white font-bold mb-1.5">{rule.num}</span>
                   <h3 className="font-semibold text-sm text-white mb-1.5">{rule.title}</h3>
                   <p className="text-neutral-400 text-xs leading-relaxed">{rule.desc}</p>
                 </motion.div>
@@ -658,7 +657,7 @@ export const WheelOfFortune: React.FC = () => {
               DERNIERS GAGNANTS
             </span>
             <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-8">
-              Tirages en <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">ville.</span>
+              Tirages en <span className="font-['Instrument_Serif'] font-normal italic text-white">ville.</span>
             </h2>
 
             <div className="liquid-glass rounded-2xl p-2 border border-white/10">
@@ -675,7 +674,7 @@ export const WheelOfFortune: React.FC = () => {
                     >
                       <div className="min-w-0">
                         <p className="text-xs sm:text-sm font-medium text-white truncate">{win.winner}</p>
-                        <p className="text-[11px] text-amber-400/90 truncate">{win.prize}</p>
+                        <p className="text-[11px] text-neutral-300 truncate">{win.prize}</p>
                       </div>
                       <span className="font-['Geist_Mono'] text-[10px] text-neutral-500 shrink-0">
                         {timeAgo(win.won_at)}
@@ -688,12 +687,12 @@ export const WheelOfFortune: React.FC = () => {
 
             <div className="mt-4 p-3.5 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between gap-3">
               <span className="text-xs text-neutral-300 flex items-center gap-2">
-                <Crown size={14} className="text-amber-400 shrink-0" />
+                <Crown size={14} className="text-white shrink-0" />
                 Cooldown réduit avec les cartes VIP
               </span>
               <Link
                 to="/abonnements"
-                className="text-xs font-['Geist_Mono'] uppercase tracking-wider font-bold text-amber-400 hover:underline flex items-center gap-1 shrink-0"
+                className="text-xs font-['Geist_Mono'] uppercase tracking-wider font-bold text-white hover:underline flex items-center gap-1 shrink-0"
               >
                 Voir <ArrowUpRight size={12} />
               </Link>
@@ -750,7 +749,7 @@ export const WheelOfFortune: React.FC = () => {
                   Tirage Gagnant
                 </span>
                 <h3 id="wheel-result-title" className="text-3xl sm:text-4xl font-['Instrument_Serif'] mt-1 mb-2 font-normal">
-                  <em className="italic text-amber-400">{wonSegment.label}</em>
+                  <em className="italic text-white">{wonSegment.label}</em>
                 </h3>
 
                 <p className="text-neutral-300 text-xs sm:text-sm leading-relaxed max-w-sm mx-auto mb-6">

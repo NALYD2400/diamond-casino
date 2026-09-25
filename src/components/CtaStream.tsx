@@ -67,7 +67,7 @@ export const CtaStream: React.FC<CtaStreamProps> = ({ view404 }) => {
         </div>
 
         <h2 className="text-4xl sm:text-6xl md:text-7xl font-semibold text-white tracking-tight mb-4">
-          Entrez dans l'univers <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">The Diamond</span>
+          Entrez dans l'univers <span className="font-['Instrument_Serif'] font-normal italic text-white">The Diamond</span>
         </h2>
         <p className="text-neutral-300 text-base sm:text-lg leading-relaxed mb-10 max-w-xl">
           Tables VIP de grand prestige, suites penthouse, Roue de la Fortune quotidienne et privilèges exclusifs réservés aux citoyens de Los Santos.
@@ -82,7 +82,7 @@ export const CtaStream: React.FC<CtaStreamProps> = ({ view404 }) => {
           </Link>
           <Link
             to="/roue-de-la-fortune"
-            className="liquid-glass rounded-full px-8 py-4 text-white text-sm font-medium hover:bg-white/10 transition-transform active:scale-95 cursor-pointer flex items-center gap-2 border border-amber-500/30 text-amber-300 text-center"
+            className="liquid-glass rounded-full px-8 py-4 text-white text-sm font-medium hover:bg-white/10 transition-transform active:scale-95 cursor-pointer flex items-center gap-2 border border-white/20 text-white text-center"
           >
             Tourner la Roue
           </Link>

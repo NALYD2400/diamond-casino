@@ -27,7 +27,7 @@ export const Hero: React.FC = () => {
           {...fadeUp(0.2)}
           className="text-5xl sm:text-7xl lg:text-8xl xl:text-9xl text-white tracking-tight leading-tight mb-6 font-['Instrument_Serif'] font-normal"
         >
-          The <em className="italic text-amber-400 font-normal">Diamond</em> Casino
+          The <em className="italic text-white font-normal">Diamond</em> Casino
         </motion.h1>
 
         {/* Subtitle */}
@@ -45,7 +45,7 @@ export const Hero: React.FC = () => {
         >
           <Link
             to="/roue-de-la-fortune"
-            className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 transition-transform duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 shadow-[0_0_30px_rgba(245,158,11,0.35)] cursor-pointer"
+            className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 transition-transform duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 shadow-[0_0_30px_rgba(255,255,255,0.35)] cursor-pointer"
           >
             <Disc size={17} />
             Tourner la Roue de la Fortune

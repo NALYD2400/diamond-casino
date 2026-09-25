@@ -12,7 +12,7 @@ export const GemArt: React.FC<{ className?: string; hue?: 'cyan' | 'pink' | 'gol
   const pal = {
     cyan: ['#f4ffff', '#9ef3ff', '#3fd2f2', '#1386b8', '#0b4a78'],
     pink: ['#fff0fb', '#ffb0e6', '#ff5fc4', '#c01d8a', '#6a0a4a'],
-    gold: ['#fffbe0', '#ffe68a', '#ffc42e', '#c07a08', '#6a3a04'],
+    gold: ['#ffffff', '#f1f5f9', '#cbd5e1', '#64748b', '#334155'],
   }[hue];
   return (
     <svg viewBox="0 0 100 100" className={className} aria-hidden="true">
@@ -65,8 +65,8 @@ export const BombArt: React.FC<{ className?: string; lit?: boolean }> = ({ class
     <path d="M62 26 Q70 10 84 14" stroke="#c8a070" strokeWidth="3.5" fill="none" strokeLinecap="round" strokeDasharray="4 3" />
     {lit && (
       <g className="mn-fuse" style={{ transformOrigin: '85px 13px' }}>
-        <circle cx="85" cy="13" r="8" fill="#ffcf3a" opacity="0.55" />
-        <path d="M85 3 L87 10 L95 9 L89 14 L94 20 L86 17 L83 24 L82 16 L75 15 L81 11 Z" fill="#ffe46a" stroke="#ff6a1a" strokeWidth="1.5" />
+        <circle cx="85" cy="13" r="8" fill="#ffffff" opacity="0.55" />
+        <path d="M85 3 L87 10 L95 9 L89 14 L94 20 L86 17 L83 24 L82 16 L75 15 L81 11 Z" fill="#ffffff" stroke="#94a3b8" strokeWidth="1.5" />
       </g>
     )}
     {/* bouchon */}
@@ -95,7 +95,7 @@ export const BlastArt: React.FC<{ className?: string }> = ({ className = '' }) =
       strokeLinejoin="round"
     />
     <path d="M50 16 L56 36 L74 26 L64 44 L84 48 L64 56 L76 74 L58 64 L52 82 L46 64 L28 74 L38 56 L18 50 L38 44 L26 26 L44 36 Z" fill="#ffb21a" />
-    <circle cx="50" cy="50" r="13" fill="#fff4a8" />
+    <circle cx="50" cy="50" r="13" fill="#ffffff" />
   </svg>
 );
 
@@ -146,7 +146,7 @@ export const RockFace: React.FC<{ seed: number }> = ({ seed }) => {
         <g className="mn-speck">
           {speck === 0 && <path d="M76 70 L82 62 L86 72 L80 80 Z" fill="#5ee8ff" stroke="#1e1530" strokeWidth="1.8" />}
           {speck === 1 && <path d="M18 70 L24 60 L29 70 L22 78 Z" fill="#ff7ad8" stroke="#1e1530" strokeWidth="1.8" />}
-          {speck === 2 && <path d="M70 18 L76 12 L80 22 L73 28 Z" fill="#ffd45a" stroke="#1e1530" strokeWidth="1.8" />}
+          {speck === 2 && <path d="M70 18 L76 12 L80 22 L73 28 Z" fill="#ffffff" stroke="#1e1530" strokeWidth="1.8" />}
         </g>
       </svg>
     </>
@@ -156,8 +156,8 @@ export const RockFace: React.FC<{ seed: number }> = ({ seed }) => {
 export const MinesLogo: React.FC<{ className?: string }> = ({ className = '' }) => (
   <div className={`relative text-center leading-none select-none ${className}`}>
     <div
-      className="font-['Oswald'] font-bold text-[clamp(13px,2.8cqw,26px)] tracking-[0.42em] pl-[0.42em] text-[#ffd45a]"
-      style={{ filter: 'drop-shadow(0 2px 0 #140c22) drop-shadow(0 0 8px rgba(255,212,90,0.45))' }}
+      className="font-['Oswald'] font-bold text-[clamp(13px,2.8cqw,26px)] tracking-[0.42em] pl-[0.42em] text-white"
+      style={{ filter: 'drop-shadow(0 2px 0 #140c22) drop-shadow(0 0 8px rgba(255,255,255,0.45))' }}
     >
       DIAMOND
     </div>
@@ -211,12 +211,12 @@ const CrystalCluster: React.FC<{ className?: string; color: string; glow: string
 
 const Lantern: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className = '', style }) => (
   <div className={`absolute ${className}`} style={style} aria-hidden="true">
-    <div className="mn-lantern-glow absolute left-1/2 top-[60%] w-[220px] h-[220px] -ml-[110px] -mt-[110px] rounded-full bg-[radial-gradient(circle,rgba(255,190,80,0.45),rgba(255,140,40,0.12)_45%,transparent_70%)]" />
+    <div className="mn-lantern-glow absolute left-1/2 top-[60%] w-[220px] h-[220px] -ml-[110px] -mt-[110px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.35),rgba(255,255,255,0.08)_45%,transparent_70%)]" />
     <svg viewBox="0 0 40 80" className="relative w-[34px] mn-swing" style={{ transformOrigin: '20px 0' }}>
       <path d="M20 0 V18" stroke={INK} strokeWidth="2.5" />
       <path d="M12 18 H28 L30 26 H10 Z" fill="#3a2a1a" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
-      <rect x="11" y="26" width="18" height="30" rx="4" fill="#ffd27a" stroke={INK} strokeWidth="2.5" />
-      <path d="M20 32 q5 8 0 16 q-5 -8 0 -16 Z" fill="#fff4c8" />
+      <rect x="11" y="26" width="18" height="30" rx="4" fill="#cbd5e1" stroke={INK} strokeWidth="2.5" />
+      <path d="M20 32 q5 8 0 16 q-5 -8 0 -16 Z" fill="#ffffff" />
       <path d="M15 26 V56 M25 26 V56" stroke={INK} strokeWidth="1.8" />
       <path d="M9 56 H31 L28 62 H12 Z" fill="#3a2a1a" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
     </svg>

@@ -6,6 +6,7 @@ import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
 import { clampBetLevels } from '../../lib/gamesConfig';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
+import { useSlotWarmup } from '../slots/useSlotWarmup';
 import { WantedAudio } from './wantedAudio';
 import { WantedLogo, WantedSymbol } from './WantedSymbols';
 import {
@@ -168,6 +169,7 @@ export const WantedGame: React.FC = () => {
   turboRef.current = turbo;
   const busyRef = useRef(false);
   const { wait, skipAll, waitClick, resolveClick, countUp } = useSlotTimeline();
+  useSlotWarmup(mode === 'real');
 
   // Manche tirée par le SERVEUR en mode jetons (mise et gain réglés en base
   // avant l'animation), localement en mode démo.
@@ -195,19 +197,27 @@ export const WantedGame: React.FC = () => {
   // ---------------------------------------------------------------------------
   // Rouleaux + duels VS
   // ---------------------------------------------------------------------------
+  /** Lance les rouleaux (visuel + son) ; renvoie l'instant de départ */
+  const startReels = useCallback((keepVs: VsReel[]) => {
+    setVsShown(keepVs);
+    setStrips([0, 1, 2, 3, 4].map(randomStrip));
+    setSpinning([0, 1, 2, 3, 4].map((r) => !keepVs.some((v) => v.reel === r)));
+    setAnticip(-1);
+    audio.current.spinStart();
+    return performance.now();
+  }, []);
+
   const animateReels = useCallback(
-    async (res: WantedSpinResult, opts: { anticipation: boolean; keepVs: VsReel[] }) => {
+    async (res: WantedSpinResult, opts: { anticipation: boolean; keepVs: VsReel[]; startedAt?: number }) => {
       const fast = turboRef.current;
-      setVsShown(opts.keepVs);
-      setStrips([0, 1, 2, 3, 4].map(randomStrip));
-      setSpinning([0, 1, 2, 3, 4].map((r) => !opts.keepVs.some((v) => v.reel === r)));
-      setAnticip(-1);
-      audio.current.spinStart();
+      // Les rouleaux ont pu être lancés avant la réponse du serveur : on ne
+      // compte que le temps de rotation minimal restant.
+      const t0 = opts.startedAt ?? startReels(opts.keepVs);
 
       const scatterOn = (r: number) => res.scatterCells.some((s) => s.reel === r);
       const anticipateLast = opts.anticipation && scatterOn(0) && scatterOn(2);
 
-      await wait(fast ? 240 : 480);
+      await wait(Math.max(0, (fast ? 240 : 480) - (performance.now() - t0)));
       let scatterCount = 0;
       for (let r = 0; r < REELS; r++) {
         if (r > 0) {
@@ -249,7 +259,7 @@ export const WantedGame: React.FC = () => {
       }
       setGrid(res.grid);
     },
-    [wait],
+    [wait, startReels],
   );
 
   const presentWins = useCallback(
@@ -401,8 +411,12 @@ export const WantedGame: React.FC = () => {
       setLastWin(0);
       setMessage('');
 
+      // Les rouleaux tournent pendant que le serveur tire la manche : le
+      // résultat n'est connu qu'à la réponse, l'aléa reste entièrement serveur.
+      const startedAt = startReels([]);
       const round = await obtainRound(buy);
       if (!round) {
+        setSpinning([false, false, false, false, false]);
         setAutoLeft(0);
         setPhase('idle');
         busyRef.current = false;
@@ -410,7 +424,7 @@ export const WantedGame: React.FC = () => {
       }
       const res = round.base;
 
-      await animateReels(res, { anticipation: !buy, keepVs: [] });
+      await animateReels(res, { anticipation: !buy, keepVs: [], startedAt });
       if (res.bonus) {
         setScatterHit(true);
         setAutoLeft(0);
@@ -427,7 +441,7 @@ export const WantedGame: React.FC = () => {
       setPhase('idle');
       busyRef.current = false;
     },
-    [animateReels, bet, buyPrices, displayCredit, obtainRound, presentWins, runBonus, wait],
+    [animateReels, startReels, bet, buyPrices, displayCredit, obtainRound, presentWins, runBonus, wait],
   );
 
   const onSpinPress = useCallback(() => {

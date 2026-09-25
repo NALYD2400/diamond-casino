@@ -19,7 +19,10 @@ import { playWantedRound, type WantedBonus } from './wantedEngine.ts';
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  // Le navigateur garde la pré-vérification CORS en cache au lieu de la
+  // refaire avant chaque tour (un aller-retour réseau de moins).
+  'Access-Control-Max-Age': '86400',
 };
 
 const json = (body: unknown, status = 200) =>
@@ -56,6 +59,9 @@ const KNOWN_ERRORS = [
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  // Préchauffage : réveille la fonction à l'ouverture du jeu (aucune donnée,
+  // aucun effet) pour éviter le démarrage à froid au premier tour.
+  if (req.method === 'GET') return json({ ok: true });
   if (req.method !== 'POST') return json({ error: 'METHOD_NOT_ALLOWED' }, 405);
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey(), {
@@ -63,8 +69,13 @@ Deno.serve(async (req) => {
   });
 
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-  const { data: auth } = token ? await admin.auth.getUser(token) : { data: { user: null } };
-  if (!auth?.user) return json({ error: 'AUTH_REQUIRED' }, 401);
+  if (!token) return json({ error: 'AUTH_REQUIRED' }, 401);
+
+  // Vérification du jeton (getUser : contrôle aussi la révocation de session)
+  // et lecture de la config en parallèle — un aller-retour de moins par tour.
+  const [authRes, cfgRes] = await Promise.all([admin.auth.getUser(token), admin.rpc('games_config')]);
+  const user = authRes.data?.user;
+  if (authRes.error || !user) return json({ error: 'AUTH_REQUIRED' }, 401);
 
   let body: { game?: string; bet?: number; mode?: string; buy?: string };
   try {
@@ -79,7 +90,7 @@ Deno.serve(async (req) => {
     return json({ error: 'INVALID_BET' }, 400);
   }
 
-  const { data: config, error: cfgError } = await admin.rpc('games_config');
+  const { data: config, error: cfgError } = cfgRes;
   if (cfgError || !config?.[game]) return json({ error: 'GAME_DISABLED' }, 503);
   const cfg = config[game];
   if (!cfg.enabled) return json({ error: 'GAME_DISABLED' }, 403);
@@ -104,7 +115,7 @@ Deno.serve(async (req) => {
   const paid = Math.floor(round.totalWin);
 
   const { data: profile, error } = await admin.rpc('settle_slot_round', {
-    p_user_id: auth.user.id,
+    p_user_id: user.id,
     p_game: game,
     p_bet: bet,
     p_cost: cost,

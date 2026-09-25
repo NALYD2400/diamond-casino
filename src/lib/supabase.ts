@@ -300,6 +300,11 @@ export interface SlotRoundResponse<R> {
   profile: ProfilePayload;
 }
 
+/** Réveille la fonction Edge (aucun effet côté serveur) pour éviter le démarrage à froid */
+export function apiWarmSlotRound(): void {
+  void supabase.functions.invoke('slot-round', { method: 'GET' }).catch(() => undefined);
+}
+
 export async function apiPlaySlotRound<R>(body: {
   game: 'doghouse' | 'wanted';
   bet: number;

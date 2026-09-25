@@ -18,6 +18,7 @@ import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
 import { clampBetLevels } from '../../lib/gamesConfig';
 import { DogHouseAudio } from './dogHouseAudio';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
+import { useSlotWarmup } from '../slots/useSlotWarmup';
 import { DogSymbol } from './DogSymbols';
 import {
   BOOST_BET_MULTIPLIER,
@@ -181,6 +182,7 @@ export const DogHouseGame: React.FC = () => {
   turboRef.current = turbo;
   const busyRef = useRef(false);
   const { wait, skipAll, waitClick, resolveClick, countUp } = useSlotTimeline();
+  useSlotWarmup(mode === 'real');
 
   // ---------------------------------------------------------------------------
   // Obtention de la manche : tirée par le SERVEUR en mode jetons (la mise et le
@@ -211,18 +213,32 @@ export const DogHouseGame: React.FC = () => {
   // ---------------------------------------------------------------------------
   // Animation d'un tour de rouleaux
   // ---------------------------------------------------------------------------
+  /** Lance les rouleaux (visuel + son) ; renvoie l'instant de départ */
+  const startReels = useCallback(() => {
+    setStrips([0, 1, 2, 3, 4].map((r) => Array.from({ length: STRIP_LEN }, () => randomStripSymbol(r))));
+    setSpinning([true, true, true, true, true]);
+    setAnticip([false, false, false, false, false]);
+    audio.current.spinStart();
+    return performance.now();
+  }, []);
+
+  /** Arrête les rouleaux sans résultat (erreur serveur) */
+  const abortReels = useCallback(() => {
+    setSpinning([false, false, false, false, false]);
+    audio.current.stopReelRoll();
+  }, []);
+
   const animateReels = useCallback(
-    async (res: DogSpinResult, allowAnticipation: boolean, newKeys?: Set<string>) => {
+    async (res: DogSpinResult, allowAnticipation: boolean, newKeys?: Set<string>, startedAt?: number) => {
       const fast = turboRef.current;
-      setStrips([0, 1, 2, 3, 4].map((r) => Array.from({ length: STRIP_LEN }, () => randomStripSymbol(r))));
-      setSpinning([true, true, true, true, true]);
-      setAnticip([false, false, false, false, false]);
-      audio.current.spinStart();
+      // Les rouleaux ont pu être lancés avant la réponse du serveur : on ne
+      // compte que le temps de rotation minimal restant.
+      const t0 = startedAt ?? startReels();
 
       const scatterOn = (r: number) => res.grid[r].includes('scatter');
       const anticipateLast = allowAnticipation && scatterOn(0) && scatterOn(2);
 
-      await wait(fast ? 260 : 520);
+      await wait(Math.max(0, (fast ? 260 : 520) - (performance.now() - t0)));
       let scatterCount = 0;
       for (let r = 0; r < 5; r++) {
         if (r > 0) {
@@ -263,7 +279,7 @@ export const DogHouseGame: React.FC = () => {
       audio.current.stopReelRoll();
       if (!newKeys && res.grid.some((col) => col.includes('wild'))) audio.current.bark();
     },
-    [wait],
+    [wait, startReels],
   );
 
   /** Présente les gains d'un tour (lignes, compteur, big win) */
@@ -402,8 +418,12 @@ export const DogHouseGame: React.FC = () => {
       setCounter(0);
       setMessage(roundMode === 'boost' ? 'BONNE CHANCE (BOOST) !' : 'BONNE CHANCE !');
 
+      // Les rouleaux tournent pendant que le serveur tire la manche : le
+      // résultat n'est connu qu'à la réponse, l'aléa reste entièrement serveur.
+      const startedAt = startReels();
       const round = await obtainRound(roundMode);
       if (!round) {
+        abortReels();
         setAutoLeft(0);
         setPhase('idle');
         busyRef.current = false;
@@ -411,7 +431,7 @@ export const DogHouseGame: React.FC = () => {
       }
       const res = round.base;
 
-      await animateReels(res, !buyBonus);
+      await animateReels(res, !buyBonus, undefined, startedAt);
 
       if (res.triggersBonus) {
         setScatterHit(true);
@@ -435,7 +455,7 @@ export const DogHouseGame: React.FC = () => {
       setPhase('idle');
       busyRef.current = false;
     },
-    [animateReels, bet, boost, cfg.boostEnabled, buyPriceX, displayCredit, obtainRound, presentWins, runFreeSpins, wait],
+    [animateReels, startReels, abortReels, bet, boost, cfg.boostEnabled, buyPriceX, displayCredit, obtainRound, presentWins, runFreeSpins, wait],
   );
 
   const onSpinPress = useCallback(() => {

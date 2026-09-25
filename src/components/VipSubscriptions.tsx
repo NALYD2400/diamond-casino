@@ -16,7 +16,9 @@ import {
   ArrowRight,
   Flame,
   HelpCircle,
-  Gem
+  Gem,
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { Footer } from './Footer';
@@ -26,6 +28,7 @@ type TierData = {
   name: string;
   badge: string;
   priceRP: string;
+  priceChips: number;
   priceReal: string;
   description: string;
   accentColor: string;
@@ -42,6 +45,7 @@ const TIERS: TierData[] = [
     name: 'Carte Silver',
     badge: 'MEMBRE PRIVILÈGE',
     priceRP: '25 000 jetons / mois',
+    priceChips: 25000,
     priceReal: '10 € / mois',
     description: "L'accès privilégié aux commodités et tables du Diamond Casino.",
     accentColor: 'text-neutral-300',
@@ -52,7 +56,7 @@ const TIERS: TierData[] = [
     perks: [
       'Accès libre aux tables classiques',
       '1 tirage de Roue par jour',
-      '15 000 jetons mensuels',
+      '15 000 jetons mensuels inclus',
       'Accès aux bars et salons ouverts',
     ],
   },
@@ -61,6 +65,7 @@ const TIERS: TierData[] = [
     name: 'Carte Gold',
     badge: 'RECOMMANDÉ',
     priceRP: '75 000 jetons / mois',
+    priceChips: 75000,
     priceReal: '20 € / mois',
     description: "Pour les joueurs d'envergure souhaitant des privilèges VIP exclusifs.",
     accentColor: 'text-white',
@@ -71,7 +76,7 @@ const TIERS: TierData[] = [
     perks: [
       'Accès prioritaire au Salon VIP',
       '2 tirages de Roue par jour',
-      '60 000 jetons mensuels',
+      '60 000 jetons mensuels inclus',
       '5 % des pertes remboursés en jetons',
     ],
   },
@@ -80,6 +85,7 @@ const TIERS: TierData[] = [
     name: 'Black Diamond',
     badge: 'PRESTIGE',
     priceRP: '180 000 jetons / mois',
+    priceChips: 180000,
     priceReal: '35 € / mois',
     description: "Le statut d'élite absolu. Tous les accès déverrouillés.",
     accentColor: 'text-white',
@@ -90,7 +96,7 @@ const TIERS: TierData[] = [
     perks: [
       'Accès illimité aux Salons High Roller',
       '3 tirages de Roue par jour',
-      '150 000 jetons mensuels',
+      '150 000 jetons mensuels inclus',
       '10 % des pertes remboursés en jetons',
     ],
   },
@@ -175,19 +181,36 @@ const FallingBills = () => {
 };
 
 export const VipSubscriptions: React.FC = () => {
-  const { user, isAuthenticated, requestVip, pendingVipTier } = useCasinoUser();
+  const { user, isAuthenticated, requestVip, buyVipWithChips, pendingVipTier } = useCasinoUser();
   const [submittingTier, setSubmittingTier] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [confirmTier, setConfirmTier] = useState<TierData | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // VIP cards are paid: the request is recorded and activated by the management after payment
-  const handleSubscribe = async (tier: 'SILVER' | 'GOLD' | 'DIAMOND') => {
+  const handleBuyWithChips = async (tier: TierData) => {
     if (!isAuthenticated) {
       showToast("Connectez votre profil Discord sur l'Espace Membre pour souscrire.");
+      return;
+    }
+    setSubmittingTier(tier.id);
+    try {
+      await buyVipWithChips(tier.id);
+      setConfirmTier(null);
+      showToast(`Félicitations ! Votre carte ${tier.name} est maintenant active.`);
+    } catch (err) {
+      showToast((err as Error).message);
+    } finally {
+      setSubmittingTier(null);
+    }
+  };
+
+  const handleRequestStaff = async (tier: 'SILVER' | 'GOLD' | 'DIAMOND') => {
+    if (!isAuthenticated) {
+      showToast("Connectez votre profil Discord sur l'Espace Membre pour faire une demande.");
       return;
     }
     setSubmittingTier(tier);
@@ -270,6 +293,8 @@ export const VipSubscriptions: React.FC = () => {
           const isCurrentTier = user?.vipTier === tier.id;
           const isPendingTier = pendingVipTier === tier.id;
           const isFeatured = tier.id === 'GOLD';
+          const hasEnoughChips = !!user && user.chips >= tier.priceChips;
+          const canDirectBuy = isAuthenticated && hasEnoughChips && !isCurrentTier;
 
           return (
             <div
@@ -323,41 +348,175 @@ export const VipSubscriptions: React.FC = () => {
               </div>
 
               {/* Action Button */}
-              <div className="relative z-10">
-                <button
-                  onClick={() => handleSubscribe(tier.id)}
-                  disabled={isCurrentTier || isPendingTier || !!pendingVipTier || submittingTier !== null}
-                  className={`w-full py-3.5 px-6 rounded-2xl font-semibold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
-                    isCurrentTier || isPendingTier
-                      ? 'bg-neutral-800 text-neutral-400 border border-white/10 cursor-default'
-                      : pendingVipTier
-                      ? 'bg-neutral-900 text-neutral-500 border border-white/10 cursor-not-allowed'
-                      : tier.id === 'GOLD'
-                      ? 'bg-neutral-900 border border-white/30 text-white hover:bg-neutral-800 active:scale-95'
-                      : tier.id === 'DIAMOND'
-                      ? 'bg-white text-black hover:bg-neutral-200 shadow-[0_0_30px_rgba(255,255,255,0.3)] active:scale-95'
-                      : 'liquid-glass hover:bg-white/10 text-white border border-white/20 active:scale-95'
-                  }`}
-                >
-                  {isCurrentTier ? (
-                    <>
-                      <Check size={14} />
-                      Abonnement Actif
-                    </>
-                  ) : isPendingTier ? (
-                    <>En attente de validation</>
-                  ) : (
-                    <>
+              <div className="relative z-10 flex flex-col items-center gap-2">
+                {isCurrentTier ? (
+                  <button
+                    disabled
+                    className="w-full py-3.5 px-6 rounded-2xl font-semibold text-xs uppercase tracking-wider bg-neutral-800 text-neutral-400 border border-white/10 flex items-center justify-center gap-2 cursor-default"
+                  >
+                    <Check size={14} className="text-emerald-400" />
+                    Abonnement Actif
+                  </button>
+                ) : isPendingTier ? (
+                  <button
+                    disabled
+                    className="w-full py-3.5 px-6 rounded-2xl font-semibold text-xs uppercase tracking-wider bg-neutral-900 text-neutral-400 border border-white/10 flex items-center justify-center gap-2 cursor-default"
+                  >
+                    En attente de validation
+                  </button>
+                ) : canDirectBuy ? (
+                  <>
+                    <button
+                      onClick={() => setConfirmTier(tier)}
+                      disabled={submittingTier !== null}
+                      className={`w-full py-3.5 px-6 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${
+                        tier.id === 'DIAMOND'
+                          ? 'bg-gradient-to-r from-white via-neutral-200 to-white text-black hover:brightness-110 shadow-[0_0_30px_rgba(255,255,255,0.4)]'
+                          : tier.id === 'GOLD'
+                          ? 'bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_25px_rgba(251,191,36,0.3)]'
+                          : 'bg-white hover:bg-neutral-200 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]'
+                      }`}
+                    >
+                      <Sparkles size={14} />
+                      {submittingTier === tier.id ? 'Activation…' : `S'abonner (${tier.priceChips.toLocaleString('fr-FR')} jetons)`}
+                    </button>
+
+                    <button
+                      onClick={() => handleRequestStaff(tier.id)}
+                      disabled={!!pendingVipTier || submittingTier !== null}
+                      className="text-[11px] text-neutral-500 hover:text-neutral-300 underline transition-colors cursor-pointer"
+                    >
+                      ou demander validation à la gérance
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleRequestStaff(tier.id)}
+                      disabled={!!pendingVipTier || submittingTier !== null}
+                      className={`w-full py-3.5 px-6 rounded-2xl font-semibold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+                        pendingVipTier
+                          ? 'bg-neutral-900 text-neutral-500 border border-white/10 cursor-not-allowed'
+                          : tier.id === 'GOLD'
+                          ? 'bg-neutral-900 border border-white/30 text-white hover:bg-neutral-800 active:scale-95'
+                          : tier.id === 'DIAMOND'
+                          ? 'bg-white text-black hover:bg-neutral-200 shadow-[0_0_30px_rgba(255,255,255,0.3)] active:scale-95'
+                          : 'liquid-glass hover:bg-white/10 text-white border border-white/20 active:scale-95'
+                      }`}
+                    >
                       <Crown size={14} />
                       {submittingTier === tier.id ? 'Envoi…' : `Demander ${tier.name}`}
-                    </>
-                  )}
-                </button>
+                    </button>
+
+                    {isAuthenticated && user && !hasEnoughChips && (
+                      <span className="text-[11px] text-neutral-500 text-center leading-tight">
+                        Solde insuffisant pour auto-achat ({user.chips.toLocaleString('fr-FR')} / {tier.priceChips.toLocaleString('fr-FR')} jetons)
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Confirmation Modal for Direct Subscription with Chips */}
+      <AnimatePresence>
+        {confirmTier && user && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-md bg-neutral-950 border border-white/20 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden"
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setConfirmTier(null)}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/5 border border-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                  <Crown size={24} className="text-white" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-['Geist_Mono'] uppercase tracking-widest text-neutral-400">
+                    Souscription Immédiate
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-bold text-white">
+                    {confirmTier.name}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Price & Balance breakdown */}
+              <div className="space-y-2.5 p-4 rounded-2xl bg-white/[0.03] border border-white/10 mb-6 text-xs sm:text-sm">
+                <div className="flex justify-between items-center text-neutral-400">
+                  <span>Solde actuel :</span>
+                  <span className="font-['Geist_Mono'] text-white font-semibold">
+                    {user.chips.toLocaleString('fr-FR')} jetons
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-rose-400">
+                  <span>Prix de la carte :</span>
+                  <span className="font-['Geist_Mono'] font-bold">
+                    - {confirmTier.priceChips.toLocaleString('fr-FR')} jetons
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-emerald-400">
+                  <span>Dotation mensuelle offerte :</span>
+                  <span className="font-['Geist_Mono'] font-bold">
+                    + {confirmTier.chipsBonus.toLocaleString('fr-FR')} jetons
+                  </span>
+                </div>
+                <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+                  <span className="font-semibold text-white">Nouveau solde :</span>
+                  <span className="font-['Geist_Mono'] font-bold text-white text-base">
+                    {(user.chips - confirmTier.priceChips + confirmTier.chipsBonus).toLocaleString('fr-FR')} jetons
+                  </span>
+                </div>
+              </div>
+
+              {/* Included perks summary */}
+              <div className="space-y-2 mb-6 text-xs text-neutral-300">
+                <div className="text-[11px] font-['Geist_Mono'] uppercase tracking-wider text-neutral-400 mb-2">
+                  Privilèges débloqués instantanément :
+                </div>
+                {confirmTier.perks.map((p, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                    <span>{p}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => handleBuyWithChips(confirmTier)}
+                  disabled={submittingTier !== null}
+                  className="flex-1 py-3.5 px-6 rounded-2xl bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(255,255,255,0.3)] active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles size={14} />
+                  {submittingTier ? 'Paiement en cours…' : 'Confirmer et Payer'}
+                </button>
+                <button
+                  onClick={() => setConfirmTier(null)}
+                  disabled={submittingTier !== null}
+                  className="py-3.5 px-6 rounded-2xl bg-neutral-900 border border-white/10 text-neutral-300 hover:text-white font-semibold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Annuler
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <Footer />

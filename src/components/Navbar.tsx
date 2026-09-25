@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isHome = currentPath === '/' || propCurrentView === 'landing';
   const isWheel = currentPath === '/roue-de-la-fortune' || propCurrentView === 'lucky-wheel';
   const isVip = currentPath === '/abonnements';
-  const isGames = currentPath === '/jeux' || currentPath === '/mines' || currentPath === '/slots';
+  const isGames = currentPath === '/jeux' || currentPath === '/mines' || currentPath === '/slots' || currentPath === '/wanted';
   const isMember = currentPath === '/espace-membre' || propCurrentView === 'member-portal';
 
   const handleSectionScroll = (sectionId: string) => {
@@ -89,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Link
               to="/jeux"
               className={`font-medium transition-colors cursor-pointer ${
-                isGames ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+                isGames ? 'text-white font-semibold' : 'text-white/70 hover:text-white'
               }`}
             >
               Jeux
@@ -100,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               to="/roue-de-la-fortune"
               onClick={() => setCurrentView?.('lucky-wheel')}
               className={`font-medium transition-colors cursor-pointer ${
-                isWheel ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+                isWheel ? 'text-white font-semibold' : 'text-white/70 hover:text-white'
               }`}
             >
               Roue de la Fortune
@@ -110,7 +110,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Link
               to="/abonnements"
               className={`font-medium transition-colors cursor-pointer ${
-                location.pathname === '/abonnements' ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+                location.pathname === '/abonnements' ? 'text-white font-semibold' : 'text-white/70 hover:text-white'
               }`}
             >
               Abonnements VIP

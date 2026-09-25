@@ -19,7 +19,7 @@ export const Architecture: React.FC = () => {
       {/* Wide 3:1 aspect ratio filmic video */}
       <div className="rounded-2xl overflow-hidden aspect-[3/1] w-full mb-16 border border-white/15">
         <video
-          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260325_125119_8e5ae31c-0021-4396-bc08-f7aebeb877a2.mp4"
+          src="/Replacing_items_with_casino_chips_20260925142337.mp4"
           className="w-full h-full object-cover"
           autoPlay
           loop

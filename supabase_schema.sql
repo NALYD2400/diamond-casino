@@ -212,7 +212,7 @@ update public.profiles set updated_at = now();
 -- --------------------------------------------------------------------
 alter table public.casino_transactions drop constraint if exists casino_transactions_type_check;
 alter table public.casino_transactions add constraint casino_transactions_type_check
-  check (type in ('DEPOSIT', 'WITHDRAW', 'BET', 'WIN', 'WHEEL', 'VIP_REWARD', 'VIP_REQUEST', 'ADMIN_ADJUST'));
+  check (type in ('DEPOSIT', 'WITHDRAW', 'BET', 'WIN', 'WHEEL', 'VIP_REWARD', 'VIP_REQUEST', 'ADMIN_ADJUST', 'VIP_SUBSCRIPTION'));
 
 update public.bets_history b
 set profile_id = p.id
@@ -689,6 +689,90 @@ begin
 end;
 $$;
 
+-- Achat direct de la carte VIP avec les jetons du compte joueur
+create or replace function public.buy_vip_with_chips(p_tier text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_profile public.profiles;
+  v_new public.profiles;
+  v_price bigint;
+  v_bonus bigint;
+begin
+  if v_uid is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '28000';
+  end if;
+
+  if p_tier not in ('SILVER', 'GOLD', 'DIAMOND') then
+    raise exception 'INVALID_TIER' using errcode = '22023';
+  end if;
+
+  v_price := case p_tier
+    when 'SILVER' then 25000
+    when 'GOLD' then 75000
+    when 'DIAMOND' then 180000
+  end;
+
+  v_bonus := case p_tier
+    when 'SILVER' then 15000
+    when 'GOLD' then 60000
+    when 'DIAMOND' then 150000
+  end;
+
+  select * into v_profile from public.profiles where user_id = v_uid for update;
+  if v_profile.id is null then
+    raise exception 'PROFILE_REQUIRED' using errcode = 'P0002';
+  end if;
+
+  if v_profile.vip_tier = p_tier then
+    raise exception 'VIP_ALREADY_ACTIVE' using errcode = 'P0001';
+  end if;
+
+  if v_profile.chips < v_price then
+    raise exception 'INSUFFICIENT_CHIPS' using errcode = 'P0001';
+  end if;
+
+  -- Déduction du prix de l'abonnement et attribution de la dotation
+  update public.profiles
+  set vip_tier = p_tier,
+      chips = chips - v_price + v_bonus,
+      last_wheel_spin = null
+  where id = v_profile.id
+  returning * into v_new;
+
+  -- Clôture d'une éventuelle demande en attente
+  update public.casino_transactions
+  set status = 'COMPLETED',
+      description = description || ' — auto-achat avec jetons'
+  where profile_id = v_profile.id and type = 'VIP_REQUEST' and status = 'PENDING';
+
+  -- Enregistrement de la transaction d'achat
+  insert into public.casino_transactions (profile_id, type, amount, chips, game, description, status)
+  values (v_profile.id, 'VIP_SUBSCRIPTION', -v_price, -v_price, p_tier, 'Abonnement VIP ' || p_tier, 'COMPLETED');
+
+  -- Enregistrement de la dotation mensuelle
+  if v_bonus > 0 then
+    insert into public.casino_transactions (profile_id, type, amount, chips, game, description, status)
+    values (v_profile.id, 'VIP_REWARD', 0, v_bonus, p_tier, 'Dotation mensuelle VIP ' || p_tier, 'COMPLETED');
+  end if;
+
+  -- Journal d'audit
+  insert into public.admin_logs (action, category, detail, author)
+  values (
+    'Abonnement VIP',
+    'CITIZEN',
+    v_profile.rp_first_name || ' ' || v_profile.rp_last_name || ' (#' || v_profile.citizen_id || ') a souscrit à l''abonnement VIP ' || p_tier || ' avec ses jetons (' || v_price || ' jetons)',
+    'Système Automatique'
+  );
+
+  return public.profile_payload(v_new);
+end;
+$$;
+
 -- Derniers gagnants de la roue (public, noms abrégés uniquement)
 create or replace function public.recent_wheel_wins(p_limit int default 8)
 returns table (winner text, prize text, won_at timestamptz)
@@ -1090,6 +1174,7 @@ grant execute on function public.register_profile(text, text, text, text) to aut
 grant execute on function public.update_my_profile(text, text, text, text) to authenticated;
 grant execute on function public.spin_wheel() to authenticated;
 grant execute on function public.request_vip(text) to authenticated;
+grant execute on function public.buy_vip_with_chips(text) to authenticated;
 -- Fonctions de gérance (le contrôle du rôle est fait à l'intérieur)
 grant execute on function public.admin_update_profile(uuid, jsonb) to authenticated;
 grant execute on function public.admin_adjust_balance(uuid, bigint, bigint, text) to authenticated;
@@ -1795,4 +1880,94 @@ $$;
 
 revoke execute on function public.play_mines_game(bigint, bigint, numeric, integer, integer) from public, anon;
 grant execute on function public.play_mines_game(bigint, bigint, numeric, integer, integer) to authenticated;
+
+-- ====================================================================
+-- THE DIAMOND CASINO & RESORT — MACHINES À SOUS (BACKEND SÉCURISÉ)
+-- ====================================================================
+create or replace function public.play_slots_round(
+  p_machine text,
+  p_bet bigint,
+  p_win bigint,
+  p_multiplier numeric
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_profile public.profiles;
+  v_net bigint;
+  v_machine_name text := coalesce(nullif(trim(p_machine), ''), 'Slots');
+begin
+  if v_uid is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '28000';
+  end if;
+
+  select * into v_profile from public.profiles where user_id = v_uid for update;
+  if v_profile.id is null then
+    raise exception 'PROFILE_REQUIRED' using errcode = 'P0002';
+  end if;
+
+  if p_bet < 0 or p_bet > 100000000 then
+    raise exception 'INVALID_BET' using errcode = 'P0001';
+  end if;
+
+  if p_win < 0 then
+    raise exception 'INVALID_WIN' using errcode = 'P0001';
+  end if;
+
+  if p_multiplier < 0 then
+    raise exception 'INVALID_MULTIPLIER' using errcode = 'P0001';
+  end if;
+
+  if v_profile.chips < p_bet then
+    raise exception 'INSUFFICIENT_FUNDS' using errcode = 'P0001';
+  end if;
+
+  v_net := p_win - p_bet;
+
+  update public.profiles
+  set chips = chips + v_net,
+      total_wagered = coalesce(total_wagered, 0) + p_bet,
+      total_spins = coalesce(total_spins, 0) + 1,
+      total_won = coalesce(total_won, 0) + greatest(v_net, 0)
+  where id = v_profile.id
+  returning * into v_profile;
+
+  insert into public.bets_history (profile_id, game_id, bet_amount, win_amount, multiplier, result_data)
+  values (
+    v_profile.id,
+    v_machine_name,
+    p_bet,
+    p_win,
+    p_multiplier,
+    jsonb_build_object('machine', v_machine_name, 'won', p_win > 0)
+  );
+
+  insert into public.casino_transactions (profile_id, type, amount, chips, game, description, status)
+  values (
+    v_profile.id,
+    case when p_win > 0 then 'WIN' else 'BET' end,
+    0,
+    case when p_win > 0 then v_net else -p_bet end,
+    v_machine_name,
+    case when p_win > 0
+      then v_machine_name || ' : gain de ' || p_win || ' jetons (x' || round(p_multiplier, 2) || ')'
+      else v_machine_name || ' : mise de ' || p_bet || ' jetons'
+    end,
+    'COMPLETED'
+  );
+
+  return jsonb_build_object(
+    'profile', public.profile_payload(v_profile),
+    'net', v_net
+  );
+end;
+$$;
+
+revoke execute on function public.play_slots_round(text, bigint, bigint, numeric) from public, anon;
+grant execute on function public.play_slots_round(text, bigint, bigint, numeric) to authenticated;
+
 

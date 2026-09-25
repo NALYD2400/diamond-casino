@@ -8,10 +8,12 @@ import {
   apiUpdateMyProfile,
   apiSpinWheel,
   apiRequestVip,
+  apiBuyVipWithChips,
   dbFetchTransactions,
   dbFetchMyRewards,
   apiClaimReward,
   apiPlayMinesGame,
+  apiPlaySlotsRound,
   type PlayerReward,
   type ProfilePayload,
   type ProfileRole,
@@ -48,6 +50,7 @@ export interface CasinoUser {
   chips: number;
   isDiscordSynced: boolean;
   vipTier?: VipTier;
+  isBooster?: boolean;
   lastWheelSpin: number | null; // ms timestamp
   nextSpinAt: number | null; // ms timestamp
   cooldownHours: number;
@@ -93,6 +96,7 @@ interface CasinoUserContextType {
   refreshProfile: () => Promise<void>;
   spinWheel: () => Promise<SpinOutcome>;
   requestVip: (tier: VipTier) => Promise<void>;
+  buyVipWithChips: (tier: VipTier) => Promise<void>;
   claimReward: (rewardId: string) => Promise<void>;
   playMinesRound: (params: {
     bet: number;
@@ -116,6 +120,7 @@ const TX_TYPE_MAP: Record<SupabaseTransaction['type'], Pick<CasinoTransaction, '
   WHEEL: { type: 'spin_reward', category: 'Roue de la Fortune' },
   VIP_REQUEST: { type: 'vip_request', category: 'Abonnement VIP' },
   VIP_REWARD: { type: 'vip_subscription', category: 'Abonnement VIP' },
+  VIP_SUBSCRIPTION: { type: 'vip_subscription', category: 'Abonnement VIP' },
   ADMIN_ADJUST: { type: 'admin', category: 'Caisse Casino' },
   DEPOSIT: { type: 'deposit', category: 'Caisse Casino' },
   WITHDRAW: { type: 'withdrawal', category: 'Caisse Casino' },
@@ -151,6 +156,7 @@ function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[], reward
     chips: Number(p.chips) || 0,
     isDiscordSynced: !!p.discord_id,
     vipTier: p.vip_tier || undefined,
+    isBooster: Boolean(p.is_booster),
     lastWheelSpin: p.last_wheel_spin ? new Date(p.last_wheel_spin).getTime() : null,
     nextSpinAt: p.next_spin_at ? new Date(p.next_spin_at).getTime() : null,
     cooldownHours: Number(p.cooldown_hours) || 24,
@@ -200,6 +206,8 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [pendingDiscordUser, setPendingDiscordUser] = useState<DiscordUserData | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
   const loadSeq = useRef(0);
+  const tabIdRef = useRef<string>(Math.random().toString(36).slice(2));
+  const syncChannelRef = useRef<BroadcastChannel | null>(null);
 
   const loadTransactions = useCallback(async (profileId: string) => {
     try {
@@ -213,7 +221,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const applyProfile = useCallback(
-    (profile: ProfilePayload) => {
+    (profile: ProfilePayload, broadcast = true) => {
       setUser((prev) =>
         mapProfile(
           profile,
@@ -223,6 +231,21 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       );
       setPendingDiscordUser(null);
       void loadTransactions(profile.id);
+
+      if (broadcast && typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        try {
+          if (!syncChannelRef.current) {
+            syncChannelRef.current = new BroadcastChannel('diamond_casino_sync');
+          }
+          syncChannelRef.current.postMessage({
+            type: 'PROFILE_SYNC',
+            profile,
+            senderId: tabIdRef.current,
+          });
+        } catch {
+          // ignore BroadcastChannel errors
+        }
+      }
     },
     [loadTransactions],
   );
@@ -265,6 +288,53 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
     return () => data.subscription.unsubscribe();
   }, [loadSession]);
+
+  // Synchronisation multi-onglets instantanée (< 1ms)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('diamond_casino_sync');
+    syncChannelRef.current = channel;
+
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.senderId === tabIdRef.current) return;
+      if (data.type === 'PROFILE_SYNC' && data.profile) {
+        applyProfile(data.profile as ProfilePayload, false);
+      }
+    };
+
+    channel.addEventListener('message', onMessage);
+    return () => {
+      channel.removeEventListener('message', onMessage);
+      channel.close();
+    };
+  }, [applyProfile]);
+
+  // Synchronisation distante / cross-device via Supabase Realtime
+  useEffect(() => {
+    if (!user?.id) return;
+    const profileChannel = supabase
+      .channel(`realtime-profile-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new && (payload.new as ProfilePayload).id === user.id) {
+            applyProfile(payload.new as ProfilePayload, false);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileChannel);
+    };
+  }, [user?.id, applyProfile]);
 
   // Countdown clock — only ticks while a cooldown is running
   const nextSpinAt = user?.nextSpinAt ?? null;
@@ -361,6 +431,14 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [user, loadTransactions],
   );
 
+  const buyVipWithChips = useCallback(
+    async (tier: VipTier) => {
+      const updatedProfile = await apiBuyVipWithChips(tier);
+      applyProfile(updatedProfile);
+    },
+    [applyProfile],
+  );
+
   const claimReward = useCallback(
     async (rewardId: string) => {
       await apiClaimReward(rewardId);
@@ -390,36 +468,14 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return { success: true, net: res.net, balance: Number(res.profile.chips) || 0 };
         }
       } catch (err) {
-        console.warn('[CasinoUser] Remote play_mines_game RPC unavailable, applying local balance sync:', err);
+        console.warn('[CasinoUser] play_mines_game RPC error:', err);
+        void refreshProfile();
+        throw err;
       }
 
-      // Synchronous fallback (persists in state and adds transaction entry)
-      const newChips = Math.max(0, user.chips + net);
-      const newTx: CasinoTransaction = {
-        id: `mines_${Date.now()}`,
-        type: params.win > 0 ? 'bonus' : 'bet',
-        category: 'Jeux',
-        label:
-          params.win > 0
-            ? `Mines : gain de ${params.win.toLocaleString('fr-FR')} jetons (x${params.multiplier})`
-            : `Mines : perte de ${params.bet.toLocaleString('fr-FR')} jetons`,
-        amountChips: Math.abs(net),
-        date: new Date().toISOString(),
-        status: 'COMPLÉTÉ',
-      };
-      setUser((prev) =>
-        prev
-          ? {
-              ...prev,
-              chips: newChips,
-              totalWon: net > 0 ? prev.totalWon + net : prev.totalWon,
-              transactions: [newTx, ...prev.transactions],
-            }
-          : null,
-      );
-      return { success: true, net, balance: newChips };
+      return { success: false, net: 0, balance: user.chips };
     },
-    [user, applyProfile],
+    [user, applyProfile, refreshProfile],
   );
 
   const playSlotsRound = useCallback(
@@ -438,48 +494,26 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
 
       try {
-        // Reuse play_mines_game RPC for atomic server-side balance & bet logging if available
-        const res = await apiPlayMinesGame({
+        // Atomic server-side balance & bet logging via play_slots_round RPC
+        const res = await apiPlaySlotsRound({
+          machineName: params.machineName,
           bet: effectiveBet,
           win: params.win,
           multiplier: params.multiplier,
-          mines: 0,
-          gems: Math.min(25, Math.round(params.multiplier)),
         });
         if (res && res.profile) {
           applyProfile(res.profile);
           return { success: true, net: res.net, balance: Number(res.profile.chips) || 0 };
         }
       } catch (err) {
-        console.warn('[CasinoUser] Remote slots RPC fallback to local state sync:', err);
+        console.warn('[CasinoUser] Remote slots RPC error:', err);
+        void refreshProfile();
+        throw err;
       }
 
-      const newChips = Math.max(0, user.chips + net);
-      const newTx: CasinoTransaction = {
-        id: `slots_${Date.now()}`,
-        type: params.win > 0 ? 'bonus' : 'bet',
-        category: 'Jeux',
-        label:
-          params.win > 0
-            ? `Slots (${params.machineName}) : gain de ${params.win.toLocaleString('fr-FR')} jetons (x${params.multiplier})`
-            : `Slots (${params.machineName}) : mise de ${effectiveBet.toLocaleString('fr-FR')} jetons`,
-        amountChips: Math.abs(net),
-        date: new Date().toISOString(),
-        status: 'COMPLÉTÉ',
-      };
-      setUser((prev) =>
-        prev
-          ? {
-              ...prev,
-              chips: newChips,
-              totalWon: net > 0 ? prev.totalWon + net : prev.totalWon,
-              transactions: [newTx, ...prev.transactions],
-            }
-          : null,
-      );
-      return { success: true, net, balance: newChips };
+      return { success: false, net: 0, balance: user.chips };
     },
-    [user, applyProfile],
+    [user, applyProfile, refreshProfile],
   );
 
   const value = useMemo<CasinoUserContextType>(
@@ -498,6 +532,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       refreshProfile,
       spinWheel,
       requestVip,
+      buyVipWithChips,
       claimReward,
       playMinesRound,
       playSlotsRound,
@@ -518,6 +553,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       refreshProfile,
       spinWheel,
       requestVip,
+      buyVipWithChips,
       claimReward,
       playMinesRound,
       playSlotsRound,

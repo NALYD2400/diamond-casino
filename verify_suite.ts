@@ -31,6 +31,14 @@ import {
   simulateDogHouse,
   MAX_WIN_X_BET,
 } from './src/components/doghouse/dogHouseEngine';
+import {
+  evaluateWantedSpin,
+  runDmhCollect,
+  simulateBonus,
+  simulateWanted,
+  BONUS_INFO,
+  MAX_WIN_X as WANTED_MAX_WIN_X,
+} from './src/components/wanted/wantedEngine';
 
 type TestCase = [string, boolean | Promise<boolean>];
 
@@ -260,6 +268,52 @@ async function main() {
     ['simulated RTP over 300k spins stays close to 96.5%', (() => {
       const sim = simulateDogHouse(300000, seeded(2026));
       return sim.rtp > 90 && sim.rtp < 103 && sim.hitRate > 20 && sim.bonusFrequency > 200 && sim.bonusFrequency < 500;
+    })()],
+  ]);
+
+  const wantedSpins = Array.from({ length: 3000 }, (_, i) => evaluateWantedSpin({ bet: 200, rng: seeded(i + 777) }));
+
+  await runGroup('WANTED DEAD OR A WILD ENGINE', [
+    ['grid is 5x5 and scatters only land on reels 1, 3 and 5 (max one per reel)', wantedSpins.every((r) =>
+      r.landed.length === 5 && r.landed.every((c) => c.length === 5) &&
+      r.scatterCells.every((s) => [0, 2, 4].includes(s.reel)) &&
+      new Set(r.scatterCells.map((s) => s.reel)).size === r.scatterCells.length,
+    )],
+    ['wilds and VS only land on reels 2-4 in the base game', wantedSpins.every((r) =>
+      r.landed.every((col, reel) => col.every((s) => (s !== 'wild' && s !== 'vs') || [1, 2, 3].includes(reel))),
+    )],
+    ['an expanded VS reel only appears when it is part of a win', wantedSpins.every((r) =>
+      r.newVsReels.every((v) => r.wins.some((w) => w.positions.some(([reel]) => reel === v.reel))),
+    )],
+    ['VS multipliers on a line are added together', wantedSpins.every((r) =>
+      r.wins.every((w) => {
+        const sum = r.vsReels.filter((v) => v.reel < w.count).reduce((a, v) => a + v.multiplier, 0);
+        return w.multiplier === (sum || 1);
+      }),
+    )],
+    ['bonus buys trigger the requested bonus', (['gtr', 'duel', 'dmh'] as const).every((b) =>
+      Array.from({ length: 100 }, (_, i) => evaluateWantedSpin({ bet: 200, forceBonus: b, rng: seeded(i + 31) })).every((r) => r.bonus === b),
+    )],
+    ['Duel at Dawn keeps its VS reels sticky', (() => {
+      const sticky = [{ reel: 1, multiplier: 7, loser: 3 }];
+      const r = evaluateWantedSpin({ bet: 200, mode: 'duel', stickyVs: sticky, rng: seeded(5) });
+      return r.vsReels.some((v) => v.reel === 1 && v.multiplier === 7) && r.grid[1].every((s) => s === 'vs');
+    })()],
+    ["Dead Man's Hand collect ends after 3 empty respins", Array.from({ length: 300 }, (_, i) => runDmhCollect(seeded(i + 9))).every((c) =>
+      c.steps.length >= 3 && c.steps.slice(-3).every((s) => s.length === 0) && c.multiplier >= 1,
+    )],
+    ['each bonus is worth close to its buy price (±15%)', (['gtr', 'duel', 'dmh'] as const).every((b) => {
+      const rng = seeded(4242);
+      let total = 0;
+      const n = b === 'gtr' ? 6000 : 12000;
+      for (let i = 0; i < n; i++) total += simulateBonus(b, 1, rng);
+      const ratio = total / n / BONUS_INFO[b].price;
+      return ratio > 0.8 && ratio < 1.15;
+    })],
+    ['a single spin never exceeds the 12 500x max win', wantedSpins.every((r) => r.totalWin <= 200 * WANTED_MAX_WIN_X)],
+    ['simulated RTP over 300k spins stays in a sane range', (() => {
+      const sim = simulateWanted(300000, seeded(2027));
+      return sim.rtp > 80 && sim.rtp < 112 && sim.hitRate > 20;
     })()],
   ]);
 

@@ -82,38 +82,44 @@ html, body {
 
 /* Winning wedge pulse on the fortune wheel */
 @keyframes wheel-win-pulse {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
-}
-.wheel-win-pulse { animation: wheel-win-pulse 0.9s ease-in-out infinite; }
-
-/* Fortune wheel marquee bulbs */
-.wheel-bulb { fill: #fde68a; }
-.wheel-idle .wheel-bulb { animation: bulb-twinkle 2.4s ease-in-out infinite; }
-.wheel-idle .wheel-bulb:nth-child(even) { animation-delay: -1.2s; }
-.wheel-spinning .wheel-bulb {
-  animation: bulb-chase 0.8s linear infinite;
-  animation-delay: calc(var(--i) * -0.025s);
-}
-.wheel-won .wheel-bulb { animation: bulb-blink 0.45s steps(1) infinite; }
-.wheel-won .wheel-bulb:nth-child(even) { animation-delay: -0.225s; }
-
-@keyframes bulb-twinkle {
   0%, 100% { opacity: 0.35; }
-  50% { opacity: 1; }
+  50% { opacity: 0.9; }
 }
-@keyframes bulb-chase {
-  0% { opacity: 1; fill: #fffbe8; }
-  35%, 100% { opacity: 0.25; fill: #fbbf24; }
+.wheel-win-pulse { animation: wheel-win-pulse 1.2s ease-in-out infinite; }
+
+/* Fortune wheel perimeter indices (sober modern luxury) */
+.wheel-pip { fill: #94a3b8; opacity: 0.45; }
+.wheel-idle .wheel-pip { animation: pip-breathe 3s ease-in-out infinite; }
+.wheel-idle .wheel-pip:nth-child(even) { animation-delay: -1.5s; }
+.wheel-spinning .wheel-pip {
+  animation: pip-sweep 0.75s linear infinite;
+  animation-delay: calc(var(--i) * -0.023s);
 }
-@keyframes bulb-blink {
-  0% { opacity: 1; fill: #fffbe8; }
-  50% { opacity: 0.2; fill: #fbbf24; }
+.wheel-won .wheel-pip { animation: pip-glow 0.8s ease-in-out infinite; }
+.wheel-won .wheel-pip:nth-child(even) { animation-delay: -0.4s; }
+
+@keyframes pip-breathe {
+  0%, 100% { opacity: 0.3; fill: #64748b; }
+  50% { opacity: 0.85; fill: #fbbf24; }
 }
+@keyframes pip-sweep {
+  0% { opacity: 1; fill: #fef08a; }
+  30%, 100% { opacity: 0.2; fill: #475569; }
+}
+@keyframes pip-glow {
+  0%, 100% { opacity: 0.4; fill: #d97706; }
+  50% { opacity: 1; fill: #fde68a; }
+}
+
+/* Backward compatibility for bulb class */
+.wheel-bulb { fill: #fde68a; }
+.wheel-idle .wheel-bulb { animation: pip-breathe 3s ease-in-out infinite; }
+.wheel-spinning .wheel-bulb { animation: pip-sweep 0.75s linear infinite; animation-delay: calc(var(--i) * -0.023s); }
+.wheel-won .wheel-bulb { animation: pip-glow 0.8s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .wheel-win-pulse { animation: none; }
-  .wheel-bulb { animation: none !important; opacity: 0.8; }
+  .wheel-pip, .wheel-bulb { animation: none !important; opacity: 0.6; }
   html { scroll-behavior: auto; }
 }
 
@@ -152,6 +158,37 @@ html, body {
 @keyframes dh-sticky {
   0%, 100% { box-shadow: inset 0 0 0 3px rgba(255, 214, 64, 0.9), 0 0 14px rgba(255, 170, 0, 0.6); }
   50% { box-shadow: inset 0 0 0 3px rgba(255, 245, 180, 1), 0 0 26px rgba(255, 200, 0, 0.9); }
+}
+
+.dh-sticky-slam {
+  animation: dh-sticky-slam 0.48s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+@keyframes dh-sticky-slam {
+  0% { transform: scale(1.65) translateY(-24px); filter: brightness(2) drop-shadow(0 0 30px #ffe14a); opacity: 0; }
+  60% { transform: scale(0.92) translateY(5px); filter: brightness(1.3); opacity: 1; }
+  80% { transform: scale(1.08) translateY(-3px); }
+  100% { transform: scale(1) translateY(0); filter: brightness(1); opacity: 1; }
+}
+
+.dh-barrel-roll {
+  animation: dh-barrel 0.16s linear infinite;
+  filter: blur(1px);
+}
+@keyframes dh-barrel {
+  0% { transform: translateY(-50%); }
+  100% { transform: translateY(0%); }
+}
+
+.dh-boost-pulse {
+  animation: dh-boost-pulse 1.1s ease-in-out infinite;
+}
+@keyframes dh-boost-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(255, 207, 63, 0.7)); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 18px rgba(255, 230, 90, 1)); }
+}
+
+.dh-ante-glow {
+  box-shadow: 0 0 18px rgba(125, 255, 90, 0.45), inset 0 0 12px rgba(125, 255, 90, 0.25);
 }
 
 .dh-anticip { animation: dh-anticip 0.5s ease-in-out infinite alternate; }
@@ -196,4 +233,28 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .dh-cloud, .dh-rays { animation: none; }
+}
+
+/* ===================== Wanted Dead or a Wild ===================== */
+.wd-win { animation: wd-win 0.8s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(255, 210, 90, 0.95)); position: relative; z-index: 5; }
+@keyframes wd-win {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.12) rotate(-2deg); }
+}
+.wd-sticky { background: radial-gradient(circle, rgba(224, 176, 64, 0.35), rgba(42, 26, 16, 0.95)); box-shadow: inset 0 0 0 2px #e0b040; }
+.wd-anticip { animation: wd-anticip 0.45s ease-in-out infinite alternate; }
+@keyframes wd-anticip {
+  from { box-shadow: inset 0 0 0 3px #e0b040, 0 0 16px 4px rgba(255, 120, 40, 0.7); }
+  to { box-shadow: inset 0 0 0 3px #fff1b0, 0 0 36px 10px rgba(255, 180, 60, 0.95); }
+}
+.wd-vs-glow { box-shadow: inset 0 0 0 3px #fff1b0, 0 0 22px rgba(255, 190, 60, 0.85); }
+.wd-pop { animation: wd-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes wd-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.wd-flash { animation: wd-flash 0.45s ease-out forwards; }
+@keyframes wd-flash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
 }

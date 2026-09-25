@@ -93,6 +93,14 @@ export const DOG_PAYLINES: readonly (readonly number[])[] = [
 export const SCATTER_PAY_X_BET = 5;
 export const MAX_WIN_X_BET = 6750;
 export const BONUS_BUY_X_BET = 100;
+/** Ante Bet (Bet Boost) : +25 % de mise pour doubler la probabilité de déclencher le bonus */
+export const BOOST_BET_MULTIPLIER = 1.25;
+/**
+ * Multiplicateur par rouleau pour doubler globalement la probabilité (x2) :
+ * Comme il faut 3 scatters indépendants sur 3 rouleaux (0, 2 et 4),
+ * la probabilité globale est au cube : cbrt(2) ≈ 1.28.
+ */
+export const BOOST_SCATTER_MULTIPLIER = 1.28;
 
 type Weights = Partial<Record<DogSymbolId, number>>;
 
@@ -127,6 +135,13 @@ const BASE_WEIGHTS: Weights[] = [0, 1, 2, 3, 4].map((r) => ({
   ...SYMBOL_WEIGHTS,
   ...(WILD_REELS.includes(r) ? { wild: BASE_WILD_WEIGHT } : {}),
   ...(SCATTER_REELS.includes(r) ? { scatter: BASE_SCATTER_WEIGHT } : {}),
+}));
+
+/** Poids avec Boost Ante Bet activé : scatters deux fois plus fréquents */
+const BOOST_WEIGHTS: Weights[] = [0, 1, 2, 3, 4].map((r) => ({
+  ...SYMBOL_WEIGHTS,
+  ...(WILD_REELS.includes(r) ? { wild: BASE_WILD_WEIGHT } : {}),
+  ...(SCATTER_REELS.includes(r) ? { scatter: BASE_SCATTER_WEIGHT * BOOST_SCATTER_MULTIPLIER } : {}),
 }));
 
 const FREE_WEIGHTS: Weights[] = [0, 1, 2, 3, 4].map((r) => ({
@@ -183,10 +198,18 @@ export function evaluateDogHouseSpin(params: {
   isFreeSpin?: boolean;
   stickyWilds?: StickyWild[];
   forceScatters?: boolean;
+  isBoost?: boolean;
   rng?: () => number;
 }): DogSpinResult {
-  const { bet, isFreeSpin = false, stickyWilds = [], forceScatters = false, rng = Math.random } = params;
-  const weights = isFreeSpin ? FREE_WEIGHTS : BASE_WEIGHTS;
+  const {
+    bet,
+    isFreeSpin = false,
+    stickyWilds = [],
+    forceScatters = false,
+    isBoost = false,
+    rng = Math.random,
+  } = params;
+  const weights = isFreeSpin ? FREE_WEIGHTS : isBoost ? BOOST_WEIGHTS : BASE_WEIGHTS;
 
   const grid: DogSymbolId[][] = [];
   const multipliers: number[][] = [];

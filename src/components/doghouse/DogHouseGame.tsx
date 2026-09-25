@@ -5,7 +5,7 @@ import {
   Info,
   Minus,
   Plus,
-  RefreshCw,
+  RotateCw,
   Settings,
   Volume2,
   VolumeX,
@@ -14,10 +14,13 @@ import {
 } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
-import { SlotsAudio } from '../slots/slotsAudio';
+import { DogHouseAudio } from './dogHouseAudio';
+import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { DogSymbol } from './DogSymbols';
 import {
   BONUS_BUY_X_BET,
+  BOOST_BET_MULTIPLIER,
+  BOOST_SCATTER_MULTIPLIER,
   DOG_PAYLINES,
   DOG_SYMBOLS,
   MAX_WIN_X_BET,
@@ -100,6 +103,16 @@ export const DogHouseGame: React.FC = () => {
     } catch {}
   }, [demoChips]);
   useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === DEMO_KEY && e.newValue) {
+        const val = Number(e.newValue);
+        if (!isNaN(val) && val >= 0) setDemoChips(val);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+  useEffect(() => {
     if (!isAuthenticated && mode === 'real') setMode('demo');
   }, [isAuthenticated, mode]);
 
@@ -139,6 +152,8 @@ export const DogHouseGame: React.FC = () => {
   const [fsEnd, setFsEnd] = useState<{ win: number; spins: number } | null>(null);
 
   const [turbo, setTurbo] = useState(false);
+  const [boost, setBoost] = useState(false);
+  const [newStickyKeys, setNewStickyKeys] = useState<Set<string>>(new Set());
   const [autoLeft, setAutoLeft] = useState(0);
   const [autoOpen, setAutoOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -152,71 +167,21 @@ export const DogHouseGame: React.FC = () => {
       return false;
     }
   });
-  const audio = useRef(new SlotsAudio());
-  audio.current.muted = muted;
+  const audio = useRef(new DogHouseAudio());
+  audio.current.sfxMuted = muted;
   useEffect(() => () => audio.current.close(), []);
+
+  const toggleBoost = useCallback(() => {
+    const next = !boost;
+    setBoost(next);
+    audio.current.boostToggle(next);
+  }, [boost]);
 
   // Refs lues par la boucle asynchrone (évite les closures périmées)
   const turboRef = useRef(turbo);
   turboRef.current = turbo;
-  const skipResolvers = useRef<Set<() => void>>(new Set());
-  const clickResolver = useRef<(() => void) | null>(null);
   const busyRef = useRef(false);
-
-  const wait = useCallback(
-    (ms: number) =>
-      new Promise<void>((resolve) => {
-        const done = () => {
-          clearTimeout(t);
-          skipResolvers.current.delete(done);
-          resolve();
-        };
-        const t = setTimeout(done, ms);
-        skipResolvers.current.add(done);
-      }),
-    [],
-  );
-  const skipAll = useCallback(() => {
-    [...skipResolvers.current].forEach((fn) => fn());
-  }, []);
-  const waitClick = useCallback(
-    () =>
-      new Promise<void>((resolve) => {
-        clickResolver.current = () => {
-          clickResolver.current = null;
-          resolve();
-        };
-      }),
-    [],
-  );
-
-  const countUp = useCallback(
-    (from: number, to: number, ms: number, onTick: (v: number) => void) =>
-      new Promise<void>((resolve) => {
-        const start = performance.now();
-        let finished = false;
-        // rAF est suspendu dans un onglet en arrière-plan : le timer garantit la fin
-        const fallback = setTimeout(() => finish(), ms + 100);
-        const finish = () => {
-          if (finished) return;
-          finished = true;
-          clearTimeout(fallback);
-          skipResolvers.current.delete(finish);
-          onTick(to);
-          resolve();
-        };
-        skipResolvers.current.add(finish);
-        const step = (now: number) => {
-          if (finished) return;
-          const p = Math.min(1, (now - start) / ms);
-          onTick(from + (to - from) * (1 - Math.pow(1 - p, 2)));
-          if (p < 1) requestAnimationFrame(step);
-          else finish();
-        };
-        requestAnimationFrame(step);
-      }),
-    [],
-  );
+  const { wait, skipAll, waitClick, resolveClick, countUp } = useSlotTimeline();
 
   // ---------------------------------------------------------------------------
   // Règlement du solde
@@ -247,7 +212,7 @@ export const DogHouseGame: React.FC = () => {
   // Animation d'un tour de rouleaux
   // ---------------------------------------------------------------------------
   const animateReels = useCallback(
-    async (res: DogSpinResult, allowAnticipation: boolean) => {
+    async (res: DogSpinResult, allowAnticipation: boolean, newKeys?: Set<string>) => {
       const fast = turboRef.current;
       setStrips([0, 1, 2, 3, 4].map((r) => Array.from({ length: STRIP_LEN }, () => randomStripSymbol(r))));
       setSpinning([true, true, true, true, true]);
@@ -258,11 +223,12 @@ export const DogHouseGame: React.FC = () => {
       const anticipateLast = allowAnticipation && scatterOn(0) && scatterOn(2);
 
       await wait(fast ? 260 : 520);
+      let scatterCount = 0;
       for (let r = 0; r < 5; r++) {
         if (r > 0) {
           if (r === 4 && anticipateLast) {
             setAnticip([false, false, false, false, true]);
-            audio.current.anticipation();
+            audio.current.startAnticipation();
             await wait(fast ? 900 : 1700);
           } else {
             await wait(fast ? 90 : 200);
@@ -272,10 +238,30 @@ export const DogHouseGame: React.FC = () => {
         setMults((prev) => prev.map((col, i) => (i === r ? res.multipliers[r] : col)));
         setSpinning((prev) => prev.map((s, i) => (i === r ? false : s)));
         setLandKeys((prev) => prev.map((k, i) => (i === r ? k + 1 : k)));
-        audio.current.reelStop(r, scatterOn(r));
+
+        if (r === 4 && anticipateLast) {
+          audio.current.stopAnticipation();
+        }
+
+        if (scatterOn(r)) {
+          scatterCount++;
+          audio.current.scatterDrop(Math.min(3, scatterCount) as 1 | 2 | 3);
+        } else {
+          audio.current.reelStop(r, false);
+        }
+
+        // Slam sonore pour les nouveaux Wilds collants sur ce rouleau
+        if (newKeys && [1, 2, 3].includes(r)) {
+          const hasNewWild = [0, 1, 2].some((row) => newKeys.has(`${r}-${row}`));
+          if (hasNewWild) {
+            audio.current.stickyWildSlam();
+          }
+        }
       }
       setAnticip([false, false, false, false, false]);
-      if (res.grid.some((col) => col.includes('wild'))) audio.current.dogBark();
+      audio.current.stopAnticipation();
+      audio.current.stopReelRoll();
+      if (!newKeys && res.grid.some((col) => col.includes('wild'))) audio.current.bark();
     },
     [wait],
   );
@@ -289,21 +275,31 @@ export const DogHouseGame: React.FC = () => {
       setActiveLine(-1);
       const tier = getWinTier(res.totalWin, stakeBet);
 
+      const maxMult = Math.max(1, ...res.wins.map((w) => w.wildMultiplier || 1));
+      if (maxMult > 1) {
+        audio.current.multiplierBoost(maxMult);
+      }
+
       if (tier.id === 'win') {
-        audio.current.winLine(res.totalWin / stakeBet >= 3 ? 'medium' : 'small');
-        await countUp(counterBase, counterBase + res.totalWin, fast ? 350 : 800, setCounter);
+        audio.current.win(res.totalWin / stakeBet >= 3 ? 'medium' : 'small');
+        await countUp(counterBase, counterBase + res.totalWin, fast ? 350 : 800, (v) => {
+          setCounter(v);
+          audio.current.coinTick();
+        });
         await wait(fast ? 350 : 900);
       } else {
-        audio.current.winLine('big');
+        audio.current.win('medium');
         await wait(fast ? 300 : 700);
         setBigWin({ amount: res.totalWin, shown: 0, bet: stakeBet });
-        audio.current.jackpotFanfare();
+        audio.current.bigWinStart();
         const durations: Record<string, number> = { big: 3200, mega: 4800, superb: 6200, sensational: 8000 };
         const duration = durations[tier.id] ?? 3200;
-        await countUp(0, res.totalWin, fast ? duration / 2 : duration, (v) =>
-          setBigWin((b) => (b ? { ...b, shown: v } : b)),
-        );
+        await countUp(0, res.totalWin, fast ? duration / 2 : duration, (v) => {
+          setBigWin((b) => (b ? { ...b, shown: v } : b));
+          audio.current.coinTick();
+        });
         setCounter(counterBase + res.totalWin);
+        audio.current.win('big');
         await wait(2500);
         setBigWin(null);
       }
@@ -320,18 +316,22 @@ export const DogHouseGame: React.FC = () => {
       const total = values.reduce((a, b) => a + b, 0);
       setPhase('overlay');
       setFsIntro({ values, revealed: 0 });
-      audio.current.jackpotFanfare();
       for (let i = 1; i <= 9; i++) {
-        await wait(260);
+        audio.current.barrelTick();
+        await wait(280);
         setFsIntro({ values, revealed: i });
-        audio.current.reelStop(i % 5, false);
+        const currentSum = values.slice(0, i).reduce((a, b) => a + b, 0);
+        audio.current.barrelStop(values[i - 1], currentSum);
       }
+      audio.current.freeSpinsIntroComplete();
       await waitClick();
       setFsIntro(null);
 
+      audio.current.startFreeSpinsMusic();
       let fsWin = 0;
       let stickies: StickyWild[] = [];
       setSticky([]);
+      setNewStickyKeys(new Set());
       setFreeSpins({ total, played: 0, win: 0 });
       setCounter(0);
       setPresentation(null);
@@ -349,9 +349,17 @@ export const DogHouseGame: React.FC = () => {
         const room = Math.max(0, cap - alreadyWon - fsWin);
         if (res.totalWin > room) res.totalWin = room;
 
+        const newKeys = new Set<string>();
+        res.stickyWilds.forEach((nw) => {
+          if (!stickies.some((ow) => ow.reel === nw.reel && ow.row === nw.row)) {
+            newKeys.add(`${nw.reel}-${nw.row}`);
+          }
+        });
+        setNewStickyKeys(newKeys);
+
         setHiddenWin((h) => h + res.totalWin);
         await settle(0, res.totalWin, true);
-        await animateReels(res, false);
+        await animateReels(res, false, newKeys);
         stickies = res.stickyWilds;
         setSticky(stickies);
 
@@ -362,14 +370,16 @@ export const DogHouseGame: React.FC = () => {
         if (alreadyWon + fsWin >= cap) break;
       }
 
+      audio.current.stopFreeSpinsMusic();
       await wait(600);
       setPhase('overlay');
       setFsEnd({ win: fsWin, spins: total });
-      audio.current.jackpotFanfare();
+      audio.current.bonusEnd();
       await waitClick();
       setFsEnd(null);
       setFreeSpins(null);
       setSticky([]);
+      setNewStickyKeys(new Set());
       setPresentation(null);
       setCounter(alreadyWon + fsWin);
       setMessage(alreadyWon + fsWin > 0 ? `GAIN TOTAL ${fmt(alreadyWon + fsWin)}` : 'TOURNEZ POUR GAGNER !');
@@ -383,7 +393,12 @@ export const DogHouseGame: React.FC = () => {
   const playRound = useCallback(
     async (buyBonus: boolean) => {
       if (busyRef.current) return;
-      const cost = buyBonus ? bet * BONUS_BUY_X_BET : bet;
+      const isBoostRound = boost && !buyBonus;
+      const cost = buyBonus
+        ? bet * BONUS_BUY_X_BET
+        : isBoostRound
+          ? Math.round(bet * BOOST_BET_MULTIPLIER * 100) / 100
+          : bet;
       if (displayCredit < cost) {
         setMessage('CRÉDIT INSUFFISANT');
         setAutoLeft(0);
@@ -396,9 +411,9 @@ export const DogHouseGame: React.FC = () => {
       setScatterHit(false);
       setActiveLine(-1);
       setCounter(0);
-      setMessage('BONNE CHANCE !');
+      setMessage(isBoostRound ? 'BONNE CHANCE (BOOST 25x) !' : 'BONNE CHANCE !');
 
-      const res = evaluateDogHouseSpin({ bet, forceScatters: buyBonus });
+      const res = evaluateDogHouseSpin({ bet, forceScatters: buyBonus, isBoost: isBoostRound });
       setHiddenWin((h) => h + res.totalWin);
       const ok = await settle(cost, res.totalWin, false);
       if (!ok) {
@@ -415,6 +430,7 @@ export const DogHouseGame: React.FC = () => {
       if (res.triggersBonus) {
         setScatterHit(true);
         setAutoLeft(0);
+        audio.current.bonusTrigger();
         setMessage('BONUS !');
       }
       await presentWins(res, bet, 0);
@@ -426,27 +442,24 @@ export const DogHouseGame: React.FC = () => {
       } else if (res.totalWin > 0) {
         setMessage(`GAIN ${fmt(res.totalWin)}`);
       } else {
-        setMessage('TOURNEZ POUR GAGNER !');
+        setMessage(boost ? 'BOOST ACTIF · TOURNEZ !' : 'TOURNEZ POUR GAGNER !');
       }
 
       setPhase('idle');
       busyRef.current = false;
     },
-    [animateReels, bet, displayCredit, presentWins, runFreeSpins, settle, wait],
+    [animateReels, bet, boost, displayCredit, presentWins, runFreeSpins, settle, wait],
   );
 
   const onSpinPress = useCallback(() => {
-    if (clickResolver.current) {
-      clickResolver.current();
-      return;
-    }
+    if (resolveClick()) return;
     if (busyRef.current) {
       skipAll();
       return;
     }
     audio.current.click();
     void playRound(false);
-  }, [playRound, skipAll]);
+  }, [playRound, resolveClick, skipAll]);
 
   // Autoplay
   useEffect(() => {
@@ -567,18 +580,26 @@ export const DogHouseGame: React.FC = () => {
         </div>
 
         {/* Zone de jeu */}
-        <div className="absolute inset-x-0 top-12 bottom-[200px] sm:bottom-[112px] flex items-center justify-center px-2 sm:px-6">
-          <div className="relative flex items-center gap-4 h-full w-full max-w-[1100px] justify-center">
-            {/* Achat bonus (desktop) */}
-            <BuyBonusButton
-              bet={bet}
-              disabled={locked || freeSpins !== null}
-              onClick={() => setBuyOpen(true)}
-              className="hidden lg:flex"
-            />
+        <div className="absolute inset-x-0 top-12 bottom-[200px] sm:bottom-[112px] flex items-center justify-center px-4 sm:px-8 xl:px-12">
+          <div className="relative flex items-center justify-center gap-8 xl:gap-16 2xl:gap-24 h-full w-full max-w-[1400px]">
+            {/* Colonne gauche desktop : Ante Bet Boost & Achat bonus */}
+            <div className="hidden lg:flex flex-col gap-3 w-[150px] shrink-0">
+              <AnteBetCard
+                active={boost}
+                disabled={locked || freeSpins !== null}
+                cost={Math.round(bet * BOOST_BET_MULTIPLIER)}
+                onToggle={toggleBoost}
+              />
+              <BuyBonusButton
+                bet={bet}
+                disabled={locked || freeSpins !== null || boost}
+                disabledReason={boost ? 'Désactivez le Boost pour acheter' : undefined}
+                onClick={() => setBuyOpen(true)}
+              />
+            </div>
 
-            <div className="relative flex-1 h-full min-w-0 flex items-center justify-center" style={{ containerType: 'size' }}>
-            <MachineFrame freeSpins={freeSpins}>
+            <div className="relative flex-1 h-full min-w-0 max-w-[800px] flex items-center justify-center" style={{ containerType: 'size' }}>
+            <MachineFrame freeSpins={freeSpins} presentation={presentation} activeLine={activeLine}>
               <div className="relative grid grid-cols-5 gap-[3px] sm:gap-1 p-[3px] sm:p-1">
                 {[0, 1, 2, 3, 4].map((r) => (
                   <Reel
@@ -592,6 +613,7 @@ export const DogHouseGame: React.FC = () => {
                     landKey={landKeys[r]}
                     anticipating={anticip[r]}
                     sticky={sticky.filter((s) => s.reel === r)}
+                    newStickyKeys={newStickyKeys}
                     winningCells={winningCells}
                     dimLosers={!!presentation}
                     scatterHit={scatterHit}
@@ -603,12 +625,12 @@ export const DogHouseGame: React.FC = () => {
             </div>
 
             {/* Colonne droite desktop : infos rapides */}
-            <div className="hidden lg:flex w-[150px] flex-col gap-2 shrink-0">
-              <div className="rounded-2xl bg-black/45 backdrop-blur p-3 text-center border border-white/10">
+            <div className="hidden lg:flex w-[150px] xl:w-[160px] flex-col gap-2 shrink-0">
+              <div className="rounded-2xl bg-black/45 backdrop-blur p-3 text-center border border-white/10 shadow-lg">
                 <div className="dh-font text-[#ffcf3f] text-sm">GAIN MAX</div>
                 <div className="dh-font text-white text-2xl">{fmt(MAX_WIN_X_BET)}x</div>
               </div>
-              <div className="rounded-2xl bg-black/45 backdrop-blur p-3 text-center border border-white/10">
+              <div className="rounded-2xl bg-black/45 backdrop-blur p-3 text-center border border-white/10 shadow-lg">
                 <div className="dh-font text-[#ffcf3f] text-sm">WILDS</div>
                 <div className="text-white text-xs font-semibold leading-snug mt-1">
                   x2 ou x3, additionnés sur la ligne, collants en bonus
@@ -622,6 +644,7 @@ export const DogHouseGame: React.FC = () => {
         <ControlBar
           credit={displayCredit}
           bet={bet}
+          boost={boost}
           mode={mode}
           text={barText}
           highlight={!!presentation || phase === 'overlay'}
@@ -637,19 +660,20 @@ export const DogHouseGame: React.FC = () => {
           onSpin={onSpinPress}
           onAuto={() => (autoLeft > 0 ? setAutoLeft(0) : setAutoOpen(true))}
           onTurbo={() => setTurbo((t) => !t)}
+          onToggleBoost={toggleBoost}
           onMute={toggleMute}
           onInfo={() => setInfoOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onBuy={() => setBuyOpen(true)}
-          buyDisabled={locked || freeSpins !== null}
+          buyDisabled={locked || freeSpins !== null || boost}
         />
 
         {/* Overlays */}
         {bigWin && <BigWinOverlay amount={bigWin.shown} bet={bigWin.bet} onClick={skipAll} />}
         {fsIntro && (
-          <FreeSpinsIntro values={fsIntro.values} revealed={fsIntro.revealed} onStart={() => clickResolver.current?.()} />
+          <FreeSpinsIntro values={fsIntro.values} revealed={fsIntro.revealed} onStart={resolveClick} />
         )}
-        {fsEnd && <FreeSpinsEnd win={fsEnd.win} spins={fsEnd.spins} onClose={() => clickResolver.current?.()} />}
+        {fsEnd && <FreeSpinsEnd win={fsEnd.win} spins={fsEnd.spins} onClose={resolveClick} />}
         {autoOpen && (
           <Modal title="JEU AUTOMATIQUE" onClose={() => setAutoOpen(false)}>
             <p className="text-sm text-white/70 mb-4 text-center">
@@ -726,8 +750,6 @@ export const DogHouseGame: React.FC = () => {
         )}
         {infoOpen && <PaytableModal bet={bet} onClose={() => setInfoOpen(false)} />}
       </div>
-
-      <GameInfoStrip />
     </div>
   );
 };
@@ -829,48 +851,64 @@ const House: React.FC<{ className: string; color: string; roof: string; night: b
 // Cadre de la machine
 // =============================================================================
 
-const MachineFrame: React.FC<{ freeSpins: FreeSpinsState | null; children: React.ReactNode }> = ({
-  freeSpins,
-  children,
-}) => (
-  <div className="relative flex flex-col" style={{ width: 'min(100cqw, calc(100cqh * 1.18), 860px)' }}>
-    {/* Toit + logo */}
-    <div className="relative w-full aspect-[500/78]">
-      <svg viewBox="0 0 500 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
-        <defs>
-          <linearGradient id="dh-roof-main" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d9793a" />
-            <stop offset="100%" stopColor="#8a3a14" />
-          </linearGradient>
-        </defs>
-        <path d="M-6 100 L250 4 L506 100 Z" fill="url(#dh-roof-main)" stroke="#3b1d0e" strokeWidth="5" strokeLinejoin="round" />
-        <path d="M40 100 L250 22 L460 100" fill="none" stroke="#f0a060" strokeWidth="3" opacity="0.6" />
-      </svg>
-      <div className="absolute inset-x-0 bottom-[6%] flex justify-center">
-        <Logo />
+const MachineFrame: React.FC<{
+  freeSpins: FreeSpinsState | null;
+  presentation?: WinPresentation | null;
+  activeLine?: number;
+  children: React.ReactNode;
+}> = ({ freeSpins, presentation, activeLine = -1, children }) => {
+  const currentLineMult =
+    activeLine >= 0 && presentation?.wins[activeLine]?.wildMultiplier
+      ? presentation.wins[activeLine].wildMultiplier
+      : undefined;
+
+  return (
+    <div className="relative flex flex-col" style={{ width: 'min(100cqw, calc(100cqh * 1.18), 800px)' }}>
+      {/* Toit + logo */}
+      <div className="relative w-full aspect-[500/78]">
+        <svg viewBox="0 0 500 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+          <defs>
+            <linearGradient id="dh-roof-main" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#d9793a" />
+              <stop offset="100%" stopColor="#8a3a14" />
+            </linearGradient>
+          </defs>
+          <path d="M-6 100 L250 4 L506 100 Z" fill="url(#dh-roof-main)" stroke="#3b1d0e" strokeWidth="5" strokeLinejoin="round" />
+          <path d="M40 100 L250 22 L460 100" fill="none" stroke="#f0a060" strokeWidth="3" opacity="0.6" />
+        </svg>
+        <div className="absolute inset-x-0 bottom-[6%] flex justify-center">
+          <Logo />
+        </div>
+      </div>
+
+      {/* Corps */}
+      <div
+        className="relative rounded-b-xl border-[5px] border-t-0 border-[#3b1d0e] p-[2.2%] shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
+        style={{ background: 'linear-gradient(180deg, #b0642c, #7a3f1a)' }}
+      >
+        {/* montants de bois */}
+        <div className="absolute inset-y-0 -left-[3%] w-[4%] rounded-l bg-gradient-to-r from-[#5a2c10] to-[#9a5424] border-2 border-[#3b1d0e] hidden sm:block" />
+        <div className="absolute inset-y-0 -right-[3%] w-[4%] rounded-r bg-gradient-to-l from-[#5a2c10] to-[#9a5424] border-2 border-[#3b1d0e] hidden sm:block" />
+
+        {freeSpins && (
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 dh-pop whitespace-nowrap rounded-full border-[3px] border-[#3b1d0e] bg-gradient-to-b from-[#ff5ab4] to-[#b01d74] px-4 py-1 dh-font text-white text-sm sm:text-lg shadow-lg">
+            TOURS GRATUITS {freeSpins.played}/{freeSpins.total}
+            <span className="ml-3 text-[#ffe14a]">GAIN {fmt(freeSpins.win)}</span>
+          </div>
+        )}
+
+        <div className="relative rounded-md bg-[#3b1d0e] overflow-hidden">
+          {children}
+          {currentLineMult && currentLineMult > 1 && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 dh-pop dh-boost-pulse px-3.5 py-1 rounded-full bg-gradient-to-r from-[#ffe14a] to-[#ff9a00] border-2 border-[#3b1d0e] text-[#3b1d0e] dh-font text-xs sm:text-sm font-black shadow-2xl pointer-events-none">
+              BOOST x{currentLineMult} !
+            </div>
+          )}
+        </div>
       </div>
     </div>
-
-    {/* Corps */}
-    <div
-      className="relative rounded-b-xl border-[5px] border-t-0 border-[#3b1d0e] p-[2.2%] shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
-      style={{ background: 'linear-gradient(180deg, #b0642c, #7a3f1a)' }}
-    >
-      {/* montants de bois */}
-      <div className="absolute inset-y-0 -left-[3%] w-[4%] rounded-l bg-gradient-to-r from-[#5a2c10] to-[#9a5424] border-2 border-[#3b1d0e] hidden sm:block" />
-      <div className="absolute inset-y-0 -right-[3%] w-[4%] rounded-r bg-gradient-to-l from-[#5a2c10] to-[#9a5424] border-2 border-[#3b1d0e] hidden sm:block" />
-
-      {freeSpins && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 dh-pop whitespace-nowrap rounded-full border-[3px] border-[#3b1d0e] bg-gradient-to-b from-[#ff5ab4] to-[#b01d74] px-4 py-1 dh-font text-white text-sm sm:text-lg shadow-lg">
-          TOURS GRATUITS {freeSpins.played}/{freeSpins.total}
-          <span className="ml-3 text-[#ffe14a]">GAIN {fmt(freeSpins.win)}</span>
-        </div>
-      )}
-
-      <div className="relative rounded-md bg-[#3b1d0e] overflow-hidden">{children}</div>
-    </div>
-  </div>
-);
+  );
+};
 
 const Logo: React.FC = () => (
   <div className="relative px-[6%] py-[1.5%] rounded-[999px] border-[4px] border-[#3b1d0e] bg-gradient-to-b from-[#fff1d0] to-[#e7b77a] shadow-[0_4px_0_#3b1d0e] whitespace-nowrap">
@@ -898,6 +936,7 @@ interface ReelProps {
   landKey: number;
   anticipating: boolean;
   sticky: StickyWild[];
+  newStickyKeys?: Set<string>;
   winningCells: Set<string>;
   dimLosers: boolean;
   scatterHit: boolean;
@@ -913,6 +952,7 @@ const Reel: React.FC<ReelProps> = ({
   landKey,
   anticipating,
   sticky,
+  newStickyKeys,
   winningCells,
   dimLosers,
   scatterHit,
@@ -957,10 +997,13 @@ const Reel: React.FC<ReelProps> = ({
     {/* Wilds collants : restent fixes pendant la rotation */}
     {sticky.map((w) => {
       const isWin = winningCells.has(`${reel}-${w.row}`);
+      const isNew = newStickyKeys?.has(`${reel}-${w.row}`);
       return (
         <div
           key={w.row}
-          className="absolute inset-x-0 z-10 p-[9%] dh-sticky rounded-[4px]"
+          className={`absolute inset-x-0 z-10 p-[9%] rounded-[4px] ${
+            isNew ? 'dh-sticky-slam' : 'dh-sticky'
+          }`}
           style={{
             top: `${(w.row / 3) * 100}%`,
             height: `${100 / 3}%`,
@@ -1019,28 +1062,9 @@ interface ControlBarProps {
   onSettings: () => void;
   onBuy: () => void;
   buyDisabled: boolean;
+  boost?: boolean;
+  onToggleBoost?: () => void;
 }
-
-const RoundBtn: React.FC<{
-  onClick: () => void;
-  disabled?: boolean;
-  title: string;
-  active?: boolean;
-  children: React.ReactNode;
-  size?: 'sm' | 'md';
-}> = ({ onClick, disabled, title, active, children, size = 'md' }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    aria-label={title}
-    className={`${size === 'sm' ? 'w-8 h-8' : 'w-10 h-10 sm:w-11 sm:h-11'} rounded-full flex items-center justify-center border-2 transition-all ${
-      active ? 'bg-[#ffcf3f] text-[#3b1d0e] border-[#ffcf3f]' : 'bg-black/30 text-white border-white/70 hover:bg-white/15'
-    } disabled:opacity-35 disabled:cursor-not-allowed`}
-  >
-    {children}
-  </button>
-);
 
 const ControlBar: React.FC<ControlBarProps> = (p) => (
   <div className="absolute inset-x-0 bottom-0 z-30">
@@ -1052,9 +1076,37 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
             <button onClick={p.onSettings} title="Paramètres" aria-label="Paramètres" className="text-white/85 hover:text-white">
               <Settings size={18} />
             </button>
-            <button onClick={p.onInfo} title="Table des gains" aria-label="Table des gains" className="text-white/85 hover:text-white">
-              <Info size={18} />
-            </button>
+            <div className="relative group">
+              <button onClick={p.onInfo} title="Table des gains et règles" aria-label="Table des gains" className="text-white/85 hover:text-white transition-colors">
+                <Info size={18} />
+              </button>
+              {/* Infobulle rapide au survol */}
+              <div className="pointer-events-none absolute bottom-full left-0 mb-2.5 hidden group-hover:flex flex-col gap-1.5 rounded-xl bg-[#121f2b]/95 border border-white/20 p-3 shadow-2xl backdrop-blur-md z-50 whitespace-nowrap min-w-[190px] animate-in fade-in zoom-in-95 duration-150">
+                <div className="text-white font-bold text-xs pb-1.5 border-b border-white/10 flex items-center justify-between">
+                  <span className="text-[#ffcf3f] dh-font">THE DOG HOUSE</span>
+                  <span className="text-[10px] bg-white/10 text-white/80 rounded px-1.5 py-0.5">Infos</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-white/60">RTP théorique</span>
+                  <span className="text-[#7dff5a] font-bold">96,5 %</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-white/60">Volatilité</span>
+                  <span className="text-[#ffe14a] font-bold">Élevée</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-white/60">Gain maximum</span>
+                  <span className="text-white font-bold">6 750x</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-white/60">Lignes</span>
+                  <span className="text-white/90 font-medium">20 fixes (5x3)</span>
+                </div>
+                <div className="text-[9px] text-[#ffcf3f]/80 pt-1 text-center border-t border-white/10 italic">
+                  Cliquez pour la table des gains complète
+                </div>
+              </div>
+            </div>
             <button onClick={p.onMute} title={p.muted ? 'Activer le son' : 'Couper le son'} aria-label="Son" className="text-white/85 hover:text-white">
               {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
@@ -1074,13 +1126,28 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
 
         {/* Centre : message */}
         <div className="col-span-2 sm:col-span-1 order-first sm:order-none flex flex-col items-center pb-1 min-w-0">
-          <button
-            onClick={p.onBuy}
-            disabled={p.buyDisabled}
-            className="lg:hidden mb-2 dh-font text-xs rounded-full px-3 py-1 bg-gradient-to-b from-[#ff5ab4] to-[#b01d74] border-2 border-[#3b1d0e] text-white disabled:opacity-40"
-          >
-            ACHETER BONUS
-          </button>
+          <div className="lg:hidden mb-2 flex items-center gap-2">
+            <button
+              onClick={p.onBuy}
+              disabled={p.buyDisabled}
+              className="dh-font text-xs rounded-full px-3 py-1 bg-gradient-to-b from-[#ff5ab4] to-[#b01d74] border-2 border-[#3b1d0e] text-white disabled:opacity-40"
+            >
+              ACHETER BONUS
+            </button>
+            {p.onToggleBoost && (
+              <button
+                onClick={p.onToggleBoost}
+                disabled={p.locked}
+                className={`dh-font text-xs rounded-full px-2.5 py-1 border-2 transition-all ${
+                  p.boost
+                    ? 'bg-gradient-to-b from-[#22c55e] to-[#15803d] border-[#86efac] text-white shadow-[0_0_8px_rgba(34,197,94,0.6)]'
+                    : 'bg-black/60 border-white/20 text-white/70'
+                } disabled:opacity-40`}
+              >
+                BOOST {p.boost ? 'ON' : 'OFF'}
+              </button>
+            )}
+          </div>
           <div
             className={`dh-font text-center whitespace-nowrap text-[15px] sm:text-2xl ${
               p.highlight ? 'text-[#ffe14a] drop-shadow-[0_0_10px_rgba(255,200,0,0.7)]' : 'text-white'
@@ -1093,27 +1160,39 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
         {/* Droite : − SPIN + / auto / turbo */}
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-2 sm:gap-3">
-            <RoundBtn onClick={p.onDec} disabled={p.locked || !p.canDec} title="Diminuer la mise" size="sm">
-              <Minus size={16} />
-            </RoundBtn>
+            <button
+              onClick={p.onDec}
+              disabled={p.locked || !p.canDec}
+              title="Diminuer la mise"
+              aria-label="Diminuer la mise"
+              className="w-10 h-10 rounded-lg bg-black/40 text-white flex items-center justify-center hover:bg-black/60 disabled:opacity-30"
+            >
+              <Minus size={22} strokeWidth={3} />
+            </button>
             <button
               onClick={p.onSpin}
               aria-label="Tourner"
               title="Tourner (ESPACE)"
-              className={`dh-spin-btn relative w-[68px] h-[68px] sm:w-[84px] sm:h-[84px] rounded-full border-[3px] border-white bg-black/40 hover:bg-black/55 flex items-center justify-center shadow-[0_0_0_4px_rgba(0,0,0,0.35)] transition-transform active:scale-95 ${
+              className={`dh-spin-btn relative w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform ${
                 p.spinning ? 'dh-spinning' : ''
               }`}
             >
-              <RefreshCw className="dh-spin-arrows text-white w-9 h-9 sm:w-11 sm:h-11" strokeWidth={2.6} />
+              <RotateCw className="dh-spin-arrows w-full h-full" strokeWidth={2.2} />
               {p.autoLeft > 0 && (
                 <span className="absolute inset-0 flex items-center justify-center dh-font text-xl text-[#ffe14a]">
                   {p.autoLeft}
                 </span>
               )}
             </button>
-            <RoundBtn onClick={p.onInc} disabled={p.locked || !p.canInc} title="Augmenter la mise" size="sm">
-              <Plus size={16} />
-            </RoundBtn>
+            <button
+              onClick={p.onInc}
+              disabled={p.locked || !p.canInc}
+              title="Augmenter la mise"
+              aria-label="Augmenter la mise"
+              className="w-10 h-10 rounded-lg bg-black/40 text-white flex items-center justify-center hover:bg-black/60 disabled:opacity-30"
+            >
+              <Plus size={22} strokeWidth={3} />
+            </button>
           </div>
           <div className="flex items-center gap-2 pr-1">
             <button
@@ -1139,24 +1218,76 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
   </div>
 );
 
-const BuyBonusButton: React.FC<{ bet: number; disabled: boolean; onClick: () => void; className?: string }> = ({
+const AnteBetCard: React.FC<{
+  active: boolean;
+  disabled: boolean;
+  cost: number;
+  onToggle: () => void;
+  className?: string;
+}> = ({ active, disabled, cost, onToggle, className = '' }) => (
+  <div
+    className={`${className} w-[150px] shrink-0 flex flex-col items-center rounded-2xl border-[4px] border-[#3b1d0e] p-2.5 text-center shadow-[0_6px_0_#3b1d0e] transition-all select-none ${
+      active
+        ? 'bg-gradient-to-b from-[#2ecc71] to-[#1b7a43] shadow-[0_0_16px_rgba(46,204,113,0.5),0_6px_0_#3b1d0e]'
+        : 'bg-gradient-to-b from-[#4a2e18] to-[#2e1a0c]'
+    }`}
+  >
+    <div className="dh-font text-[13px] text-[#ffe14a] leading-tight">BET MULTIPLIER 25X</div>
+    <div className="text-[10px] text-white/95 font-bold leading-tight mt-0.5">DOUBLE CHANCE</div>
+    <div className="text-[9px] text-white/75 leading-tight">DE GAGNER LE BONUS</div>
+
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      type="button"
+      className={`relative mt-2 w-16 h-8 rounded-full border-2 border-[#3b1d0e] transition-colors p-0.5 flex items-center cursor-pointer ${
+        active ? 'bg-[#ffe14a]' : 'bg-black/50'
+      } disabled:opacity-40 disabled:cursor-not-allowed`}
+      title={active ? 'Désactiver le Boost' : 'Activer le Boost'}
+    >
+      <div
+        className={`w-6 h-6 rounded-full bg-white shadow-md border border-[#3b1d0e] transition-transform ${
+          active ? 'translate-x-8 bg-[#2ecc71]' : 'translate-x-0 bg-white/80'
+        }`}
+      />
+    </button>
+
+    <div className="dh-font text-white text-xs mt-1.5">{fmt(cost)}</div>
+  </div>
+);
+
+const BuyBonusButton: React.FC<{
+  bet: number;
+  disabled: boolean;
+  disabledReason?: string;
+  onClick: () => void;
+  className?: string;
+}> = ({
   bet,
   disabled,
+  disabledReason,
   onClick,
   className = '',
 }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    className={`${className} w-[150px] shrink-0 flex-col items-center rounded-2xl border-[4px] border-[#3b1d0e] bg-gradient-to-b from-[#ff5ab4] to-[#9a1566] p-3 shadow-[0_6px_0_#3b1d0e] hover:-translate-y-0.5 transition-transform disabled:opacity-50 disabled:hover:translate-y-0`}
-  >
-    <div className="w-16 h-16 -mt-1">
-      <DogSymbol id="scatter" />
-    </div>
-    <div className="dh-font text-white text-lg leading-tight mt-1">ACHETER</div>
-    <div className="dh-font text-[#ffe14a] text-sm leading-tight">TOURS GRATUITS</div>
-    <div className="dh-font text-white text-base mt-1">{fmt(bet * BONUS_BUY_X_BET)}</div>
-  </button>
+  <div className="relative group">
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${className} w-[150px] shrink-0 flex-col items-center rounded-2xl border-[4px] border-[#3b1d0e] bg-gradient-to-b from-[#ff5ab4] to-[#9a1566] p-3 shadow-[0_6px_0_#3b1d0e] hover:-translate-y-0.5 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 cursor-pointer disabled:cursor-not-allowed`}
+    >
+      <div className="w-16 h-16 -mt-1">
+        <DogSymbol id="scatter" />
+      </div>
+      <div className="dh-font text-white text-lg leading-tight mt-1">ACHETER</div>
+      <div className="dh-font text-[#ffe14a] text-sm leading-tight">TOURS GRATUITS</div>
+      <div className="dh-font text-white text-base mt-1">{fmt(bet * BONUS_BUY_X_BET)}</div>
+    </button>
+    {disabledReason && disabled && (
+      <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block whitespace-nowrap bg-black/90 text-white text-[10px] px-2 py-1 rounded shadow-lg border border-white/20 z-40">
+        {disabledReason}
+      </div>
+    )}
+  </div>
 );
 
 // =============================================================================

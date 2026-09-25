@@ -405,7 +405,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
   if (!isAuthenticated || !user) {
     return (
-      <div className="w-full min-h-screen bg-black p-3 sm:p-6 pt-24 sm:pt-28 flex items-center justify-center font-sans">
+      <div className="w-full min-h-screen lg:h-screen bg-black flex flex-col lg:grid lg:grid-cols-2 font-sans relative overflow-x-hidden lg:overflow-hidden select-none">
         {/* Toast Feedback */}
         <AnimatePresence>
           {toastMessage && (
@@ -413,7 +413,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="fixed top-6 z-50 px-6 py-3 rounded-full bg-white text-black font-semibold text-sm shadow-[0_0_30px_rgba(255,255,255,0.4)] flex items-center gap-2"
+              className="fixed top-6 right-6 z-50 px-6 py-3 rounded-full bg-white text-black font-semibold text-sm shadow-[0_0_30px_rgba(255,255,255,0.4)] flex items-center gap-2"
             >
               <CheckCircle2 size={18} className="text-black" />
               {toastMessage}
@@ -421,69 +421,46 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
           )}
         </AnimatePresence>
 
-        {/* 50/50 Auth Layout Wrapper */}
-        <div className="w-full max-w-[1400px] h-[90vh] min-h-[640px] grid grid-cols-1 lg:grid-cols-2 gap-4">
-          
-          {/* Left Side: Matrix Canvas & Prestige Presentation */}
-          <div 
-            ref={containerRef}
-            className="relative h-[260px] sm:h-[340px] lg:h-full rounded-3xl border border-white/10 bg-[#050608] flex flex-col justify-between p-6 sm:p-10 lg:p-12 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]"
-          >
-            <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,255,255,0.06)_0%,transparent_45%),radial-gradient(circle_at_82%_78%,rgba(45,65,105,0.12)_0%,transparent_55%),radial-gradient(circle_at_50%_50%,rgba(12,14,20,0.7),#030406)] pointer-events-none" />
-            <canvas ref={canvasRef} className="absolute inset-0 z-10 w-full h-full pointer-events-none" />
-            <div className="absolute inset-0 z-20 pointer-events-none bg-[radial-gradient(circle_at_center,transparent,rgba(0,0,0,0.55)),linear-gradient(to_bottom,rgba(3,4,6,0.4),transparent_40%,rgba(3,4,6,0.8))]" />
+        {/* Left Side: Matrix Canvas & Prestige Presentation (Full Edge-to-Edge Half) */}
+        <div 
+          ref={containerRef}
+          className="relative w-full h-[380px] sm:h-[460px] lg:h-full border-b lg:border-b-0 lg:border-r border-white/10 bg-[#050608] flex items-center justify-center p-6 sm:p-10 lg:p-14 overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)]"
+        >
+          <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,255,255,0.06)_0%,transparent_45%),radial-gradient(circle_at_82%_78%,rgba(45,65,105,0.12)_0%,transparent_55%),radial-gradient(circle_at_50%_50%,rgba(12,14,20,0.7),#030406)] pointer-events-none" />
+          <canvas ref={canvasRef} className="absolute inset-0 z-10 w-full h-full pointer-events-none" />
+          <div className="absolute inset-0 z-20 pointer-events-none bg-[radial-gradient(circle_at_center,transparent,rgba(0,0,0,0.55)),linear-gradient(to_bottom,rgba(3,4,6,0.4),transparent_40%,rgba(3,4,6,0.8))]" />
 
-            <div className="relative z-30 flex items-center justify-start">
-              <Link
-                to="/"
-                onClick={() => onBackToHome?.()}
-                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/15 flex items-center justify-center text-white transition-all cursor-pointer shadow-lg"
-                title="Retour à l'accueil"
-              >
-                <ArrowLeft size={16} />
-              </Link>
-            </div>
-
-            <div className="relative z-30 my-auto flex flex-col items-center text-center">
-              <div className="inline-flex items-center relative mb-5 select-none">
-                <div className="w-9 h-9 rounded-full bg-[#111] border border-white/20 p-1 flex items-center justify-center z-10 shadow-md">
-                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-black">
-                    <Coins size={14} />
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-[#111] border border-white/20 p-1 flex items-center justify-center z-20 -ml-3.5 shadow-md">
-                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-black">
-                    <Car size={14} />
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-[#111] border border-white/20 p-1 flex items-center justify-center z-30 -ml-3.5 shadow-md">
-                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-black">
-                    <Crown size={14} />
-                  </div>
-                </div>
-                <div className="h-9 bg-[#0c0e14]/90 border border-white/20 rounded-full -ml-3.5 pl-5 pr-4 flex items-center z-25 shadow-lg backdrop-blur-md">
-                  <span className="text-[12px] font-medium tracking-wide text-white">
-                    The Diamond Casino &amp; Resort
-                  </span>
-                </div>
-              </div>
-
-              <div className="my-4 sm:my-6 flex justify-center items-center">
-                <img
-                  src="/diamond_casino_logo.png"
-                  alt="The Diamond Casino & Resort"
-                  className="h-20 sm:h-28 lg:h-36 w-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.35)] transition-transform hover:scale-105 duration-300"
-                />
-              </div>
-
-              <p className="text-neutral-400 text-xs sm:text-sm lg:text-[14px] leading-relaxed max-w-md mx-auto font-normal">
-                Explorez nos salons exclusifs : jeux de table VIP, Roue de la Fortune quotidienne, salons privés et service d'exception Los Santos RP.
-              </p>
-            </div>
+          {/* Floating Back Button */}
+          <div className="absolute top-6 left-6 sm:top-8 sm:left-8 z-30">
+            <Link
+              to="/"
+              onClick={() => onBackToHome?.()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/15 text-white text-xs font-semibold tracking-wide transition-all cursor-pointer shadow-lg group"
+              title="Retour au Casino"
+            >
+              <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
+              <span>Retour au Casino</span>
+            </Link>
           </div>
 
-          {/* Right Side: Clean Discord OAuth Landing or Onboarding Form */}
-          <div className="h-full rounded-3xl bg-neutral-950 border border-white/10 flex flex-col p-6 sm:p-10 lg:p-12 overflow-y-auto relative custom-scrollbar">
+          {/* Perfectly Centered Content */}
+          <div className="relative z-30 flex flex-col items-center text-center max-w-xl mx-auto py-6">
+            <div className="mb-6 sm:mb-8 flex justify-center items-center">
+              <img
+                src="/diamond_casino_logo.png"
+                alt="The Diamond Casino & Resort"
+                className="h-36 sm:h-48 lg:h-56 xl:h-64 w-auto max-w-[90%] object-contain drop-shadow-[0_0_60px_rgba(255,255,255,0.38)] transition-transform hover:scale-105 duration-300"
+              />
+            </div>
+
+            <p className="text-neutral-400 text-xs sm:text-sm lg:text-[15px] leading-relaxed max-w-md mx-auto font-normal">
+              Explorez nos salons exclusifs : jeux de table VIP, Roue de la Fortune quotidienne, salons privés et service d'exception Los Santos RP.
+            </p>
+          </div>
+        </div>
+
+        {/* Right Side: Clean Discord OAuth Landing or Onboarding Form (Full Edge-to-Edge Half) */}
+        <div className="w-full h-full min-h-[520px] lg:min-h-0 bg-neutral-950 flex flex-col justify-center items-center p-6 sm:p-12 lg:p-16 overflow-y-auto relative custom-scrollbar">
             {!pendingDiscordUser ? (
               <motion.div
                 key="auth-landing"
@@ -681,9 +658,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             )}
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
   // =========================================================================
   // VIEW B : AUTHENTICATED CLIENT CONSOLE (FULL-WIDTH GRAND LUXURY CONSOLE)

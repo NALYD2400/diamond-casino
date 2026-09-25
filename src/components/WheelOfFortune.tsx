@@ -1,7 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
-import { ArrowUpRight, Clock, Coins, Crown, Lock, Loader2, User, Volume2, VolumeX, X } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Car,
+  Clock,
+  Coins,
+  Crown,
+  Gift,
+  Lock,
+  Loader2,
+  ShieldCheck,
+  Shirt,
+  Sparkles,
+  User,
+  Volume2,
+  VolumeX,
+  X,
+  Zap,
+} from 'lucide-react';
 import { fadeUp } from '../constants/animations';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin, type WheelSegmentConfig } from '../context/CasinoAdminContext';
@@ -24,20 +41,38 @@ const TYPE_LABEL: Record<WheelSegmentConfig['type'], string> = {
 };
 
 const RULES = [
-  { num: '01', title: 'Un tirage par cycle', desc: 'Chaque citoyen inscrit dispose d’un tirage gratuit toutes les 24 heures.' },
-  { num: '02', title: 'Avantage VIP', desc: 'Carte Gold : un tirage toutes les 12 h. Black Diamond : toutes les 8 h.' },
-  { num: '03', title: 'Tirage certifié', desc: 'Le résultat est calculé par le serveur du casino, jamais par votre navigateur.' },
-  { num: '04', title: 'Gains crédités', desc: 'Les jetons sont crédités immédiatement. Les véhicules et lots rejoignent votre inventaire : réclamez-les, la direction vous les remet en ville.' },
+  {
+    num: '01',
+    title: 'Un tirage quotidien',
+    desc: 'Chaque citoyen enregistré reçoit 1 lancer gratuit toutes les 24 heures.',
+  },
+  {
+    num: '02',
+    title: 'Boost Discord & VIP (/boost)',
+    desc: 'Boostez le Discord ou souscrivez un pass : cooldown réduit à 12h (Booster/Gold) ou 8h (Black Diamond).',
+  },
+  {
+    num: '03',
+    title: 'Provably Fair certifié',
+    desc: 'Le tirage est calculé de manière cryptographique et vérifiable par le serveur.',
+  },
+  {
+    num: '04',
+    title: 'Crédit immédiat & Inventaire',
+    desc: 'Les jetons sont crédités instantanément. Les véhicules et récompenses rejoignent votre inventaire.',
+  },
 ];
 
-// Long spin for suspense: fast launch, then a slow crawl over the last studs
-const SPIN_MS = 12000;
-const SPIN_TURNS = 10;
-const SUSPENSE_FROM = 0.58; // fraction of the spin where the tension drone starts
-const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+const SPIN_MS = 8500;
+const SPIN_TURNS = 8;
+const SUSPENSE_FROM = 0.65;
+// Inertia friction easing (smooth natural deceleration)
+const easeOutWheel = (t: number) => 1 - Math.pow(1 - t, 3.8);
 
 function formatPrizeValue(seg: WheelSegmentConfig): string {
-  if (seg.type === 'chips' && typeof seg.value === 'number') return `${seg.value.toLocaleString('fr-FR')} jetons`;
+  if (seg.type === 'chips' && typeof seg.value === 'number') {
+    return `${seg.value.toLocaleString('fr-FR')} jetons`;
+  }
   return String(seg.value);
 }
 
@@ -90,7 +125,6 @@ export const WheelOfFortune: React.FC = () => {
     loadRecentWins();
   }, [loadRecentWins]);
 
-  // Cleanup: stop the animation, release audio and never lose a won balance
   useEffect(
     () => () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -114,7 +148,7 @@ export const WheelOfFortune: React.FC = () => {
       try {
         localStorage.setItem('diamond_wheel_sound_muted', String(next));
       } catch {
-        // storage unavailable
+        // storage fallback
       }
       return next;
     });
@@ -131,7 +165,6 @@ export const WheelOfFortune: React.FC = () => {
     setWinIndex(null);
     setPhase('requesting');
 
-    // The AudioContext must be created synchronously inside the click (browser autoplay rules)
     const audio = audioRef.current;
     audio.unlock();
 
@@ -153,7 +186,7 @@ export const WheelOfFortune: React.FC = () => {
 
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const duration = reduceMotion ? 1500 : SPIN_MS;
-    const jitter = (Math.random() - 0.5) * deg * 0.6;
+    const jitter = (Math.random() - 0.5) * deg * 0.5;
     const targetMod = (((360 - (index + 0.5) * deg + jitter) % 360) + 360) % 360;
     const from = rotationRef.current;
     const base = from - (from % 360);
@@ -164,24 +197,25 @@ export const WheelOfFortune: React.FC = () => {
     const start = performance.now();
     let lastPin = Math.floor(from / deg);
     let suspenseStarted = false;
+    let pointerDeflection = 0;
 
     const frame = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
-      const angle = from + (to - from) * easeOutCubic(t);
+      const angle = from + (to - from) * easeOutWheel(t);
       if (rotorRef.current) rotorRef.current.style.transform = `rotate(${angle}deg)`;
 
       const pin = Math.floor(angle / deg);
       if (pin !== lastPin) {
         lastPin = pin;
         audio.tick(Math.pow(1 - t, 2));
-        // Flapper flicks back as each stud passes under it
-        const ptr = pointerRef.current;
-        if (ptr) {
-          ptr.style.transform = `rotate(${-(8 + 18 * (1 - t))}deg)`;
-          window.setTimeout(() => {
-            if (pointerRef.current) pointerRef.current.style.transform = '';
-          }, 60);
-        }
+        pointerDeflection = -(5 + 14 * Math.pow(1 - t, 1.2));
+      }
+
+      // Smooth damped spring decay on pointer
+      pointerDeflection *= 0.84;
+      if (pointerRef.current) {
+        pointerRef.current.style.transform =
+          Math.abs(pointerDeflection) > 0.05 ? `rotate(${pointerDeflection.toFixed(2)}deg)` : '';
       }
 
       if (!suspenseStarted && !reduceMotion && t >= SUSPENSE_FROM) {
@@ -217,314 +251,450 @@ export const WheelOfFortune: React.FC = () => {
 
   const maxChance = Math.max(...prizeBoard.map((p) => p.chance), 1);
 
-  // ------------------------------------------------------------------
-  // Session panel content
-  // ------------------------------------------------------------------
-  let statusLabel = 'Connexion requise';
-  let statusTone = 'text-neutral-400';
+  // Status badges & labels
+  let statusBadge = {
+    label: 'Connexion requise',
+    dotClass: 'bg-neutral-500',
+    textClass: 'text-neutral-400',
+  };
   if (maintenance) {
-    statusLabel = 'Maintenance';
-    statusTone = 'text-amber-400';
+    statusBadge = {
+      label: 'Maintenance',
+      dotClass: 'bg-amber-400',
+      textClass: 'text-amber-400',
+    };
   } else if (isAuthenticated && canSpinWheel) {
-    statusLabel = 'Tirage disponible';
-    statusTone = 'text-emerald-400';
+    statusBadge = {
+      label: 'Tirage disponible',
+      dotClass: 'bg-emerald-400 animate-pulse',
+      textClass: 'text-emerald-400',
+    };
   } else if (isAuthenticated) {
-    statusLabel = 'Prochain tirage';
-    statusTone = 'text-white';
+    statusBadge = {
+      label: 'Cooldown actif',
+      dotClass: 'bg-amber-400',
+      textClass: 'text-amber-300',
+    };
   }
 
   return (
-    <div className="relative bg-black text-white">
-      {/* ================================================================ */}
-      {/* HEADER                                                           */}
-      {/* ================================================================ */}
-      <section className="relative pt-36 sm:pt-44 pb-12 px-6 overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-25 grayscale"
-          style={{ backgroundImage: "url('/diamond_casino_hall.jpg')" }}
-          aria-hidden="true"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-black" aria-hidden="true" />
-
-        <div className="relative max-w-4xl mx-auto text-center">
-          <motion.span {...fadeUp(0.05)} className="text-xs font-['Geist_Mono'] tracking-[4px] uppercase text-neutral-400 block mb-4">
-            THE DIAMOND // ROTONDE CENTRALE
-          </motion.span>
-          <motion.h1
-            {...fadeUp(0.1)}
-            className="text-5xl sm:text-7xl lg:text-8xl tracking-tight leading-[1.05] mb-6 font-['Instrument_Serif'] font-normal"
-          >
-            La Roue de la <em className="italic text-amber-400">Fortune</em>
-          </motion.h1>
-          <motion.p {...fadeUp(0.15)} className="text-base sm:text-lg text-neutral-300 max-w-2xl mx-auto leading-relaxed">
-            Un tirage offert à chaque citoyen. Jetons, lots d’exception et la {podiumVehicle.name} exposée sur le
-            podium — chaque lancer est gagnant.
-          </motion.p>
-        </div>
-      </section>
+    <div className="relative min-h-screen bg-black text-white selection:bg-white selection:text-black font-sans pb-24">
+      {/* Background Ambience Monochrome */}
+      <div
+        className="pointer-events-none fixed inset-0 opacity-[0.03] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-gradient-to-b from-white/[0.04] via-white/[0.015] to-transparent blur-[140px]"
+        aria-hidden="true"
+      />
 
       {/* ================================================================ */}
-      {/* STAGE                                                            */}
+      {/* HEADER : Sober, modern, clean luxury                             */}
       {/* ================================================================ */}
-      <section className="px-6 pb-24 max-w-6xl mx-auto">
+      <header className="relative pt-28 sm:pt-32 pb-8 px-4 sm:px-6 text-center max-w-4xl mx-auto">
+        <motion.h1
+          {...fadeUp(0.06)}
+          className="text-4xl sm:text-6xl lg:text-7xl font-['Instrument_Serif'] font-normal tracking-tight leading-tight mb-3"
+        >
+          La Roue de la <em className="italic text-white">Fortune</em>
+        </motion.h1>
+
+        <motion.p
+          {...fadeUp(0.1)}
+          className="text-sm sm:text-base text-neutral-400 max-w-xl mx-auto leading-relaxed"
+        >
+          Un tirage quotidien certifié pour chaque citoyen. Véhicules d’exception, jetons et dotations prestigieuses.
+        </motion.p>
+      </header>
+
+      {/* ================================================================ */}
+      {/* MAIN STAGE : Perfectly balanced Wheel & Session Control Panel    */}
+      {/* ================================================================ */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6">
         {maintenance && (
-          <div className="mb-8 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 flex items-center justify-center gap-3 text-amber-300 font-['Geist_Mono'] text-xs sm:text-sm text-center">
-            <Lock size={15} className="shrink-0" />
-            MAINTENANCE — La roue est temporairement suspendue par la direction.
+          <div className="mb-6 p-3.5 rounded-xl border border-white/20 bg-white/[0.04] flex items-center justify-center gap-2.5 text-neutral-300 font-['Geist_Mono'] text-xs sm:text-sm text-center">
+            <Lock size={14} className="shrink-0" />
+            MAINTENANCE — La roue est momentanément suspendue par la direction du casino.
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-10 lg:gap-14 items-center">
-          {/* Wheel */}
-          <motion.div {...fadeUp(0.1)} className="relative mx-auto w-full max-w-[560px]">
-            <div className="absolute inset-[8%] rounded-full bg-amber-500/10 blur-[80px]" aria-hidden="true" />
-            <Wheel
-              ref={rotorRef}
-              pointerRef={pointerRef}
-              segments={segments}
-              mode={phase === 'won' ? 'won' : busy ? 'spinning' : 'idle'}
-              highlightIndex={phase === 'won' ? winIndex : null}
-              className="w-full drop-shadow-[0_30px_60px_rgba(0,0,0,0.9)]"
+        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.8fr] gap-8 lg:gap-14 items-center">
+          {/* 1. Wheel Container (Strictly bounded, magnified & fluid) */}
+          <motion.div {...fadeUp(0.1)} className="relative flex flex-col items-center justify-center w-full max-w-[620px] lg:max-w-[680px] xl:max-w-[740px] mx-auto">
+            <div className="relative w-full aspect-square flex items-center justify-center">
+              {/* Subtle ambient light behind wheel */}
+              <div
+                className="absolute inset-[8%] rounded-full bg-white/[0.04] blur-[110px] pointer-events-none"
+                aria-hidden="true"
+              />
+
+              {/* The Wheel */}
+              <Wheel
+                ref={rotorRef}
+                pointerRef={pointerRef}
+                segments={segments}
+                mode={phase === 'won' ? 'won' : busy ? 'spinning' : 'idle'}
+                highlightIndex={phase === 'won' ? winIndex : null}
+                className="w-full h-full drop-shadow-[0_28px_60px_rgba(0,0,0,0.95)]"
+              />
+            </div>
+
+            {/* Subtle luxury floor shadow */}
+            <div
+              className="mt-3 h-5 w-3/4 rounded-full bg-white/[0.06] blur-2xl pointer-events-none"
+              aria-hidden="true"
             />
-            <div className="mx-auto mt-4 h-6 w-3/4 rounded-[100%] bg-amber-500/20 blur-2xl" aria-hidden="true" />
           </motion.div>
 
-          {/* Session panel */}
-          <motion.aside {...fadeUp(0.2)} className="liquid-glass rounded-2xl p-6 sm:p-7 flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <span className="font-['Geist_Mono'] text-xs tracking-[3px] uppercase text-neutral-400">Votre session</span>
+          {/* 2. Session & Boost Control Dashboard */}
+          <motion.aside
+            {...fadeUp(0.18)}
+            className="liquid-glass rounded-2xl p-5 sm:p-7 border border-white/10 flex flex-col gap-5"
+          >
+            {/* Top Bar: Session title, Status pill, and Sound toggle */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className={`w-2 h-2 rounded-full ${statusBadge.dotClass}`} />
+                <span className={`text-xs font-['Geist_Mono'] uppercase tracking-wider font-medium ${statusBadge.textClass}`}>
+                  {statusBadge.label}
+                </span>
+              </div>
+
               <button
                 type="button"
                 onClick={toggleMute}
-                className="w-9 h-9 rounded-full border border-white/15 flex items-center justify-center text-neutral-400 hover:text-white hover:border-white/30 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full border border-white/15 bg-white/[0.02] flex items-center justify-center text-neutral-400 hover:text-white hover:border-white/30 transition-colors cursor-pointer"
                 aria-label={muted ? 'Activer le son' : 'Couper le son'}
                 title={muted ? 'Activer le son' : 'Couper le son'}
               >
-                {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
               </button>
             </div>
 
+            {/* User Identity / Discord Connection */}
             {isLoading ? (
-              <div className="flex items-center gap-3 text-neutral-400 text-sm py-6">
-                <Loader2 size={16} className="animate-spin" /> Vérification de votre session…
+              <div className="flex items-center gap-3 py-4 text-neutral-400 text-sm">
+                <Loader2 size={16} className="animate-spin text-amber-400" />
+                Chargement de votre profil citoyen…
               </div>
             ) : isAuthenticated && user ? (
-              <>
-                <div className="flex items-center gap-3">
-                  <img src={user.avatarUrl} alt="" className="w-11 h-11 rounded-full object-cover border border-white/20" />
+              <div className="flex items-center justify-between gap-3 bg-white/[0.02] border border-white/10 rounded-xl p-3.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={user.avatarUrl}
+                    alt=""
+                    className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
+                  />
                   <div className="min-w-0">
-                    <p className="font-semibold truncate">
+                    <p className="font-medium text-sm text-white truncate">
                       {user.rpFirstName} {user.rpLastName}
                     </p>
-                    <p className="font-['Geist_Mono'] text-xs text-neutral-500">
+                    <p className="font-['Geist_Mono'] text-xs text-neutral-400 truncate">
                       #{user.citizenId}
                       {user.vipTier && <span className="text-amber-400"> · VIP {user.vipTier}</span>}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[1fr_auto] gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                    <span className="font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500">Jetons</span>
-                    <p className="font-semibold text-xl tabular-nums">{user.chips.toLocaleString('fr-FR')}</p>
-                  </div>
-                  <Link
-                    to="/espace-membre"
-                    className="rounded-xl border border-white/10 bg-white/[0.02] p-3 hover:border-amber-400/40 transition-colors"
-                    title="Voir mon inventaire"
-                  >
-                    <span className="font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500">Lots</span>
-                    <p className="font-semibold text-xl tabular-nums text-amber-400">
-                      {user.rewards.filter((r) => r.status === 'IN_INVENTORY' || r.status === 'CLAIMED').length}
-                    </p>
-                  </Link>
-                </div>
-              </>
+                {user.isBooster ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-['Geist_Mono'] font-semibold tracking-wider uppercase bg-purple-500/15 border border-purple-500/30 text-purple-300 shrink-0">
+                    <Zap size={11} className="text-purple-400" /> Booster
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-['Geist_Mono'] font-medium tracking-wider uppercase bg-white/5 border border-white/10 text-neutral-400 shrink-0">
+                    Citoyen
+                  </span>
+                )}
+              </div>
             ) : (
-              <p className="text-neutral-400 text-sm leading-relaxed">
-                Connectez votre compte Discord et créez votre fiche citoyen pour recevoir votre tirage gratuit.
-              </p>
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] text-sm text-neutral-400 leading-relaxed">
+                Connectez votre compte Discord pour accéder à votre lancer quotidien gratuit et retrouver vos lots.
+              </div>
             )}
 
-            <div className="border-t border-white/10 pt-5">
-              <span className="font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500 flex items-center gap-2">
-                <Clock size={12} /> Statut
-              </span>
-              <p className={`mt-1 text-2xl font-semibold tabular-nums ${statusTone}`} aria-live="polite">
-                {isAuthenticated && !canSpinWheel && !maintenance ? timeUntilNextSpin : statusLabel}
-              </p>
-              {isAuthenticated && user && (
-                <p className="text-xs text-neutral-500 mt-1">
-                  Un tirage toutes les {user.cooldownHours} h
-                  {!user.vipTier && (
-                    <>
-                      {' · '}
-                      <Link to="/abonnements" className="text-amber-400 hover:underline">
-                        plus avec le VIP
-                      </Link>
-                    </>
-                  )}
-                </p>
-              )}
+            {/* Metrics: Chips & Rewards Inventory */}
+            {isAuthenticated && user && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5">
+                  <span className="font-['Geist_Mono'] text-[10px] tracking-[1.5px] uppercase text-neutral-400 block mb-1 flex items-center gap-1.5">
+                    <Coins size={12} className="text-amber-400" /> Jetons
+                  </span>
+                  <p className="font-semibold text-lg sm:text-xl tabular-nums text-white">
+                    {user.chips.toLocaleString('fr-FR')}
+                  </p>
+                </div>
+
+                <Link
+                  to="/espace-membre"
+                  className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 hover:border-amber-400/40 hover:bg-white/[0.04] transition-all group"
+                  title="Voir mes récompenses"
+                >
+                  <span className="font-['Geist_Mono'] text-[10px] tracking-[1.5px] uppercase text-neutral-400 block mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Gift size={12} className="text-amber-400" /> Inventaire
+                    </span>
+                    <ArrowUpRight size={12} className="text-neutral-500 group-hover:text-amber-400 transition-colors" />
+                  </span>
+                  <p className="font-semibold text-lg sm:text-xl tabular-nums text-amber-400">
+                    {user.rewards.filter((r) => r.status === 'IN_INVENTORY' || r.status === 'CLAIMED').length} lot(s)
+                  </p>
+                </Link>
+              </div>
+            )}
+
+            {/* Countdown / Cooldown Timer Card */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col justify-between gap-2">
+              <div className="flex items-center justify-between text-xs text-neutral-400 font-['Geist_Mono']">
+                <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                  <Clock size={12} className="text-amber-400" /> Cooldown
+                </span>
+                <span>
+                  {isAuthenticated && user ? `1 tirage / ${user.cooldownHours}h` : '1 tirage / 24h'}
+                </span>
+              </div>
+
+              <div className="text-2xl sm:text-3xl font-semibold tabular-nums text-white tracking-tight">
+                {isAuthenticated && !canSpinWheel && !maintenance
+                  ? timeUntilNextSpin
+                  : canSpinWheel && !maintenance
+                    ? 'Disponible immédiatement'
+                    : maintenance
+                      ? 'Service suspendu'
+                      : '24h 00m 00s'}
+              </div>
             </div>
 
+            {/* Discord Booster & VIP Perk Banner (/boost) */}
+            <div className="p-3.5 rounded-xl border border-white/10 bg-gradient-to-r from-amber-500/[0.04] to-purple-500/[0.04] flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shrink-0 text-amber-400">
+                  <Zap size={14} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-neutral-200 truncate">Avantage Boost Discord (/boost)</p>
+                  <p className="text-neutral-400 text-[11px] truncate">
+                    Booster Discord &amp; VIP Gold : 12h · Black Diamond : 8h
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                to="/abonnements"
+                className="shrink-0 font-['Geist_Mono'] text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors uppercase tracking-wider flex items-center gap-1"
+              >
+                Pass <ArrowUpRight size={12} />
+              </Link>
+            </div>
+
+            {/* Action CTA Button */}
             {isAuthenticated || isLoading ? (
               <button
                 type="button"
                 onClick={handleSpin}
                 disabled={spinDisabled}
-                className="w-full rounded-full py-4 text-sm font-bold tracking-wider uppercase transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-black shadow-[0_0_30px_rgba(245,158,11,0.35)] hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:shadow-none"
+                className="w-full rounded-xl py-3.5 sm:py-4 text-xs sm:text-sm font-bold tracking-widest uppercase transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-black shadow-[0_0_24px_rgba(245,158,11,0.25)] hover:shadow-[0_0_32px_rgba(245,158,11,0.4)] hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:shadow-none disabled:active:scale-100"
               >
-                {phase === 'requesting' && <Loader2 size={16} className="animate-spin" />}
+                {phase === 'requesting' && <Loader2 size={16} className="animate-spin text-black" />}
                 {phase === 'requesting'
-                  ? 'Tirage en cours…'
+                  ? 'Génération certifiée…'
                   : phase === 'spinning'
                     ? 'La roue tourne…'
-                    : 'Tourner la roue'}
+                    : !canSpinWheel && !maintenance
+                      ? `Prochain tirage dans ${timeUntilNextSpin}`
+                      : 'Tourner la Roue'}
               </button>
             ) : (
               <Link
                 to="/espace-membre"
-                className="w-full rounded-full py-4 text-sm font-semibold tracking-wide bg-white text-black flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                className="w-full rounded-xl py-3.5 sm:py-4 text-xs sm:text-sm font-semibold tracking-wider uppercase bg-white text-black flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors shadow-[0_0_24px_rgba(255,255,255,0.15)]"
               >
-                <User size={16} /> Se connecter avec Discord
+                <User size={15} /> Se connecter avec Discord
               </Link>
             )}
 
             {error && (
-              <p role="alert" className="text-sm text-red-400 -mt-2">
+              <p role="alert" className="text-xs text-red-400 text-center">
                 {error}
               </p>
             )}
+
+            {/* Cryptographic Certification Footnote */}
+            <div className="flex items-center justify-center gap-1.5 text-[11px] font-['Geist_Mono'] text-neutral-500 text-center">
+              <ShieldCheck size={13} className="text-neutral-400" />
+              <span>Tirage RNG certifié · Algorithme Provably Fair</span>
+            </div>
           </motion.aside>
         </div>
-      </section>
+      </main>
 
       {/* ================================================================ */}
-      {/* PRIZES                                                           */}
+      {/* PRIZES & ODDS : Clean, balanced layout                           */}
       {/* ================================================================ */}
-      <section className="py-24 sm:py-28 px-6 max-w-6xl mx-auto border-t border-white/10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+      <section className="mt-20 sm:mt-24 pt-16 border-t border-white/10 max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
           <div>
-            <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-2">
-              LOTS EN JEU &amp; PROBABILITÉS
+            <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-1.5">
+              DOTATIONS EN JEU &amp; PROBABILITÉS
             </span>
-            <h2 className="text-4xl sm:text-5xl font-semibold tracking-[-0.03em]">
+            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">
               Ce que la roue vous <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">réserve</span>
             </h2>
           </div>
-          <p className="text-neutral-400 text-sm max-w-sm">
-            Les chances affichées sont celles utilisées par le serveur au moment du tirage. Du plus rare au plus fréquent.
+          <p className="text-neutral-400 text-xs sm:text-sm max-w-md">
+            Probabilités transparentes calculées par le serveur au moment du tirage, du lot le plus rare au plus fréquent.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-8">
-          {/* Podium vehicle */}
-          <motion.div {...fadeUp(0.05)} className="relative rounded-2xl overflow-hidden border border-white/15 min-h-[360px] group">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.3fr] gap-6 items-start">
+          {/* 1. Featured Podium Vehicle Showcase */}
+          <motion.div
+            {...fadeUp(0.06)}
+            className="relative rounded-2xl overflow-hidden border border-white/15 group aspect-[16/11] max-h-[460px] bg-neutral-900"
+          >
             <img
               src={podiumVehicle.imageUrl}
               alt={podiumVehicle.name}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               loading="lazy"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-7">
-              <span className="font-['Geist_Mono'] text-xs tracking-[3px] uppercase text-amber-400">Lot 01 // Podium</span>
-              <h3 className="text-3xl sm:text-4xl font-semibold mt-2">{podiumVehicle.name}</h3>
-              <p className="text-neutral-300 text-sm mt-1">
-                Valeur concession : {podiumVehicle.value.toLocaleString('fr-FR')}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+            <div className="absolute top-4 left-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-['Geist_Mono'] font-bold uppercase tracking-wider bg-amber-400 text-black shadow-lg">
+                <Crown size={12} /> Lot 01 // Podium
+              </span>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 p-6">
+              <h3 className="text-2xl sm:text-3xl font-semibold text-white">{podiumVehicle.name}</h3>
+              <p className="text-neutral-300 text-sm mt-1 font-['Geist_Mono']">
+                Valeur concessionnaire : {podiumVehicle.value.toLocaleString('fr-FR')} $
               </p>
             </div>
           </motion.div>
 
-          {/* Odds list */}
-          <motion.div {...fadeUp(0.1)} className="liquid-glass rounded-2xl p-6">
-            <ul className="divide-y divide-white/5">
-              {prizeBoard.map(({ seg, chance }) => (
-                <li key={seg.id} className="py-3 flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span
-                        className={`text-sm font-medium truncate ${
-                          seg.type === 'vehicle' || seg.type === 'mystery' || seg.type === 'clothing' ? 'text-amber-300' : 'text-white'
-                        }`}
-                      >
-                        {seg.label}
-                      </span>
-                      <span className="font-['Geist_Mono'] text-xs text-neutral-400 tabular-nums shrink-0">
-                        {chance.toLocaleString('fr-FR', { maximumFractionDigits: chance < 1 ? 2 : 1 })} %
-                      </span>
+          {/* 2. Structured Odds & Prizes Board */}
+          <motion.div
+            {...fadeUp(0.12)}
+            className="liquid-glass rounded-2xl p-5 border border-white/10 flex flex-col max-h-[460px] overflow-hidden"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 text-xs font-['Geist_Mono'] text-neutral-400 uppercase tracking-wider">
+              <span>Lot &amp; Nature</span>
+              <span>Cote de tirage</span>
+            </div>
+
+            <ul className="divide-y divide-white/5 overflow-y-auto pr-1">
+              {prizeBoard.map(({ seg, chance }) => {
+                const Icon = seg.type === 'vehicle' ? Car : seg.type === 'chips' ? Coins : seg.type === 'clothing' ? Shirt : Gift;
+                const isSpecial = seg.type === 'vehicle' || seg.type === 'mystery' || seg.type === 'clothing';
+                return (
+                  <li key={seg.id} className="py-2.5 flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/10 flex items-center justify-center shrink-0">
+                      <Icon size={14} className={isSpecial ? 'text-amber-400' : 'text-neutral-400'} />
                     </div>
-                    <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${seg.type === 'vehicle' ? 'bg-amber-400' : 'bg-white/40'}`}
-                        style={{ width: `${Math.max(2, (chance / maxChance) * 100)}%` }}
-                      />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className={`text-xs sm:text-sm font-medium truncate ${isSpecial ? 'text-amber-300' : 'text-white'}`}>
+                          {seg.label}
+                        </span>
+                        <span className="font-['Geist_Mono'] text-xs text-neutral-400 tabular-nums shrink-0">
+                          {chance.toLocaleString('fr-FR', { maximumFractionDigits: chance < 1 ? 2 : 1 })} %
+                        </span>
+                      </div>
+                      <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            seg.type === 'vehicle' ? 'bg-amber-400' : isSpecial ? 'bg-amber-500/70' : 'bg-neutral-500'
+                          }`}
+                          style={{ width: `${Math.max(2, (chance / maxChance) * 100)}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <span className="hidden sm:block font-['Geist_Mono'] text-[10px] tracking-[2px] uppercase text-neutral-500 w-20 text-right">
-                    {TYPE_LABEL[seg.type]}
-                  </span>
-                </li>
-              ))}
+
+                    <span className="hidden sm:inline font-['Geist_Mono'] text-[10px] tracking-wider uppercase text-neutral-500 shrink-0 w-16 text-right">
+                      {TYPE_LABEL[seg.type]}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </motion.div>
         </div>
       </section>
 
       {/* ================================================================ */}
-      {/* RULES + RECENT WINNERS                                           */}
+      {/* RULES & RECENT WINS : Symmetrical, clean                         */}
       {/* ================================================================ */}
-      <section className="py-24 sm:py-28 px-6 max-w-6xl mx-auto border-t border-white/10">
-        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-14">
+      <section className="mt-20 pt-16 border-t border-white/10 max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-14">
+          {/* Rules / Boost FAQ */}
           <div>
-            <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-2">RÈGLEMENT</span>
-            <h2 className="text-4xl sm:text-5xl font-semibold tracking-[-0.03em] mb-10">
-              Simple, équitable, <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">vérifié.</span>
+            <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-1.5">
+              RÈGLEMENT &amp; AVANTAGES
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-8">
+              Équité, transparence &amp; <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">avantages.</span>
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {RULES.map((rule, idx) => (
-                <motion.div key={rule.num} {...fadeUp(0.08 * idx)} className="flex flex-col border-l border-white/10 pl-5">
-                  <span className="font-['Geist_Mono'] text-xs text-amber-400/80 mb-2">{rule.num}</span>
-                  <h3 className="font-semibold text-lg mb-2">{rule.title}</h3>
-                  <p className="text-neutral-400 text-sm leading-relaxed">{rule.desc}</p>
+                <motion.div
+                  key={rule.num}
+                  {...fadeUp(0.06 * idx)}
+                  className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col justify-between"
+                >
+                  <span className="font-['Geist_Mono'] text-xs text-amber-400 font-bold mb-1.5">{rule.num}</span>
+                  <h3 className="font-semibold text-sm text-white mb-1.5">{rule.title}</h3>
+                  <p className="text-neutral-400 text-xs leading-relaxed">{rule.desc}</p>
                 </motion.div>
               ))}
             </div>
           </div>
 
+          {/* Recent Winners Live Stream */}
           <div>
-            <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-2">DERNIERS GAGNANTS</span>
-            <div className="liquid-glass rounded-2xl p-2 mt-4">
+            <span className="text-xs font-['Geist_Mono'] tracking-[3px] uppercase text-neutral-400 block mb-1.5">
+              DERNIERS GAGNANTS
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-8">
+              Tirages en <span className="font-['Instrument_Serif'] font-normal italic text-amber-400">ville.</span>
+            </h2>
+
+            <div className="liquid-glass rounded-2xl p-2 border border-white/10">
               {recentWins.length === 0 ? (
-                <p className="text-sm text-neutral-500 p-5">Aucun tirage pour le moment. Soyez le premier !</p>
+                <p className="text-xs text-neutral-500 p-5 text-center font-['Geist_Mono']">
+                  Aucun tirage récent pour le moment.
+                </p>
               ) : (
-                <ul>
-                  {recentWins.map((win, i) => (
+                <ul className="divide-y divide-white/5">
+                  {recentWins.slice(0, 6).map((win, i) => (
                     <li
                       key={`${win.won_at}-${i}`}
-                      className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl hover:bg-white/[0.03] transition-colors"
+                      className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-lg hover:bg-white/[0.02] transition-colors"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{win.winner}</p>
-                        <p className="text-xs text-neutral-400 truncate">{win.prize}</p>
+                        <p className="text-xs sm:text-sm font-medium text-white truncate">{win.winner}</p>
+                        <p className="text-[11px] text-amber-400/90 truncate">{win.prize}</p>
                       </div>
-                      <span className="font-['Geist_Mono'] text-[11px] text-neutral-500 shrink-0">{timeAgo(win.won_at)}</span>
+                      <span className="font-['Geist_Mono'] text-[10px] text-neutral-500 shrink-0">
+                        {timeAgo(win.won_at)}
+                      </span>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
 
-            <div className="mt-6 p-5 rounded-xl border border-white/15 bg-white/[0.02] flex items-center justify-between gap-4">
-              <span className="text-sm text-neutral-300 flex items-center gap-2">
-                <Crown size={16} className="text-amber-400 shrink-0" /> Plus de tirages avec les cartes VIP
+            <div className="mt-4 p-3.5 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between gap-3">
+              <span className="text-xs text-neutral-300 flex items-center gap-2">
+                <Crown size={14} className="text-amber-400 shrink-0" />
+                Cooldown réduit avec les cartes VIP
               </span>
               <Link
                 to="/abonnements"
-                className="text-xs uppercase tracking-widest font-bold hover:underline flex items-center gap-1 shrink-0"
+                className="text-xs font-['Geist_Mono'] uppercase tracking-wider font-bold text-amber-400 hover:underline flex items-center gap-1 shrink-0"
               >
-                Voir <ArrowUpRight size={14} />
+                Voir <ArrowUpRight size={12} />
               </Link>
             </div>
           </div>
@@ -532,7 +702,7 @@ export const WheelOfFortune: React.FC = () => {
       </section>
 
       {/* ================================================================ */}
-      {/* RESULT MODAL                                                     */}
+      {/* RESULT MODAL : Ultra-clean minimalist victory modal              */}
       {/* ================================================================ */}
       <AnimatePresence>
         {resultOpen && wonSegment && (
@@ -547,14 +717,14 @@ export const WheelOfFortune: React.FC = () => {
             aria-labelledby="wheel-result-title"
           >
             <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
-              className="liquid-glass bg-black/70 rounded-3xl w-full max-w-md overflow-hidden border border-white/15"
+              className="liquid-glass bg-black/90 rounded-2xl w-full max-w-md overflow-hidden border border-white/20 shadow-2xl"
             >
-              <div className="relative h-56">
+              <div className="relative h-48 sm:h-52 bg-neutral-900">
                 <img
                   src={wonSegment.imageUrl || (wonSegment.type === 'vehicle' ? podiumVehicle.imageUrl : PRIZE_IMAGES[wonSegment.type])}
                   alt=""
@@ -563,37 +733,42 @@ export const WheelOfFortune: React.FC = () => {
                     e.currentTarget.src = PRIZE_IMAGES[wonSegment.type] || '/mystery_vault.jpg';
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                 <button
                   type="button"
                   onClick={() => setResultOpen(false)}
-                  className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 border border-white/20 flex items-center justify-center hover:bg-black cursor-pointer"
+                  className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center hover:bg-black text-neutral-300 hover:text-white transition-colors cursor-pointer"
                   aria-label="Fermer"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
-              <div className="p-7 text-center">
-                <span className="font-['Geist_Mono'] text-xs tracking-[3px] uppercase text-neutral-400">Félicitations</span>
-                <h3 id="wheel-result-title" className="text-4xl font-['Instrument_Serif'] mt-2 mb-2">
+
+              <div className="p-6 text-center">
+                <span className="font-['Geist_Mono'] text-xs tracking-[3px] uppercase text-neutral-400">
+                  Tirage Gagnant
+                </span>
+                <h3 id="wheel-result-title" className="text-3xl sm:text-4xl font-['Instrument_Serif'] mt-1 mb-2 font-normal">
                   <em className="italic text-amber-400">{wonSegment.label}</em>
                 </h3>
-                <p className="text-neutral-300 text-sm">
+
+                <p className="text-neutral-300 text-xs sm:text-sm leading-relaxed max-w-sm mx-auto mb-6">
                   {wonSegment.type === 'chips'
-                    ? `${formatPrizeValue(wonSegment)} crédités sur votre compte.`
-                    : `« ${formatPrizeValue(wonSegment)} » est dans votre inventaire. Réclamez-le depuis l’Espace Membre : la direction vous le remettra en ville.`}
+                    ? `${formatPrizeValue(wonSegment)} crédités sur votre compte joueur.`
+                    : `« ${formatPrizeValue(wonSegment)} » rejoint votre inventaire citoyen. Réclamez-le depuis votre Espace Membre pour remise en ville.`}
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 mt-7">
+
+                <div className="flex flex-col sm:flex-row gap-2.5">
                   <Link
                     to="/espace-membre"
-                    className="flex-1 rounded-full py-3 text-sm font-semibold bg-white text-black flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors"
+                    className="flex-1 rounded-xl py-3 text-xs sm:text-sm font-semibold tracking-wide bg-white text-black flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors"
                   >
-                    <Coins size={15} /> {wonSegment.type === 'chips' ? 'Voir mon compte' : 'Réclamer mon lot'}
+                    <Coins size={14} /> {wonSegment.type === 'chips' ? 'Voir mon compte' : 'Accéder à l’inventaire'}
                   </Link>
                   <button
                     type="button"
                     onClick={() => setResultOpen(false)}
-                    className="flex-1 rounded-full py-3 text-sm font-medium border border-white/20 hover:bg-white/10 transition-colors cursor-pointer"
+                    className="flex-1 rounded-xl py-3 text-xs sm:text-sm font-medium border border-white/20 hover:bg-white/10 text-neutral-300 hover:text-white transition-colors cursor-pointer"
                   >
                     Fermer
                   </button>

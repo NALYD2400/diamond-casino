@@ -19,18 +19,24 @@ import { MemberPortal } from './components/MemberPortal';
 import { WheelOfFortune } from './components/WheelOfFortune';
 import { MinesGame } from './components/MinesGame';
 import { DogHouseGame } from './components/doghouse/DogHouseGame';
+import { WantedGame } from './components/wanted/WantedGame';
 import { GamesHub } from './components/GamesHub';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
 import { NotFound } from './components/NotFound';
 
+import { useCasinoUser } from './context/CasinoUserContext';
+
 /**
  * Root Layout Component
- * Renders Navbar on all views except the full-screen member portal and staff consoles
+ * Renders Navbar on all views except the standalone login view and staff consoles
  */
 function RootComponent() {
   const location = useLocation();
-  const hideNavbar = location.pathname === '/admin' || location.pathname === '/dev';
+  const { isAuthenticated, isLoading } = useCasinoUser();
+
+  const isLoginPage = location.pathname === '/espace-membre' && (!isAuthenticated || isLoading);
+  const hideNavbar = isLoginPage || location.pathname === '/admin' || location.pathname === '/dev';
 
   React.useEffect(() => {
     window.scrollTo(0, 0);
@@ -139,6 +145,24 @@ function SlotsPage() {
 }
 
 /**
+ * Wanted Dead or a Wild Slot Route Component (/wanted)
+ */
+function WantedPage() {
+  return (
+    <motion.div
+      key="wanted-page"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <WantedGame />
+      <Footer />
+    </motion.div>
+  );
+}
+
+/**
  * Games Catalog / Hub Route Component (/jeux)
  */
 function GamesCatalogPage() {
@@ -239,6 +263,12 @@ const luckyWheelRoute = createRoute({
   component: LuckyWheelPage,
 });
 
+const boostRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/boost',
+  component: LuckyWheelPage,
+});
+
 const minesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/mines',
@@ -249,6 +279,12 @@ const slotsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/slots',
   component: SlotsPage,
+});
+
+const wantedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/wanted',
+  component: WantedPage,
 });
 
 const gamesRoute = createRoute({
@@ -286,8 +322,10 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   memberPortalRoute,
   luckyWheelRoute,
+  boostRoute,
   minesRoute,
   slotsRoute,
+  wantedRoute,
   gamesRoute,
   subscriptionsRoute,
   adminRoute,

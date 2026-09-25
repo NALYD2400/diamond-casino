@@ -1,0 +1,7 @@
+Sons de la machine Wanted — tous sous licence CC0 (domaine public).
+
+- Jingles (win-*, bonus-*, collect) : "Music Jingles" par Kenney — https://kenney.nl/assets/music-jingles
+- Pièces (coin-*, coins-shower) : "Casino Audio" par Kenney — https://kenney.nl/assets/casino-audio
+- Coups de feu : synthétisés dans le navigateur (Web Audio).
+
+Fichiers convertis en MP3 avec ffmpeg.

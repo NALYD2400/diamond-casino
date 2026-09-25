@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { DogSymbol } from './doghouse/DogSymbols';
+import { WantedSymbol } from './wanted/WantedSymbols';
 
 type Category = 'all' | 'slots' | 'originals' | 'rewards';
 
@@ -48,6 +49,24 @@ const DogHouseCover: React.FC = () => (
     </div>
     <div className="absolute inset-x-0 bottom-[5%] text-center dh-font-xl text-[clamp(18px,2.2vw,26px)] leading-none text-[#ffb300] [-webkit-text-stroke:1.5px_#3b1d0e] drop-shadow-[0_3px_0_#3b1d0e]">
       THE DOG HOUSE
+    </div>
+  </div>
+);
+
+const WantedCover: React.FC = () => (
+  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,#e8482a_0%,#b8231a_45%,#3a0a06_100%)]">
+    <div className="absolute -left-6 top-[10%] w-24 h-24 rounded-full bg-[#f5d86a] opacity-90" />
+    <div className="absolute inset-x-[18%] top-[16%] aspect-square drop-shadow-[0_6px_0_rgba(0,0,0,0.35)]">
+      <WantedSymbol id="vs" />
+    </div>
+    <div className="absolute left-[5%] bottom-[22%] w-[34%] aspect-square -rotate-6">
+      <WantedSymbol id="skull" />
+    </div>
+    <div className="absolute right-[5%] bottom-[22%] w-[34%] aspect-square rotate-6">
+      <WantedSymbol id="wild" />
+    </div>
+    <div className="absolute inset-x-0 bottom-[5%] text-center font-['Rye'] text-[clamp(20px,2.4vw,30px)] leading-none text-[#e0b040] [-webkit-text-stroke:1.5px_#1c120c] drop-shadow-[0_3px_0_#1c120c]">
+      WANTED
     </div>
   </div>
 );
@@ -118,6 +137,16 @@ const GAMES: GameTile[] = [
     cover: <DogHouseCover />,
   },
   {
+    id: 'wanted',
+    title: 'Wanted Dead or a Wild',
+    provider: 'Diamond Slots',
+    category: 'slots',
+    link: '/wanted',
+    tag: 'NOUVEAU',
+    rtp: '96,4 %',
+    cover: <WantedCover />,
+  },
+  {
     id: 'mines',
     title: 'Mines',
     provider: 'Diamond Originals',
@@ -176,8 +205,8 @@ const Tile: React.FC<{ game: GameTile; index: number }> = ({ game, index }) => {
       className={`group relative ${available ? 'cursor-pointer' : 'cursor-default'}`}
     >
       <div
-        className={`relative aspect-[3/4] overflow-hidden rounded-xl bg-[#213743] shadow-[0_4px_12px_rgba(0,0,0,0.35)] transition-transform duration-200 ${
-          available ? 'group-hover:-translate-y-1.5' : ''
+        className={`relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-900 border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.5)] transition-all duration-200 ${
+          available ? 'group-hover:-translate-y-1.5 group-hover:border-white/30' : ''
         }`}
       >
         {game.cover}
@@ -187,13 +216,13 @@ const Tile: React.FC<{ game: GameTile; index: number }> = ({ game, index }) => {
           </span>
         )}
         {available ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/45 group-hover:opacity-100">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-all group-hover:opacity-100 backdrop-blur-[2px]">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ffcf3f] text-[#1a1000] shadow-[0_0_25px_rgba(255,207,63,0.6)]">
               <Play size={24} fill="currentColor" className="ml-1" />
             </span>
           </div>
         ) : (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/55">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/60 backdrop-blur-[2px]">
             <Lock size={20} className="text-white/70" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-white/70">Bientôt</span>
           </div>
@@ -201,7 +230,7 @@ const Tile: React.FC<{ game: GameTile; index: number }> = ({ game, index }) => {
       </div>
       <div className="mt-2 px-0.5">
         <div className="truncate text-sm font-bold text-white">{game.title}</div>
-        <div className="flex items-center justify-between text-[11px] text-[#b1bad3]">
+        <div className="flex items-center justify-between text-[11px] text-neutral-400">
           <span className="truncate">{game.provider}</span>
           {game.rtp && <span className="shrink-0">RTP {game.rtp}</span>}
         </div>
@@ -230,25 +259,25 @@ export const GamesHub: React.FC = () => {
   }, [category, query]);
 
   return (
-    <div className="min-h-screen bg-[#0f1923] pt-[80px] sm:pt-[90px] text-white">
+    <div className="min-h-screen bg-black pt-[80px] sm:pt-[90px] text-white selection:bg-white selection:text-black">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Solde */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#1a2c38] px-4 py-3">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-neutral-950/80 border border-white/10 px-4 py-3 backdrop-blur-md">
           {isAuthenticated && user ? (
             <>
               <div className="flex items-center gap-3 min-w-0">
-                <img src={user.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                <img src={user.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover border border-white/20" />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-bold">
+                  <div className="truncate text-sm font-bold text-white">
                     {user.rpFirstName} {user.rpLastName}
                   </div>
-                  <div className="text-[11px] text-[#b1bad3]">ID {user.citizenId}</div>
+                  <div className="text-[11px] text-neutral-400">ID {user.citizenId}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 rounded-lg bg-[#0f1923] px-3 py-2">
+                <div className="flex items-center gap-2 rounded-lg bg-neutral-900 border border-white/10 px-3 py-2">
                   <Coins size={16} className="text-[#ffcf3f]" />
-                  <span className="font-['Geist_Mono'] text-sm font-bold">{user.chips.toLocaleString('fr-FR')}</span>
+                  <span className="font-['Geist_Mono'] text-sm font-bold text-white">{user.chips.toLocaleString('fr-FR')}</span>
                 </div>
                 <Link
                   to="/espace-membre"
@@ -260,7 +289,7 @@ export const GamesHub: React.FC = () => {
             </>
           ) : (
             <>
-              <div className="text-sm text-[#b1bad3]">
+              <div className="text-sm text-neutral-400">
                 <span className="font-bold text-white">Mode démo disponible.</span> Connectez-vous pour jouer avec vos jetons.
               </div>
               <Link
@@ -277,7 +306,7 @@ export const GamesHub: React.FC = () => {
         <div className="grid gap-4 lg:grid-cols-3">
           <Link
             to="/slots"
-            className="group relative col-span-1 lg:col-span-2 overflow-hidden rounded-2xl min-h-[220px] sm:min-h-[260px] bg-[linear-gradient(180deg,#3fa9f5_0%,#8fd3ff_62%,#7ed957_62%,#2d7d27_100%)]"
+            className="group relative col-span-1 lg:col-span-2 overflow-hidden rounded-2xl min-h-[220px] sm:min-h-[260px] bg-[linear-gradient(180deg,#3fa9f5_0%,#8fd3ff_62%,#7ed957_62%,#2d7d27_100%)] shadow-lg shadow-black/50"
           >
             <div className="absolute right-[-4%] bottom-[-6%] w-[58%] sm:w-[44%] max-w-[360px] aspect-square transition-transform duration-300 group-hover:scale-105">
               <DogSymbol id="wild" multiplier={3} />
@@ -295,7 +324,7 @@ export const GamesHub: React.FC = () => {
               <p className="mt-3 text-sm font-semibold text-[#1b2a3a] max-w-sm">
                 Wilds x2 et x3 additionnés, jusqu'à 27 tours gratuits avec wilds collants. Gain max 6 750x.
               </p>
-              <span className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-[#3b1d0e] px-5 py-2.5 text-sm font-bold text-white group-hover:bg-[#5a2c10] transition-colors">
+              <span className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-[#3b1d0e] px-5 py-2.5 text-sm font-bold text-white group-hover:bg-[#5a2c10] transition-colors shadow-md">
                 <Play size={15} fill="currentColor" /> Jouer maintenant
               </span>
             </div>
@@ -304,22 +333,22 @@ export const GamesHub: React.FC = () => {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <Link
               to="/roue-de-la-fortune"
-              className="group relative overflow-hidden rounded-2xl min-h-[120px] bg-[#1a2c38]"
+              className="group relative overflow-hidden rounded-2xl min-h-[120px] bg-[#1a2c38] border border-white/10"
             >
-              <img src="/podium_supercar.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-50 transition-transform duration-500 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0f1923] via-[#0f1923]/70 to-transparent" />
+              <img src="/podium_supercar.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-500 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
               <div className="relative p-5">
                 <div className="text-[11px] font-extrabold text-[#ffcf3f]">TOUS LES JOURS</div>
-                <div className="text-xl font-extrabold">Roue de la Fortune</div>
-                <div className="mt-1 text-xs text-[#b1bad3]">Un tour offert, la supercar du podium en jeu.</div>
+                <div className="text-xl font-extrabold text-white">Roue de la Fortune</div>
+                <div className="mt-1 text-xs text-neutral-300">Un tour offert, la supercar du podium en jeu.</div>
               </div>
             </Link>
-            <Link to="/mines" className="group relative overflow-hidden rounded-2xl min-h-[120px] bg-[radial-gradient(circle_at_80%_50%,#1f4a6e,#1a2c38_60%)]">
+            <Link to="/mines" className="group relative overflow-hidden rounded-2xl min-h-[120px] bg-[radial-gradient(circle_at_80%_50%,#1f4a6e,#1a2c38_60%)] border border-white/10">
               <Gem className="absolute right-6 top-1/2 -translate-y-1/2 h-16 w-16 text-[#3dffb0] drop-shadow-[0_0_14px_rgba(61,255,176,0.7)] transition-transform group-hover:scale-110" />
               <div className="relative p-5">
                 <div className="text-[11px] font-extrabold text-[#3dffb0]">ORIGINALS</div>
-                <div className="text-xl font-extrabold">Mines</div>
-                <div className="mt-1 text-xs text-[#b1bad3]">Révélez les diamants, encaissez avant la bombe.</div>
+                <div className="text-xl font-extrabold text-white">Mines</div>
+                <div className="mt-1 text-xs text-neutral-300">Révélez les diamants, encaissez avant la bombe.</div>
               </div>
             </Link>
           </div>
@@ -328,21 +357,21 @@ export const GamesHub: React.FC = () => {
         {/* Recherche + catégories */}
         <div className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#b1bad3]" />
+            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Rechercher un jeu"
-              className="w-full rounded-full border-2 border-[#2f4553] bg-[#0f212e] py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-[#7a8ba0] outline-none transition-colors focus:border-[#557086]"
+              className="w-full rounded-full border border-white/10 bg-neutral-950/80 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-neutral-500 outline-none transition-colors focus:border-white/30 backdrop-blur-sm"
             />
           </label>
-          <div className="flex gap-1 overflow-x-auto rounded-full bg-[#0f212e] p-1 [scrollbar-width:none]">
+          <div className="flex gap-1 overflow-x-auto rounded-full bg-neutral-950/80 border border-white/10 p-1 [scrollbar-width:none] backdrop-blur-sm">
             {CATEGORIES.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setCategory(c.id)}
                 className={`flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                  category === c.id ? 'bg-[#2f4553] text-white' : 'text-[#b1bad3] hover:text-white hover:bg-[#1a2c38]'
+                  category === c.id ? 'bg-white text-black' : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
                 }`}
               >
                 {c.icon}
@@ -355,8 +384,8 @@ export const GamesHub: React.FC = () => {
         {/* Grille */}
         <div className="mt-6 mb-3 flex items-center gap-2">
           <Sparkles size={18} className="text-[#ffcf3f]" />
-          <h3 className="text-lg font-bold">{CATEGORIES.find((c) => c.id === category)?.label}</h3>
-          <span className="text-sm text-[#b1bad3]">({filtered.length})</span>
+          <h3 className="text-lg font-bold text-white">{CATEGORIES.find((c) => c.id === category)?.label}</h3>
+          <span className="text-sm text-neutral-400">({filtered.length})</span>
         </div>
         {filtered.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6">
@@ -365,7 +394,7 @@ export const GamesHub: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="rounded-xl bg-[#1a2c38] py-12 text-center text-sm text-[#b1bad3]">
+          <div className="rounded-xl bg-neutral-950/80 border border-white/10 py-12 text-center text-sm text-neutral-400">
             Aucun jeu ne correspond à « {query} ».
           </div>
         )}
@@ -377,11 +406,11 @@ export const GamesHub: React.FC = () => {
             { icon: <Coins size={18} />, t: 'Jetons instantanés', d: 'Vos gains sont crédités à la fin de chaque partie.' },
             { icon: <Play size={18} />, t: 'Mode démo', d: 'Essayez les jeux sans miser vos jetons.' },
           ].map((f) => (
-            <div key={f.t} className="flex items-start gap-3 rounded-xl bg-[#1a2c38] p-4">
+            <div key={f.t} className="flex items-start gap-3 rounded-xl bg-neutral-950/80 border border-white/10 p-4">
               <span className="mt-0.5 text-[#ffcf3f]">{f.icon}</span>
               <div>
-                <div className="text-sm font-bold">{f.t}</div>
-                <div className="text-xs text-[#b1bad3]">{f.d}</div>
+                <div className="text-sm font-bold text-white">{f.t}</div>
+                <div className="text-xs text-neutral-400">{f.d}</div>
               </div>
             </div>
           ))}

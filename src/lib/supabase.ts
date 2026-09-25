@@ -50,6 +50,7 @@ export interface ProfilePayload {
   cooldown_hours: number;
   next_spin_at: string | null;
   is_staff: boolean;
+  is_booster?: boolean | null;
   created_at: string | null;
 }
 
@@ -105,6 +106,7 @@ export type TransactionType =
   | 'WHEEL'
   | 'VIP_REWARD'
   | 'VIP_REQUEST'
+  | 'VIP_SUBSCRIPTION'
   | 'ADMIN_ADJUST';
 
 export interface SupabaseTransaction {
@@ -163,6 +165,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   WHEEL_NOT_CONFIGURED: 'La roue n’est pas encore configurée par la direction.',
   VIP_ALREADY_ACTIVE: 'Cette carte VIP est déjà active sur votre compte.',
   VIP_REQUEST_PENDING: 'Une demande VIP est déjà en attente de validation.',
+  INSUFFICIENT_CHIPS: 'Solde de jetons insuffisant pour cet abonnement.',
+  INSUFFICIENT_FUNDS: 'Solde de jetons insuffisant.',
+  INVALID_BET: 'Mise invalide.',
   REWARD_NOT_CLAIMABLE: 'Ce lot a déjà été réclamé ou traité.',
   REWARD_NOT_FOUND: 'Lot introuvable.',
   VEHICLE_NOT_FOUND: 'Véhicule introuvable dans le catalogue.',
@@ -233,6 +238,8 @@ export const apiSpinWheel = () => rpc<SpinResult>('spin_wheel');
 
 export const apiRequestVip = (tier: VipTier) => rpc<{ status: string; tier: VipTier }>('request_vip', { p_tier: tier });
 
+export const apiBuyVipWithChips = (tier: VipTier) => rpc<ProfilePayload>('buy_vip_with_chips', { p_tier: tier });
+
 export const apiRecentWheelWins = (limit = 8) => rpc<WheelWin[]>('recent_wheel_wins', { p_limit: limit });
 
 export interface MinesRoundResult {
@@ -253,6 +260,19 @@ export const apiPlayMinesGame = (p: {
     p_multiplier: Number(p.multiplier.toFixed(4)),
     p_mines: p.mines,
     p_gems: p.gems,
+  });
+
+export const apiPlaySlotsRound = (p: {
+  machineName: string;
+  bet: number;
+  win: number;
+  multiplier: number;
+}) =>
+  rpc<MinesRoundResult>('play_slots_round', {
+    p_machine: p.machineName,
+    p_bet: Math.trunc(p.bet),
+    p_win: Math.trunc(p.win),
+    p_multiplier: Number(p.multiplier.toFixed(4)),
   });
 
 export const apiSubscribeEvents = (email: string) => rpc<null>('subscribe_events', { p_email: email });

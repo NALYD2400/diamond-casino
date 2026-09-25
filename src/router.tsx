@@ -18,6 +18,7 @@ import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
 import { WheelOfFortune } from './components/WheelOfFortune';
 import { MinesGame } from './components/MinesGame';
+import { GamesHub } from './components/GamesHub';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
 import { NotFound } from './components/NotFound';
@@ -101,7 +102,7 @@ function LuckyWheelPage() {
 }
 
 /**
- * Mines Game Route Component (/mines and /jeux)
+ * Mines Game Route Component (/mines)
  */
 function MinesPage() {
   return (
@@ -113,6 +114,24 @@ function MinesPage() {
       transition={{ duration: 0.3 }}
     >
       <MinesGame />
+      <Footer />
+    </motion.div>
+  );
+}
+
+/**
+ * Games Catalog / Hub Route Component (/jeux)
+ */
+function GamesCatalogPage() {
+  return (
+    <motion.div
+      key="games-catalog-page"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <GamesHub />
       <Footer />
     </motion.div>
   );
@@ -210,7 +229,7 @@ const minesRoute = createRoute({
 const gamesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/jeux',
-  component: MinesPage,
+  component: GamesCatalogPage,
 });
 
 const subscriptionsRoute = createRoute({

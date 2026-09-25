@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isHome = currentPath === '/' || propCurrentView === 'landing';
   const isWheel = currentPath === '/roue-de-la-fortune' || propCurrentView === 'lucky-wheel';
   const isVip = currentPath === '/abonnements';
-  const isMines = currentPath === '/mines' || currentPath === '/jeux';
+  const isGames = currentPath === '/jeux' || currentPath === '/mines';
   const isMember = currentPath === '/espace-membre' || propCurrentView === 'member-portal';
 
   const handleSectionScroll = (sectionId: string) => {
@@ -78,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               to="/"
               onClick={() => setCurrentView?.('landing')}
               className={`font-medium transition-colors cursor-pointer ${
-                isHome && !isWheel && !isVip && !isMember && !isMines
+                isHome && !isWheel && !isVip && !isMember && !isGames
                   ? 'text-white font-semibold'
                   : 'text-white/70 hover:text-white'
               }`}
@@ -87,15 +87,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             </Link>
             
             <Link
-              to="/mines"
-              className={`font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-                isMines ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
+              to="/jeux"
+              className={`font-medium transition-colors cursor-pointer ${
+                isGames ? 'text-amber-400 font-semibold' : 'text-white/70 hover:text-white'
               }`}
             >
-              <span>Mines</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 tracking-wider">
-                JEU
-              </span>
+              Jeux
             </Link>
 
             {/* Clean Roue de la Fortune Nav Link */}
@@ -215,14 +212,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               Accueil
             </Link>
             <Link
-              to="/mines"
+              to="/jeux"
               onClick={() => setMenuOpen(false)}
-              className="text-left text-lg font-medium text-white/90 hover:text-white flex items-center justify-between"
+              className="text-left text-lg font-medium text-white/90 hover:text-white"
             >
-              <span>Jeu des Mines</span>
-              <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                NOUVEAU
-              </span>
+              Jeux
             </Link>
             <Link
               to="/roue-de-la-fortune"

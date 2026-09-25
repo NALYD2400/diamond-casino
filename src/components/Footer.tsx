@@ -16,11 +16,14 @@ export const Footer: React.FC = () => {
           className="h-8 w-auto object-contain transition-transform group-hover:scale-105"
         />
         <span className="font-['Geist_Mono'] text-xs text-neutral-400">
-          © 2026 THE DIAMOND CASINO &amp; RESORT // LOS SANTOS FIVEM RP. TOUS DROITS RÉSERVÉS.
+          © 2026 THE DIAMOND CASINO &amp; RESORT // LOS SANTOS. TOUS DROITS RÉSERVÉS.
         </span>
       </Link>
 
       <div className="flex flex-wrap items-center gap-6 sm:gap-8 text-xs font-['Geist_Mono'] text-neutral-400">
+        <Link to="/jeux" className="hover:text-amber-400 transition-colors">
+          JEUX DE CASINO
+        </Link>
         <Link to="/mines" className="hover:text-amber-400 transition-colors">
           JEU DES MINES
         </Link>

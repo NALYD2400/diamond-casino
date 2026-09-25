@@ -157,6 +157,23 @@ async function main() {
       const h2 = await sha256Hex('test_diamond_casino');
       return h1 === h2 && h1.length >= 8;
     })()],
+    ['grid tile coordinates map accurately across 5x5 board', (() => {
+      const toCoord = (idx: number) => `${String.fromCharCode(65 + (idx % 5))}${Math.floor(idx / 5) + 1}`;
+      return (
+        toCoord(0) === 'A1' &&
+        toCoord(4) === 'E1' &&
+        toCoord(12) === 'C3' &&
+        toCoord(20) === 'A5' &&
+        toCoord(24) === 'E5'
+      );
+    })()],
+    ['provably fair verifies correctly and detects tampering', (async () => {
+      const b = await generateBoard(5);
+      const boardStr = b.board.map((m) => (m ? 'M' : 'D')).join('');
+      const validHash = await sha256Hex(`${b.serverSeed}:${boardStr}`);
+      const tamperedHash = await sha256Hex(`tampered_${b.serverSeed}:${boardStr}`);
+      return validHash === b.hash && tamperedHash !== b.hash;
+    })()],
   ]);
 
   const health = await dbCheckHealth();

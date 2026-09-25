@@ -504,7 +504,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   Espace Membre
                 </h2>
                 <p className="text-neutral-400 text-xs sm:text-[13.5px] leading-relaxed mb-8 max-w-sm">
-                  Connectez votre compte Discord pour accéder instantanément à votre console privée, vos jetons réels et votre profil FiveM.
+                  Connectez votre compte Discord pour accéder instantanément à votre console privée, vos jetons réels et votre profil citoyen.
                 </p>
 
                 <button
@@ -575,7 +575,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     Création de Profil Citoyen
                   </span>
                   <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                    Identité Roleplay FiveM
+                    Identité Citoyenne
                   </h2>
                   <p className="text-neutral-400 text-xs sm:text-[13px] leading-relaxed mt-1">
                     Renseignez vos coordonnées in-game. Elles seront rattachées à votre compte Discord et rechargées automatiquement à chaque visite.
@@ -626,7 +626,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-semibold text-neutral-300 flex items-center justify-between">
-                        <span>ID Citoyen FiveM</span>
+                        <span>ID Citoyen</span>
                         <span className="text-white text-[11px]">*</span>
                       </label>
                       <input
@@ -861,7 +861,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     Console de Suite Privée, <em className="italic text-white font-normal">{user.rpFirstName} {user.rpLastName}</em>
                   </h1>
                   <p className="text-neutral-400 text-xs sm:text-sm max-w-2xl leading-relaxed">
-                    Votre terminal centralise vos jetons de casino réels, vos accès sécurisés FiveM et vos privilèges VIP du Resort.
+                    Votre terminal centralise vos jetons de casino réels, vos accès sécurisés et vos privilèges VIP du Resort.
                   </p>
                 </div>
 
@@ -1364,7 +1364,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 IDENTIFICATION RP OFFICIELLE
               </span>
               <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight font-['Instrument_Serif'] font-normal">
-                Fiche Citoyenne <em className="italic text-white font-normal">FiveM</em> &amp; Discord
+                Fiche Citoyenne &amp; Discord
               </h2>
               <p className="text-neutral-400 text-xs sm:text-sm leading-relaxed">
                 Vos coordonnées Roleplay enregistrées sont sauvegardées dans notre base sécurisée et associées à votre compte Discord officiel.
@@ -1420,7 +1420,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 </div>
 
                 <div className="p-4 rounded-2xl bg-black/40 border border-white/6 flex flex-col gap-1">
-                  <span className="text-[10px] text-neutral-500 uppercase font-semibold">Numéro / ID Citoyen FiveM</span>
+                  <span className="text-[10px] text-neutral-500 uppercase font-semibold">Numéro / ID Citoyen</span>
                   <span className="font-mono font-bold text-white text-base">
                     #{user.citizenId}
                   </span>
@@ -1544,7 +1544,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   </li>
                   <li className="flex items-center gap-2">
                     <Check size={14} className="text-neutral-300 shrink-0" />
-                    <span>Fiche citoyenne certifiée FiveM</span>
+                    <span>Fiche citoyenne certifiée</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check size={14} className="text-neutral-300 shrink-0" />
@@ -1635,7 +1635,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   Modifier mes informations RP
                 </h3>
                 <p className="text-neutral-400 text-xs mt-1">
-                  Vos informations FiveM seront sauvegardées et synchronisées dans notre base Supabase.
+                  Vos informations seront sauvegardées et synchronisées dans notre base sécurisée.
                 </p>
               </div>
 
@@ -1676,7 +1676,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-neutral-300 flex items-center justify-between">
-                    <span>Numéro / ID Citoyen FiveM</span>
+                    <span>Numéro / ID Citoyen</span>
                   </label>
                   <input
                     type="text"
@@ -1744,7 +1744,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 Fermeture de Session Console
               </h3>
               <p className="text-neutral-300 text-xs sm:text-sm leading-relaxed mb-6">
-                Êtes-vous certain de vouloir quitter votre Suite Citoyenne ? Vos jetons ({user.chips.toLocaleString()} ⛁), vos gains et votre profil FiveM restent sauvegardés et synchronisés sur le Cloud.
+                Êtes-vous certain de vouloir quitter votre Suite Citoyenne ? Vos jetons ({user.chips.toLocaleString()} ⛁), vos gains et votre profil restent sauvegardés et synchronisés sur le Cloud.
               </p>
 
               <div className="flex items-center gap-3">

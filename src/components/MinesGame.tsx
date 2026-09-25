@@ -497,7 +497,7 @@ export const MinesGame: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-black text-white selection:bg-amber-400 selection:text-black">
+    <div className="relative min-h-screen bg-black text-white select-none selection:bg-amber-400 selection:text-black">
       {/* Atmosphere Background Texture */}
       <div
         className="fixed inset-0 bg-cover bg-center opacity-10 grayscale pointer-events-none"

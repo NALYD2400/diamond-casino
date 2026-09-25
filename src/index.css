@@ -116,3 +116,84 @@ html, body {
   .wheel-bulb { animation: none !important; opacity: 0.8; }
   html { scroll-behavior: auto; }
 }
+
+/* ===================== The Dog House slot ===================== */
+.dh-font { font-family: 'Lilita One', 'Luckiest Guy', system-ui, sans-serif; letter-spacing: 0.01em; }
+.dh-font-xl { font-family: 'Luckiest Guy', 'Lilita One', system-ui, sans-serif; }
+
+.dh-strip { animation: dh-strip 0.32s linear infinite; filter: blur(1.6px) saturate(1.1); }
+.dh-strip-fast { animation-duration: 0.2s; }
+@keyframes dh-strip {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+
+.dh-land { animation: dh-land 0.34s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes dh-land {
+  0% { transform: translateY(-22%); }
+  55% { transform: translateY(7%); }
+  100% { transform: translateY(0); }
+}
+
+.dh-win { animation: dh-win 0.9s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(255, 230, 90, 0.95)); z-index: 5; }
+@keyframes dh-win {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.16) rotate(-3deg); }
+  60% { transform: scale(1.08) rotate(2deg); }
+}
+
+.dh-scatter-hit { animation: dh-scatter 0.6s ease-in-out infinite alternate; }
+@keyframes dh-scatter {
+  from { transform: scale(1); filter: drop-shadow(0 0 4px #ff2b4f); }
+  to { transform: scale(1.18); filter: drop-shadow(0 0 22px #ffe14a); }
+}
+
+.dh-sticky { animation: dh-sticky 1.6s ease-in-out infinite; }
+@keyframes dh-sticky {
+  0%, 100% { box-shadow: inset 0 0 0 3px rgba(255, 214, 64, 0.9), 0 0 14px rgba(255, 170, 0, 0.6); }
+  50% { box-shadow: inset 0 0 0 3px rgba(255, 245, 180, 1), 0 0 26px rgba(255, 200, 0, 0.9); }
+}
+
+.dh-anticip { animation: dh-anticip 0.5s ease-in-out infinite alternate; }
+@keyframes dh-anticip {
+  from { box-shadow: inset 0 0 0 3px #ffcf3f, 0 0 18px 4px rgba(255, 190, 40, 0.7); }
+  to { box-shadow: inset 0 0 0 3px #fff3b0, 0 0 38px 10px rgba(255, 220, 90, 0.95); }
+}
+
+.dh-cloud { animation: dh-cloud linear infinite; }
+@keyframes dh-cloud {
+  from { transform: translateX(-30vw); }
+  to { transform: translateX(130vw); }
+}
+
+.dh-coin { animation: dh-coin-fall linear forwards; }
+@keyframes dh-coin-fall {
+  from { transform: translateY(-15vh) rotateY(0deg); }
+  to { transform: translateY(115vh) rotateY(1080deg); }
+}
+
+.dh-pop { animation: dh-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes dh-pop {
+  from { transform: scale(0.3); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.dh-bigwin-text {
+  background: linear-gradient(180deg, #fffbd0 0%, #ffe14a 35%, #ff9a00 70%, #c24a00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 2px #4a1a00;
+  filter: drop-shadow(0 6px 0 #4a1a00) drop-shadow(0 0 30px rgba(255, 180, 0, 0.6));
+}
+
+.dh-rays { animation: dh-rays 14s linear infinite; }
+@keyframes dh-rays { to { transform: rotate(360deg); } }
+
+.dh-spin-btn:hover:not(:disabled) .dh-spin-arrows { transform: rotate(90deg); }
+.dh-spin-arrows { transition: transform 0.35s ease; }
+.dh-spinning .dh-spin-arrows { animation: dh-rays 0.7s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dh-cloud, .dh-rays { animation: none; }
+}

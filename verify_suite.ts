@@ -25,6 +25,12 @@ import {
   PAYLINES_5X3,
   PAYLINES_3X3,
 } from './src/components/slots/slotsEngine';
+import {
+  evaluateDogHouseSpin,
+  rollFreeSpinsGrid,
+  simulateDogHouse,
+  MAX_WIN_X_BET,
+} from './src/components/doghouse/dogHouseEngine';
 
 type TestCase = [string, boolean | Promise<boolean>];
 
@@ -208,6 +214,52 @@ async function main() {
         report.hitRatePct >= 10 &&
         report.durationMs < 500
       );
+    })()],
+  ]);
+
+  const seeded = (seed: number) => () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const dogSpins = Array.from({ length: 3000 }, (_, i) => evaluateDogHouseSpin({ bet: 200, rng: seeded(i + 1) }));
+  const dogFree = Array.from({ length: 1500 }, (_, i) =>
+    evaluateDogHouseSpin({ bet: 200, isFreeSpin: true, rng: seeded(i + 99999) }),
+  );
+
+  await runGroup('THE DOG HOUSE ENGINE', [
+    ['wilds only land on reels 2-4, scatters only on reels 1, 3 and 5', dogSpins.every((r) =>
+      r.grid.every((col, reel) =>
+        col.every((s) => (s !== 'wild' || [1, 2, 3].includes(reel)) && (s !== 'scatter' || [0, 2, 4].includes(reel))),
+      ),
+    )],
+    ['wild multipliers are 2x or 3x and line multipliers are their sum', dogSpins.every((r) =>
+      r.grid.every((col, reel) => col.every((s, row) => s !== 'wild' || [2, 3].includes(r.multipliers[reel][row]))) &&
+      r.wins.filter((w) => w.lineIndex >= 0).every((w) => {
+        const sum = w.positions.reduce((a, [reel, row]) => a + (r.grid[reel][row] === 'wild' ? r.multipliers[reel][row] : 0), 0);
+        return w.wildMultiplier === (sum || 1);
+      }),
+    )],
+    ['3 scatters pay 5x the bet and trigger the bonus', dogSpins.filter((r) => r.triggersBonus).every((r) =>
+      r.scatterCount === 3 && r.wins.some((w) => w.lineIndex === -1 && w.win === 1000),
+    )],
+    ['no scatter and no retrigger during free spins', dogFree.every((r) => !r.triggersBonus && r.scatterCount === 0)],
+    ['sticky wilds keep their position and multiplier', (() => {
+      const sticky = [{ reel: 2, row: 1, multiplier: 3 }];
+      const r = evaluateDogHouseSpin({ bet: 200, isFreeSpin: true, stickyWilds: sticky, rng: seeded(7) });
+      return r.grid[2][1] === 'wild' && r.multipliers[2][1] === 3 && r.stickyWilds.some((w) => w.reel === 2 && w.row === 1);
+    })()],
+    ['bonus buy always triggers the free spins', Array.from({ length: 200 }, (_, i) =>
+      evaluateDogHouseSpin({ bet: 200, forceScatters: true, rng: seeded(i + 555) }),
+    ).every((r) => r.triggersBonus)],
+    ['free spins grid awards 9 to 27 spins', Array.from({ length: 500 }, (_, i) => rollFreeSpinsGrid(seeded(i + 3))).every(
+      (g) => g.length === 9 && g.every((v) => v >= 1 && v <= 3),
+    )],
+    ['a single spin never exceeds the 6 750x max win', dogSpins.every((r) => r.totalWin <= 200 * MAX_WIN_X_BET)],
+    ['simulated RTP over 300k spins stays close to 96.5%', (() => {
+      const sim = simulateDogHouse(300000, seeded(2026));
+      return sim.rtp > 90 && sim.rtp < 103 && sim.hitRate > 20 && sim.bonusFrequency > 200 && sim.bonusFrequency < 500;
     })()],
   ]);
 

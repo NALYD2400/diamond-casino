@@ -18,7 +18,7 @@ import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
 import { WheelOfFortune } from './components/WheelOfFortune';
 import { MinesGame } from './components/MinesGame';
-import { SlotsGame } from './components/SlotsGame';
+import { DogHouseGame } from './components/doghouse/DogHouseGame';
 import { GamesHub } from './components/GamesHub';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
@@ -132,7 +132,7 @@ function SlotsPage() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <SlotsGame />
+      <DogHouseGame />
       <Footer />
     </motion.div>
   );

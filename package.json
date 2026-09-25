@@ -7,7 +7,8 @@
     "dev": "vite --port 5179",
     "build": "tsc && vite build",
     "preview": "vite preview --port 5179",
-    "test": "npx tsx verify_suite.ts"
+    "test": "npx tsx verify_suite.ts",
+    "sync:edge": "node scripts/sync-edge-engines.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",

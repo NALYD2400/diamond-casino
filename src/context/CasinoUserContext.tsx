@@ -12,8 +12,6 @@ import {
   dbFetchTransactions,
   dbFetchMyRewards,
   apiClaimReward,
-  apiPlayMinesGame,
-  apiPlaySlotsRound,
   type PlayerReward,
   type ProfilePayload,
   type ProfileRole,
@@ -50,6 +48,7 @@ export interface CasinoUser {
   chips: number;
   isDiscordSynced: boolean;
   vipTier?: VipTier;
+  vipExpiresAt: number | null;
   isBooster?: boolean;
   lastWheelSpin: number | null; // ms timestamp
   nextSpinAt: number | null; // ms timestamp
@@ -98,20 +97,8 @@ interface CasinoUserContextType {
   requestVip: (tier: VipTier) => Promise<void>;
   buyVipWithChips: (tier: VipTier) => Promise<void>;
   claimReward: (rewardId: string) => Promise<void>;
-  playMinesRound: (params: {
-    bet: number;
-    win: number;
-    multiplier: number;
-    mines: number;
-    gems: number;
-  }) => Promise<{ success: boolean; net: number; balance: number }>;
-  playSlotsRound: (params: {
-    machineName: string;
-    bet: number;
-    win: number;
-    multiplier: number;
-    isFreeSpin?: boolean;
-  }) => Promise<{ success: boolean; net: number; balance: number }>;
+  /** Applique un profil renvoyé par le serveur (après une manche de jeu) */
+  applyServerProfile: (profile: ProfilePayload) => void;
   canSpinWheel: boolean;
   timeUntilNextSpin: string;
 }
@@ -156,6 +143,7 @@ function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[], reward
     chips: Number(p.chips) || 0,
     isDiscordSynced: !!p.discord_id,
     vipTier: p.vip_tier || undefined,
+    vipExpiresAt: p.vip_expires_at ? new Date(p.vip_expires_at).getTime() : null,
     isBooster: Boolean(p.is_booster),
     lastWheelSpin: p.last_wheel_spin ? new Date(p.last_wheel_spin).getTime() : null,
     nextSpinAt: p.next_spin_at ? new Date(p.next_spin_at).getTime() : null,
@@ -310,28 +298,30 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [applyProfile]);
 
-  // Synchronisation distante / cross-device via Supabase Realtime
+  // Synchronisation distante / cross-device via Supabase Realtime.
+  // La ligne brute de la table n'a pas les champs calculés (is_staff,
+  // next_spin_at, VIP expiré…) : on recharge le profil calculé par le serveur.
+  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!user?.id) return;
     const profileChannel = supabase
       .channel(`realtime-profile-${user.id}`)
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${user.id}`,
-        },
-        (payload) => {
-          if (payload.new && (payload.new as ProfilePayload).id === user.id) {
-            applyProfile(payload.new as ProfilePayload, false);
-          }
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        () => {
+          if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
+          realtimeTimer.current = setTimeout(() => {
+            apiGetMyProfile()
+              .then((p) => p && applyProfile(p, false))
+              .catch(() => {});
+          }, 400);
         },
       )
       .subscribe();
 
     return () => {
+      if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
       supabase.removeChannel(profileChannel);
     };
   }, [user?.id, applyProfile]);
@@ -447,74 +437,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [user, loadTransactions],
   );
 
-  const playMinesRound = useCallback(
-    async (params: {
-      bet: number;
-      win: number;
-      multiplier: number;
-      mines: number;
-      gems: number;
-    }): Promise<{ success: boolean; net: number; balance: number }> => {
-      const net = params.win - params.bet;
-      if (!user) return { success: false, net: 0, balance: 0 };
-      if (user.chips < params.bet) {
-        throw new Error('Solde de jetons insuffisant.');
-      }
-
-      try {
-        const res = await apiPlayMinesGame(params);
-        if (res && res.profile) {
-          applyProfile(res.profile);
-          return { success: true, net: res.net, balance: Number(res.profile.chips) || 0 };
-        }
-      } catch (err) {
-        console.warn('[CasinoUser] play_mines_game RPC error:', err);
-        void refreshProfile();
-        throw err;
-      }
-
-      return { success: false, net: 0, balance: user.chips };
-    },
-    [user, applyProfile, refreshProfile],
-  );
-
-  const playSlotsRound = useCallback(
-    async (params: {
-      machineName: string;
-      bet: number;
-      win: number;
-      multiplier: number;
-      isFreeSpin?: boolean;
-    }): Promise<{ success: boolean; net: number; balance: number }> => {
-      const effectiveBet = params.isFreeSpin ? 0 : params.bet;
-      const net = params.win - effectiveBet;
-      if (!user) return { success: false, net: 0, balance: 0 };
-      if (user.chips < effectiveBet) {
-        throw new Error('Solde de jetons insuffisant.');
-      }
-
-      try {
-        // Atomic server-side balance & bet logging via play_slots_round RPC
-        const res = await apiPlaySlotsRound({
-          machineName: params.machineName,
-          bet: effectiveBet,
-          win: params.win,
-          multiplier: params.multiplier,
-        });
-        if (res && res.profile) {
-          applyProfile(res.profile);
-          return { success: true, net: res.net, balance: Number(res.profile.chips) || 0 };
-        }
-      } catch (err) {
-        console.warn('[CasinoUser] Remote slots RPC error:', err);
-        void refreshProfile();
-        throw err;
-      }
-
-      return { success: false, net: 0, balance: user.chips };
-    },
-    [user, applyProfile, refreshProfile],
-  );
+  const applyServerProfile = useCallback((profile: ProfilePayload) => applyProfile(profile), [applyProfile]);
 
   const value = useMemo<CasinoUserContextType>(
     () => ({
@@ -534,8 +457,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       requestVip,
       buyVipWithChips,
       claimReward,
-      playMinesRound,
-      playSlotsRound,
+      applyServerProfile,
       canSpinWheel,
       timeUntilNextSpin,
     }),
@@ -555,8 +477,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       requestVip,
       buyVipWithChips,
       claimReward,
-      playMinesRound,
-      playSlotsRound,
+      applyServerProfile,
       canSpinWheel,
       timeUntilNextSpin,
     ],

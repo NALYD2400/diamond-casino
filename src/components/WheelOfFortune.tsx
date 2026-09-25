@@ -88,7 +88,7 @@ function timeAgo(iso: string): string {
 
 export const WheelOfFortune: React.FC = () => {
   const { user, isAuthenticated, isLoading, canSpinWheel, timeUntilNextSpin, spinWheel } = useCasinoUser();
-  const { segments, podiumVehicle, economy } = useCasinoAdmin();
+  const { segments, podiumVehicle, economy, gamesConfig } = useCasinoAdmin();
 
   const [phase, setPhase] = useState<'idle' | 'requesting' | 'spinning' | 'won'>('idle');
   const [winIndex, setWinIndex] = useState<number | null>(null);
@@ -154,7 +154,8 @@ export const WheelOfFortune: React.FC = () => {
     });
   };
 
-  const maintenance = economy.maintenanceMode;
+  // Roue fermée = maintenance générale OU roue désactivée dans la console
+  const maintenance = economy.maintenanceMode || !gamesConfig.wheel.enabled;
   const busy = phase === 'requesting' || phase === 'spinning';
   const spinDisabled = !isAuthenticated || !canSpinWheel || maintenance || busy;
 

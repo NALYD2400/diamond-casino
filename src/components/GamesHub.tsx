@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
 import {
-  Bomb,
   ChevronRight,
   Coins,
   Dices,
@@ -18,6 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
+import { BombArt, GemArt } from './mines/MinesArt';
 import { DogSymbol } from './doghouse/DogSymbols';
 import { WantedSymbol } from './wanted/WantedSymbols';
 
@@ -72,24 +72,38 @@ const WantedCover: React.FC = () => (
 );
 
 const MinesCover: React.FC = () => (
-  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,#1f4a6e,#0b1a2a_70%)]">
-    <div className="absolute inset-x-[12%] top-[14%] grid grid-cols-3 gap-2">
+  <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_50%_35%,#3a2a6a,#1a1238_55%,#07050f)]">
+    <div className="absolute inset-x-[14%] top-[10%] grid grid-cols-3 gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-lg border-[3px] border-[#140c22] bg-[linear-gradient(180deg,#8a5a2a,#4a2a12)]">
       {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
         <div
           key={i}
-          className={`aspect-square rounded-lg flex items-center justify-center shadow-[inset_0_-4px_0_rgba(0,0,0,0.35)] ${
-            i === 4 ? 'bg-[#3a1020]' : i % 3 === 0 ? 'bg-[#0f3a2a]' : 'bg-[#2a4a66]'
+          className={`relative aspect-square rounded-[14%] border-2 border-[#140c22] flex items-center justify-center ${
+            i === 4
+              ? 'bg-[radial-gradient(circle,#ff6a3a,#8a1010_70%)]'
+              : i === 0 || i === 5 || i === 7
+                ? 'bg-[radial-gradient(circle,#1c5a7a,#0c1e3a_75%)]'
+                : 'bg-[radial-gradient(circle_at_30%_25%,#8f7cb4,#5d4d80_42%,#372b55)] shadow-[inset_0_3px_0_rgba(255,255,255,0.2),inset_0_-4px_0_rgba(0,0,0,0.45)]'
           }`}
         >
           {i === 4 ? (
-            <Bomb className="w-1/2 h-1/2 text-[#ff4f6a]" />
-          ) : i % 3 === 0 ? (
-            <Gem className="w-1/2 h-1/2 text-[#3dffb0] drop-shadow-[0_0_8px_rgba(61,255,176,0.8)]" />
+            <BombArt className="w-[70%]" />
+          ) : i === 0 || i === 5 || i === 7 ? (
+            <GemArt className="w-[72%] drop-shadow-[0_0_8px_rgba(94,232,255,0.8)]" />
           ) : null}
         </div>
       ))}
     </div>
-    <div className="absolute inset-x-0 bottom-[7%] text-center font-black italic tracking-tight text-white text-[clamp(22px,2.6vw,32px)] drop-shadow-[0_3px_0_rgba(0,0,0,0.5)]">
+    <div
+      className="absolute inset-x-0 bottom-[5%] text-center font-['Luckiest_Guy'] text-[clamp(24px,2.8vw,36px)] leading-none"
+      style={{
+        background: 'linear-gradient(180deg, #ffffff 0%, #b8f6ff 30%, #3fd2f2 60%, #1470a8 100%)',
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        color: 'transparent',
+        WebkitTextStroke: '1.5px #140c22',
+        filter: 'drop-shadow(0 3px 0 #140c22)',
+      }}
+    >
       MINES
     </div>
   </div>

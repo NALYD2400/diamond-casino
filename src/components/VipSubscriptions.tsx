@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
 import { 
@@ -21,6 +21,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
+import { useCasinoAdmin } from '../context/CasinoAdminContext';
 import { Footer } from './Footer';
 
 type TierData = {
@@ -77,7 +78,7 @@ const TIERS: TierData[] = [
       'Accès prioritaire au Salon VIP',
       '2 tirages de Roue par jour',
       '60 000 jetons mensuels inclus',
-      '5 % des pertes remboursés en jetons',
+      'Délai de roue réduit',
     ],
   },
   {
@@ -97,7 +98,7 @@ const TIERS: TierData[] = [
       'Accès illimité aux Salons High Roller',
       '3 tirages de Roue par jour',
       '150 000 jetons mensuels inclus',
-      '10 % des pertes remboursés en jetons',
+      'Délai de roue le plus court',
     ],
   },
 ];
@@ -185,6 +186,32 @@ export const VipSubscriptions: React.FC = () => {
   const [submittingTier, setSubmittingTier] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [confirmTier, setConfirmTier] = useState<TierData | null>(null);
+  const { vipConfig, wheelCooldownHours } = useCasinoAdmin();
+
+  // Prix, dotation et délai de roue viennent des réglages (console → VIP)
+  const tiers = useMemo<TierData[]>(
+    () =>
+      TIERS.map((t) => {
+        const cfg = vipConfig[t.id];
+        const spins = Math.max(1, Math.floor(24 / Math.min(cfg.wheelCooldownHours, wheelCooldownHours)));
+        const fmtN = (n: number) => n.toLocaleString('fr-FR');
+        return {
+          ...t,
+          priceChips: cfg.price,
+          chipsBonus: cfg.bonus,
+          priceRP: `${fmtN(cfg.price)} jetons / ${vipConfig.durationDays} jours`,
+          dailySpins: spins,
+          cashback: 'Aucun',
+          perks: [
+            t.perks[0],
+            `${spins} tirage${spins > 1 ? 's' : ''} de Roue par jour`,
+            `${fmtN(cfg.bonus)} jetons offerts à l'activation`,
+            `Carte valable ${vipConfig.durationDays} jours`,
+          ],
+        };
+      }),
+    [vipConfig, wheelCooldownHours],
+  );
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -289,7 +316,7 @@ export const VipSubscriptions: React.FC = () => {
 
       {/* 3 VIP Membership Cards */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-20 items-stretch">
-        {TIERS.map((tier) => {
+        {tiers.map((tier) => {
           const isCurrentTier = user?.vipTier === tier.id;
           const isPendingTier = pendingVipTier === tier.id;
           const isFeatured = tier.id === 'GOLD';

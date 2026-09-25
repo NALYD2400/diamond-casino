@@ -1,3 +1,4 @@
+import { GAME_LABELS } from '../lib/gamesConfig';
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -421,13 +422,19 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
 
     // From Supabase bets_history
     bets.forEach((b) => {
+      const isWheel = b.game_id === 'lucky_wheel';
+      const game = GAME_LABELS[b.game_id] ?? b.game_id;
       list.push({
         id: b.id || `bet_${Math.random()}`,
-        label: b.result_data?.segment || (b.win_amount > 0 ? `Gain ${b.win_amount.toLocaleString()} jetons` : 'Tirage Roue'),
-        type: b.result_data?.type || 'chips',
-        value: (b.result_data?.value as string | number | undefined) ?? b.win_amount,
+        label: isWheel
+          ? b.result_data?.segment || 'Tirage Roue'
+          : `${game} · mise ${Number(b.bet_amount).toLocaleString('fr-FR')} → ${
+              b.win_amount > 0 ? `gain ${Number(b.win_amount).toLocaleString('fr-FR')}` : 'perdu'
+            }`,
+        type: isWheel ? b.result_data?.type || 'chips' : 'chips',
+        value: isWheel ? ((b.result_data?.value as string | number | undefined) ?? b.win_amount) : b.win_amount - b.bet_amount,
         date: b.created_at,
-        source: 'Historique des tirages',
+        source: game,
       });
     });
 

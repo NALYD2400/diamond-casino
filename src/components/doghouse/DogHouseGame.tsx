@@ -14,23 +14,26 @@ import {
 } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
+import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
+import { clampBetLevels } from '../../lib/gamesConfig';
 import { DogHouseAudio } from './dogHouseAudio';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { DogSymbol } from './DogSymbols';
 import {
-  BONUS_BUY_X_BET,
   BOOST_BET_MULTIPLIER,
-  BOOST_SCATTER_MULTIPLIER,
   DOG_PAYLINES,
   DOG_SYMBOLS,
   MAX_WIN_X_BET,
   PAYING_SYMBOLS,
   SCATTER_PAY_X_BET,
-  evaluateDogHouseSpin,
+  dogRoundCost,
   getWinTier,
+  playDogHouseRound,
   randomStripSymbol,
-  rollFreeSpinsGrid,
+  type DogFreeSpinsRound,
+  type DogHouseRound,
   type DogLineWin,
+  type DogRoundMode,
   type DogSpinResult,
   type DogSymbolId,
   type StickyWild,
@@ -72,16 +75,12 @@ interface FreeSpinsState {
 }
 
 export const DogHouseGame: React.FC = () => {
-  const { user, isAuthenticated, playSlotsRound } = useCasinoUser();
-  const { slotMachines } = useCasinoAdmin();
-  const machine = slotMachines.find((m) => m.id === 'the-dog-house');
-  const minBet = machine?.minBet ?? 20;
-  const maxBet = machine?.maxBet ?? 500000;
+  const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
+  const { gamesConfig } = useCasinoAdmin();
+  const cfg = gamesConfig.doghouse;
+  const buyPriceX = cfg.buyPrice;
 
-  const betLevels = useMemo(() => {
-    const list = BET_LEVELS.filter((b) => b >= minBet && b <= maxBet);
-    return list.length > 0 ? list : [Math.max(20, Math.ceil(minBet / 20) * 20)];
-  }, [minBet, maxBet]);
+  const betLevels = useMemo(() => clampBetLevels(BET_LEVELS, cfg.minBet, cfg.maxBet), [cfg.minBet, cfg.maxBet]);
 
   // ---------------------------------------------------------------------------
   // Solde (réel / démo)
@@ -125,8 +124,7 @@ export const DogHouseGame: React.FC = () => {
   // État de jeu
   // ---------------------------------------------------------------------------
   const [betIdx, setBetIdx] = useState(() => {
-    const def = machine?.defaultBet ?? 200;
-    const idx = betLevels.findIndex((b) => b >= def);
+    const idx = betLevels.findIndex((b) => b >= 200);
     return idx >= 0 ? idx : 0;
   });
   const bet = betLevels[Math.min(betIdx, betLevels.length - 1)];
@@ -152,7 +150,8 @@ export const DogHouseGame: React.FC = () => {
   const [fsEnd, setFsEnd] = useState<{ win: number; spins: number } | null>(null);
 
   const [turbo, setTurbo] = useState(false);
-  const [boost, setBoost] = useState(false);
+  const [boostOn, setBoost] = useState(false);
+  const boost = boostOn && cfg.boostEnabled;
   const [newStickyKeys, setNewStickyKeys] = useState<Set<string>>(new Set());
   const [autoLeft, setAutoLeft] = useState(0);
   const [autoOpen, setAutoOpen] = useState(false);
@@ -184,28 +183,29 @@ export const DogHouseGame: React.FC = () => {
   const { wait, skipAll, waitClick, resolveClick, countUp } = useSlotTimeline();
 
   // ---------------------------------------------------------------------------
-  // Règlement du solde
+  // Obtention de la manche : tirée par le SERVEUR en mode jetons (la mise et le
+  // gain sont réglés en base avant l'animation), localement en mode démo.
   // ---------------------------------------------------------------------------
-  const settle = useCallback(
-    async (cost: number, win: number, isFreeSpin: boolean): Promise<boolean> => {
+  const obtainRound = useCallback(
+    async (roundMode: DogRoundMode): Promise<DogHouseRound | null> => {
       if (mode === 'real') {
         try {
-          await playSlotsRound({
-            machineName: 'The Dog House',
-            bet: cost,
-            win,
-            multiplier: cost > 0 ? Number((win / cost).toFixed(2)) : 0,
-            isFreeSpin,
-          });
-          return true;
-        } catch {
-          return false;
+          const res = await apiPlaySlotRound<DogHouseRound>({ game: 'doghouse', bet, mode: roundMode });
+          // Le gain est déjà crédité : on le masque jusqu'à sa présentation
+          setHiddenWin(res.paid);
+          applyServerProfile(res.profile);
+          return res.round;
+        } catch (err) {
+          setMessage(err instanceof CasinoApiError ? err.message.toUpperCase() : 'ERREUR SERVEUR');
+          return null;
         }
       }
-      setDemoChips((prev) => Math.max(0, Math.round((prev - (isFreeSpin ? 0 : cost) + win) * 100) / 100));
-      return true;
+      const round = playDogHouseRound({ bet, mode: roundMode, buyPriceX });
+      setHiddenWin(round.totalWin);
+      setDemoChips((prev) => Math.max(0, Math.round((prev - round.cost + round.totalWin) * 100) / 100));
+      return round;
     },
-    [mode, playSlotsRound],
+    [mode, bet, buyPriceX, applyServerProfile],
   );
 
   // ---------------------------------------------------------------------------
@@ -311,8 +311,8 @@ export const DogHouseGame: React.FC = () => {
   // Tours gratuits
   // ---------------------------------------------------------------------------
   const runFreeSpins = useCallback(
-    async (stakeBet: number, alreadyWon: number) => {
-      const values = rollFreeSpinsGrid();
+    async (fs: DogFreeSpinsRound, stakeBet: number, alreadyWon: number) => {
+      const values = fs.values;
       const total = values.reduce((a, b) => a + b, 0);
       setPhase('overlay');
       setFsIntro({ values, revealed: 0 });
@@ -338,17 +338,13 @@ export const DogHouseGame: React.FC = () => {
       setScatterHit(false);
       setPhase('spinning');
 
-      const cap = stakeBet * MAX_WIN_X_BET;
-      for (let i = 1; i <= total; i++) {
+      for (let i = 1; i <= fs.spins.length; i++) {
         await wait(turboRef.current ? 250 : 550);
         setPresentation(null);
         setMessage('TOURS GRATUITS');
         setFreeSpins({ total, played: i, win: fsWin });
 
-        const res = evaluateDogHouseSpin({ bet: stakeBet, isFreeSpin: true, stickyWilds: stickies });
-        const room = Math.max(0, cap - alreadyWon - fsWin);
-        if (res.totalWin > room) res.totalWin = room;
-
+        const res = fs.spins[i - 1];
         const newKeys = new Set<string>();
         res.stickyWilds.forEach((nw) => {
           if (!stickies.some((ow) => ow.reel === nw.reel && ow.row === nw.row)) {
@@ -357,8 +353,6 @@ export const DogHouseGame: React.FC = () => {
         });
         setNewStickyKeys(newKeys);
 
-        setHiddenWin((h) => h + res.totalWin);
-        await settle(0, res.totalWin, true);
         await animateReels(res, false, newKeys);
         stickies = res.stickyWilds;
         setSticky(stickies);
@@ -367,7 +361,6 @@ export const DogHouseGame: React.FC = () => {
         fsWin += res.totalWin;
         setHiddenWin((h) => Math.max(0, h - res.totalWin));
         setFreeSpins({ total, played: i, win: fsWin });
-        if (alreadyWon + fsWin >= cap) break;
       }
 
       audio.current.stopFreeSpinsMusic();
@@ -384,7 +377,7 @@ export const DogHouseGame: React.FC = () => {
       setCounter(alreadyWon + fsWin);
       setMessage(alreadyWon + fsWin > 0 ? `GAIN TOTAL ${fmt(alreadyWon + fsWin)}` : 'TOURNEZ POUR GAGNER !');
     },
-    [animateReels, presentWins, settle, wait, waitClick],
+    [animateReels, presentWins, wait, waitClick],
   );
 
   // ---------------------------------------------------------------------------
@@ -393,12 +386,8 @@ export const DogHouseGame: React.FC = () => {
   const playRound = useCallback(
     async (buyBonus: boolean) => {
       if (busyRef.current) return;
-      const isBoostRound = boost && !buyBonus;
-      const cost = buyBonus
-        ? bet * BONUS_BUY_X_BET
-        : isBoostRound
-          ? Math.round(bet * BOOST_BET_MULTIPLIER * 100) / 100
-          : bet;
+      const roundMode: DogRoundMode = buyBonus ? 'buy' : boost && cfg.boostEnabled ? 'boost' : 'spin';
+      const cost = dogRoundCost(bet, roundMode, buyPriceX);
       if (displayCredit < cost) {
         setMessage('CRÉDIT INSUFFISANT');
         setAutoLeft(0);
@@ -411,19 +400,16 @@ export const DogHouseGame: React.FC = () => {
       setScatterHit(false);
       setActiveLine(-1);
       setCounter(0);
-      setMessage(isBoostRound ? 'BONNE CHANCE (BOOST 25x) !' : 'BONNE CHANCE !');
+      setMessage(roundMode === 'boost' ? 'BONNE CHANCE (BOOST) !' : 'BONNE CHANCE !');
 
-      const res = evaluateDogHouseSpin({ bet, forceScatters: buyBonus, isBoost: isBoostRound });
-      setHiddenWin((h) => h + res.totalWin);
-      const ok = await settle(cost, res.totalWin, false);
-      if (!ok) {
-        setHiddenWin((h) => Math.max(0, h - res.totalWin));
-        setMessage('CRÉDIT INSUFFISANT');
+      const round = await obtainRound(roundMode);
+      if (!round) {
         setAutoLeft(0);
         setPhase('idle');
         busyRef.current = false;
         return;
       }
+      const res = round.base;
 
       await animateReels(res, !buyBonus);
 
@@ -436,19 +422,20 @@ export const DogHouseGame: React.FC = () => {
       await presentWins(res, bet, 0);
       setHiddenWin((h) => Math.max(0, h - res.totalWin));
 
-      if (res.triggersBonus) {
+      if (round.freeSpins) {
         await wait(1200);
-        await runFreeSpins(bet, res.totalWin);
+        await runFreeSpins(round.freeSpins, bet, res.totalWin);
       } else if (res.totalWin > 0) {
         setMessage(`GAIN ${fmt(res.totalWin)}`);
       } else {
         setMessage(boost ? 'BOOST ACTIF · TOURNEZ !' : 'TOURNEZ POUR GAGNER !');
       }
 
+      setHiddenWin(0);
       setPhase('idle');
       busyRef.current = false;
     },
-    [animateReels, bet, boost, displayCredit, presentWins, runFreeSpins, settle, wait],
+    [animateReels, bet, boost, cfg.boostEnabled, buyPriceX, displayCredit, obtainRound, presentWins, runFreeSpins, wait],
   );
 
   const onSpinPress = useCallback(() => {
@@ -584,18 +571,22 @@ export const DogHouseGame: React.FC = () => {
           <div className="relative flex items-center justify-center gap-8 xl:gap-16 2xl:gap-24 h-full w-full max-w-[1400px]">
             {/* Colonne gauche desktop : Ante Bet Boost & Achat bonus */}
             <div className="hidden lg:flex flex-col gap-3 w-[150px] shrink-0">
-              <AnteBetCard
-                active={boost}
-                disabled={locked || freeSpins !== null}
-                cost={Math.round(bet * BOOST_BET_MULTIPLIER)}
-                onToggle={toggleBoost}
-              />
-              <BuyBonusButton
-                bet={bet}
-                disabled={locked || freeSpins !== null || boost}
-                disabledReason={boost ? 'Désactivez le Boost pour acheter' : undefined}
-                onClick={() => setBuyOpen(true)}
-              />
+              {cfg.boostEnabled && (
+                <AnteBetCard
+                  active={boost}
+                  disabled={locked || freeSpins !== null}
+                  cost={dogRoundCost(bet, 'boost')}
+                  onToggle={toggleBoost}
+                />
+              )}
+              {cfg.buyEnabled && (
+                <BuyBonusButton
+                  price={dogRoundCost(bet, 'buy', buyPriceX)}
+                  disabled={locked || freeSpins !== null || boost}
+                  disabledReason={boost ? 'Désactivez le Boost pour acheter' : undefined}
+                  onClick={() => setBuyOpen(true)}
+                />
+              )}
             </div>
 
             <div className="relative flex-1 h-full min-w-0 max-w-[800px] flex items-center justify-center" style={{ containerType: 'size' }}>
@@ -660,11 +651,11 @@ export const DogHouseGame: React.FC = () => {
           onSpin={onSpinPress}
           onAuto={() => (autoLeft > 0 ? setAutoLeft(0) : setAutoOpen(true))}
           onTurbo={() => setTurbo((t) => !t)}
-          onToggleBoost={toggleBoost}
+          onToggleBoost={cfg.boostEnabled ? toggleBoost : undefined}
           onMute={toggleMute}
           onInfo={() => setInfoOpen(true)}
           onSettings={() => setSettingsOpen(true)}
-          onBuy={() => setBuyOpen(true)}
+          onBuy={cfg.buyEnabled ? () => setBuyOpen(true) : undefined}
           buyDisabled={locked || freeSpins !== null || boost}
         />
 
@@ -705,9 +696,9 @@ export const DogHouseGame: React.FC = () => {
               ))}
             </div>
             <p className="text-center text-white/80 text-sm mb-1">Déclenchez directement le bonus pour</p>
-            <p className="text-center dh-font text-4xl text-[#ffcf3f] mb-1">{fmt(bet * BONUS_BUY_X_BET)}</p>
+            <p className="text-center dh-font text-4xl text-[#ffcf3f] mb-1">{fmt(dogRoundCost(bet, 'buy', buyPriceX))}</p>
             <p className="text-center text-white/50 text-xs mb-5">
-              {BONUS_BUY_X_BET}x la mise actuelle ({fmt(bet)}) · 9 à 27 tours avec wilds collants
+              {buyPriceX}x la mise actuelle ({fmt(bet)}) · 9 à 27 tours avec wilds collants
             </p>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -717,7 +708,7 @@ export const DogHouseGame: React.FC = () => {
                 ANNULER
               </button>
               <button
-                disabled={displayCredit < bet * BONUS_BUY_X_BET}
+                disabled={displayCredit < dogRoundCost(bet, 'buy', buyPriceX)}
                 onClick={() => {
                   setBuyOpen(false);
                   void playRound(true);
@@ -1060,7 +1051,7 @@ interface ControlBarProps {
   onMute: () => void;
   onInfo: () => void;
   onSettings: () => void;
-  onBuy: () => void;
+  onBuy?: () => void;
   buyDisabled: boolean;
   boost?: boolean;
   onToggleBoost?: () => void;
@@ -1127,13 +1118,15 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
         {/* Centre : message */}
         <div className="col-span-2 sm:col-span-1 order-first sm:order-none flex flex-col items-center pb-1 min-w-0">
           <div className="lg:hidden mb-2 flex items-center gap-2">
-            <button
-              onClick={p.onBuy}
-              disabled={p.buyDisabled}
-              className="dh-font text-xs rounded-full px-3 py-1 bg-gradient-to-b from-[#ff5ab4] to-[#b01d74] border-2 border-[#3b1d0e] text-white disabled:opacity-40"
-            >
-              ACHETER BONUS
-            </button>
+            {p.onBuy && (
+              <button
+                onClick={p.onBuy}
+                disabled={p.buyDisabled}
+                className="dh-font text-xs rounded-full px-3 py-1 bg-gradient-to-b from-[#ff5ab4] to-[#b01d74] border-2 border-[#3b1d0e] text-white disabled:opacity-40"
+              >
+                ACHETER BONUS
+              </button>
+            )}
             {p.onToggleBoost && (
               <button
                 onClick={p.onToggleBoost}
@@ -1257,13 +1250,13 @@ const AnteBetCard: React.FC<{
 );
 
 const BuyBonusButton: React.FC<{
-  bet: number;
+  price: number;
   disabled: boolean;
   disabledReason?: string;
   onClick: () => void;
   className?: string;
 }> = ({
-  bet,
+  price,
   disabled,
   disabledReason,
   onClick,
@@ -1280,7 +1273,7 @@ const BuyBonusButton: React.FC<{
       </div>
       <div className="dh-font text-white text-lg leading-tight mt-1">ACHETER</div>
       <div className="dh-font text-[#ffe14a] text-sm leading-tight">TOURS GRATUITS</div>
-      <div className="dh-font text-white text-base mt-1">{fmt(bet * BONUS_BUY_X_BET)}</div>
+      <div className="dh-font text-white text-base mt-1">{fmt(price)}</div>
     </button>
     {disabledReason && disabled && (
       <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block whitespace-nowrap bg-black/90 text-white text-[10px] px-2 py-1 rounded shadow-lg border border-white/20 z-40">
@@ -1503,7 +1496,7 @@ const PaytableModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, on
       </div>
       <p className="text-white/50 text-[11px] text-center mt-4">
         Gains de gauche à droite sur lignes adjacentes. Seul le gain le plus élevé par ligne est payé. Gain maximum :{' '}
-        {fmt(MAX_WIN_X_BET)}x la mise. RTP théorique ≈ 96,5 %.
+        {fmt(MAX_WIN_X_BET)}x la mise. RTP théorique ≈ 95 % (tirages effectués par le serveur).
       </p>
     </Modal>
   );

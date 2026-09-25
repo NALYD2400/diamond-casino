@@ -40,6 +40,7 @@ export interface ProfilePayload {
   phone_number: string | null;
   role: ProfileRole;
   vip_tier: VipTier | null;
+  vip_expires_at?: string | null;
   chips: number;
   cash: number;
   inventory: string[];
@@ -72,9 +73,11 @@ export interface SupabaseProfile {
   citizen_id: string | null;
   role: ProfileRole;
   vip_tier: VipTier | null;
+  vip_expires_at: string | null;
   chips: number;
   cash: number;
   total_won: number | null;
+  total_wagered: number | null;
   total_spins: number | null;
   avatar_url: string | null;
   phone_number: string | null;
@@ -161,20 +164,32 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_TIER: 'Formule VIP inconnue.',
   INVALID_ROLE: 'Rôle inconnu.',
   COOLDOWN: 'Votre prochain tirage n’est pas encore disponible.',
-  MAINTENANCE: 'La roue est suspendue pour maintenance.',
+  MAINTENANCE: 'Le casino est en maintenance, revenez bientôt.',
   WHEEL_NOT_CONFIGURED: 'La roue n’est pas encore configurée par la direction.',
   VIP_ALREADY_ACTIVE: 'Cette carte VIP est déjà active sur votre compte.',
   VIP_REQUEST_PENDING: 'Une demande VIP est déjà en attente de validation.',
   INSUFFICIENT_CHIPS: 'Solde de jetons insuffisant pour cet abonnement.',
   INSUFFICIENT_FUNDS: 'Solde de jetons insuffisant.',
-  INVALID_BET: 'Mise invalide.',
+  INVALID_BET: 'Mise invalide (hors des limites autorisées).',
+  INVALID_MINES: 'Nombre de mines invalide.',
+  INVALID_CELL: 'Case invalide.',
+  ROUND_IN_PROGRESS: 'Une manche est déjà en cours.',
+  ROUND_NOT_FOUND: 'Cette manche est terminée.',
+  NOTHING_TO_CASHOUT: 'Révélez au moins une case avant d’encaisser.',
+  GAME_DISABLED: 'Ce jeu est temporairement fermé par la direction.',
+  BUY_DISABLED: 'L’achat de bonus est désactivé.',
+  BOOST_DISABLED: 'Le boost est désactivé.',
+  INVALID_WIN: 'Gain refusé par le serveur.',
+  INVALID_AMOUNT: 'Montant invalide.',
+  INVALID_SETTING: 'Réglage refusé : valeur invalide.',
+  SERVER_ERROR: 'Erreur serveur, réessayez.',
   REWARD_NOT_CLAIMABLE: 'Ce lot a déjà été réclamé ou traité.',
   REWARD_NOT_FOUND: 'Lot introuvable.',
   VEHICLE_NOT_FOUND: 'Véhicule introuvable dans le catalogue.',
   INVALID_REWARD: 'Lot invalide.',
   INVALID_STATUS: 'Statut invalide.',
   INVALID_IMPORT: 'Fichier d’import invalide (3 000 véhicules maximum par envoi).',
-  FORBIDDEN: 'Action réservée à la gérance.',
+  FORBIDDEN: 'Vous n’avez pas les droits pour cette action (rôle insuffisant).',
   FORBIDDEN_ROLE_CHANGE: 'Vous n’avez pas les droits pour modifier ce rôle.',
   CANNOT_DELETE_SELF: 'Vous ne pouvez pas supprimer votre propre profil.',
 };
@@ -242,38 +257,69 @@ export const apiBuyVipWithChips = (tier: VipTier) => rpc<ProfilePayload>('buy_vi
 
 export const apiRecentWheelWins = (limit = 8) => rpc<WheelWin[]>('recent_wheel_wins', { p_limit: limit });
 
-export interface MinesRoundResult {
-  profile: ProfilePayload;
-  net: number;
+// -------------------------------------------------------------
+// Mines — la grille est secrète et gérée par le serveur
+// -------------------------------------------------------------
+
+export interface MinesRoundState {
+  round_id: string;
+  status: 'ACTIVE' | 'LOST' | 'CASHED';
+  bet: number;
+  mines: number;
+  rtp: number;
+  revealed: number[];
+  gems: number;
+  multiplier: number;
+  next_multiplier: number;
+  win: number;
+  hash: string;
+  /** Uniquement en fin de manche : true = mine */
+  board?: boolean[] | null;
+  server_seed?: string | null;
+  /** Uniquement après mines_reveal */
+  cell?: number;
+  hit?: boolean;
+  profile?: ProfilePayload;
 }
 
-export const apiPlayMinesGame = (p: {
-  bet: number;
-  win: number;
-  multiplier: number;
-  mines: number;
-  gems: number;
-}) =>
-  rpc<MinesRoundResult>('play_mines_game', {
-    p_bet: Math.trunc(p.bet),
-    p_win: Math.trunc(p.win),
-    p_multiplier: Number(p.multiplier.toFixed(4)),
-    p_mines: p.mines,
-    p_gems: p.gems,
-  });
+export const apiMinesStart = (bet: number, mines: number) =>
+  rpc<MinesRoundState>('mines_start', { p_bet: Math.trunc(bet), p_mines: mines });
+export const apiMinesReveal = (roundId: string, cell: number) =>
+  rpc<MinesRoundState>('mines_reveal', { p_round_id: roundId, p_cell: cell });
+export const apiMinesCashout = (roundId: string) => rpc<MinesRoundState>('mines_cashout', { p_round_id: roundId });
+export const apiMinesCurrent = () => rpc<MinesRoundState | null>('mines_current');
 
-export const apiPlaySlotsRound = (p: {
-  machineName: string;
+// -------------------------------------------------------------
+// Machines à sous — tirage fait par la fonction Edge « slot-round »
+// -------------------------------------------------------------
+
+export interface SlotRoundResponse<R> {
+  round: R;
+  cost: number;
+  paid: number;
+  profile: ProfilePayload;
+}
+
+export async function apiPlaySlotRound<R>(body: {
+  game: 'doghouse' | 'wanted';
   bet: number;
-  win: number;
-  multiplier: number;
-}) =>
-  rpc<MinesRoundResult>('play_slots_round', {
-    p_machine: p.machineName,
-    p_bet: Math.trunc(p.bet),
-    p_win: Math.trunc(p.win),
-    p_multiplier: Number(p.multiplier.toFixed(4)),
-  });
+  mode?: 'spin' | 'boost' | 'buy';
+  buy?: string | null;
+}): Promise<SlotRoundResponse<R>> {
+  const { data, error } = await supabase.functions.invoke('slot-round', { body });
+  if (error) {
+    let code = 'SERVER_ERROR';
+    try {
+      const ctx = (error as { context?: Response }).context;
+      const payload = ctx ? await ctx.json() : null;
+      if (payload?.error) code = payload.error;
+    } catch {
+      if (/fetch|network/i.test(error.message || '')) code = 'NETWORK';
+    }
+    throw code === 'NETWORK' ? new CasinoApiError('NETWORK', 'Serveur injoignable. Vérifiez votre connexion.') : new CasinoApiError(code);
+  }
+  return data as SlotRoundResponse<R>;
+}
 
 export const apiSubscribeEvents = (email: string) => rpc<null>('subscribe_events', { p_email: email });
 
@@ -430,12 +476,9 @@ export async function dbGetSetting<T>(key: string): Promise<T | null> {
   return data.value as T;
 }
 
-export async function dbSetSetting(key: string, value: unknown): Promise<void> {
-  const { error } = await supabase
-    .from('casino_settings')
-    .upsert({ key, value, updated_at: new Date().toISOString() });
-  if (error) throw toApiError(error);
-}
+/** Staff : écriture validée et journalisée côté serveur (admin_set_setting) */
+export const apiAdminSetSetting = <T>(key: string, value: unknown) =>
+  rpc<T>('admin_set_setting', { p_key: key, p_value: value });
 
 // -------------------------------------------------------------
 // Staff API (every call is re-checked server-side)
@@ -470,16 +513,6 @@ export async function dbFetchAdminLogs(limit = 50): Promise<SupabaseAdminLog[]> 
     .limit(limit);
   if (error) return [];
   return (data || []) as SupabaseAdminLog[];
-}
-
-export async function dbAddAdminLog(log: Omit<SupabaseAdminLog, 'id' | 'created_at'>): Promise<void> {
-  const { error } = await supabase.from('admin_logs').insert({
-    action: log.action,
-    category: log.category,
-    detail: log.detail,
-    author: log.author || 'Console Admin',
-  });
-  if (error) console.warn('[Supabase] admin log refused:', error.message);
 }
 
 export interface AdminProfilePatch {
@@ -517,6 +550,42 @@ export const apiAdminRejectVipRequest = (transactionId: string) =>
 
 export const apiAdminDeleteProfile = (profileId: string) =>
   rpc<null>('admin_delete_profile', { p_profile_id: profileId });
+
+export interface GameStats {
+  rounds: number;
+  players: number;
+  wagered: number;
+  paid: number;
+  profit: number;
+  rtp: number | null;
+  biggest_win: number;
+}
+
+export interface AdminDashboard {
+  since: string;
+  days: number;
+  games: Record<string, GameStats>;
+  totals: {
+    players: number;
+    linked_players: number;
+    active_players: number;
+    chips_in_circulation: number;
+    chips_players_only: number;
+    vip_active: number;
+    admin_injected: number;
+    admin_removed: number;
+    vip_sales: number;
+    vip_bonuses: number;
+    pending_vip: number;
+    pending_rewards: number;
+    mines_open_rounds: number;
+    mines_open_stake: number;
+  };
+  top_players: { id: string; name: string; citizen_id: string; role: ProfileRole; wagered: number; paid: number; net: number; rounds: number }[];
+  daily: { day: string; wagered: number; paid: number; rounds: number }[];
+}
+
+export const apiAdminDashboard = (days: number) => rpc<AdminDashboard>('admin_dashboard', { p_days: days });
 
 // -------------------------------------------------------------
 // Health

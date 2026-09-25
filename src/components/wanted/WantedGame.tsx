@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, Info, Menu, Minus, Play, Plus, RotateCw, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
+import { useCasinoAdmin } from '../../context/CasinoAdminContext';
+import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
+import { clampBetLevels } from '../../lib/gamesConfig';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { WantedAudio } from './wantedAudio';
 import { WantedLogo, WantedSymbol } from './WantedSymbols';
@@ -13,15 +16,16 @@ import {
   PAYTABLE,
   REELS,
   ROWS,
-  evaluateWantedSpin,
   getWantedTier,
+  playWantedRound,
   randomStripSymbol,
-  runDmhCollect,
   type Cell,
   type DmhLanding,
   type VsReel,
   type WantedBonus,
+  type WantedBonusRound,
   type WantedLineWin,
+  type WantedRound,
   type WantedSpinResult,
   type WantedSymbolId,
 } from './wantedEngine';
@@ -34,7 +38,6 @@ const LINE_COLORS = [
 const STRIP_LEN = 14;
 const DEMO_KEY = 'diamond_wanted_demo_chips';
 const DEMO_START = 50000;
-const MACHINE_NAME = 'Wanted Dead or a Wild';
 
 const INITIAL_GRID: WantedSymbolId[][] = [
   ['vs', 'whiskey', 'revolver', '10', 'A'],
@@ -73,7 +76,11 @@ interface DmhBoardState {
 }
 
 export const WantedGame: React.FC = () => {
-  const { user, isAuthenticated, playSlotsRound } = useCasinoUser();
+  const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
+  const { gamesConfig } = useCasinoAdmin();
+  const cfg = gamesConfig.wanted;
+  const buyPrices = cfg.buyPrices;
+  const betLevels = useMemo(() => clampBetLevels(BET_LEVELS, cfg.minBet, cfg.maxBet), [cfg.minBet, cfg.maxBet]);
 
   // ---------------------------------------------------------------------------
   // Solde
@@ -116,7 +123,7 @@ export const WantedGame: React.FC = () => {
   // État de jeu
   // ---------------------------------------------------------------------------
   const [betIdx, setBetIdx] = useState(4);
-  const bet = BET_LEVELS[betIdx];
+  const bet = betLevels[Math.min(betIdx, betLevels.length - 1)];
 
   const [grid, setGrid] = useState<WantedSymbolId[][]>(INITIAL_GRID);
   const [vsShown, setVsShown] = useState<VsReel[]>([]);
@@ -162,26 +169,27 @@ export const WantedGame: React.FC = () => {
   const busyRef = useRef(false);
   const { wait, skipAll, waitClick, resolveClick, countUp } = useSlotTimeline();
 
-  const settle = useCallback(
-    async (cost: number, win: number, isFreeSpin: boolean): Promise<boolean> => {
+  // Manche tirée par le SERVEUR en mode jetons (mise et gain réglés en base
+  // avant l'animation), localement en mode démo.
+  const obtainRound = useCallback(
+    async (buy: WantedBonus | null): Promise<WantedRound | null> => {
       if (mode === 'real') {
         try {
-          await playSlotsRound({
-            machineName: MACHINE_NAME,
-            bet: cost,
-            win,
-            multiplier: cost > 0 ? Number((win / cost).toFixed(2)) : 0,
-            isFreeSpin,
-          });
-          return true;
-        } catch {
-          return false;
+          const res = await apiPlaySlotRound<WantedRound>({ game: 'wanted', bet, buy });
+          setHiddenWin(res.paid);
+          applyServerProfile(res.profile);
+          return res.round;
+        } catch (err) {
+          setMessage(err instanceof CasinoApiError ? err.message.toUpperCase() : 'ERREUR SERVEUR');
+          return null;
         }
       }
-      setDemoChips((prev) => Math.max(0, Math.round((prev - (isFreeSpin ? 0 : cost) + win) * 100) / 100));
-      return true;
+      const round = playWantedRound({ bet, buy, buyPrices });
+      setHiddenWin(round.totalWin);
+      setDemoChips((prev) => Math.max(0, Math.round((prev - round.cost + round.totalWin) * 100) / 100));
+      return round;
     },
-    [mode, playSlotsRound],
+    [mode, bet, buyPrices, applyServerProfile],
   );
 
   // ---------------------------------------------------------------------------
@@ -282,7 +290,8 @@ export const WantedGame: React.FC = () => {
   // Bonus
   // ---------------------------------------------------------------------------
   const runBonus = useCallback(
-    async (bonus: WantedBonus, stakeBet: number, alreadyWon: number) => {
+    async (round: WantedBonusRound, stakeBet: number, alreadyWon: number) => {
+      const bonus = round.bonus;
       setPhase('overlay');
       setIntro({ bonus });
       audio.current.bonusTrigger(bonus);
@@ -294,24 +303,22 @@ export const WantedGame: React.FC = () => {
       setVsShown([]);
       setStickyWilds([]);
 
-      const cap = stakeBet * MAX_WIN_X;
       let bonusWin = 0;
-      let multiplier = 1;
+      const multiplier = round.multiplier;
       let sticky: Cell[] = [];
       let stickyVs: VsReel[] = [];
       const total = BONUS_INFO[bonus].spins;
 
-      if (bonus === 'dmh') {
-        // Phase 1 : collecte
+      if (round.collect) {
+        // Phase 1 : collecte (déjà tirée, on la rejoue)
         setPhase('spinning');
-        const collect = runDmhCollect();
         const landings: DmhLanding[] = [];
         let respins = 3;
         let mult = 0;
         setDmhBoard({ landings: [], respins, multiplier: 1, fresh: new Set() });
         setMessage('COLLECTE');
         await wait(700);
-        for (const step of collect.steps) {
+        for (const step of round.collect.steps) {
           audio.current.spinStart();
           await wait(turboRef.current ? 350 : 700);
           step.forEach((l) => {
@@ -330,8 +337,7 @@ export const WantedGame: React.FC = () => {
           await wait(turboRef.current ? 250 : 500);
         }
         await wait(900);
-        sticky = collect.wilds;
-        multiplier = collect.multiplier;
+        sticky = round.collect.wilds;
         setDmhBoard(null);
         setMessage('SHOWDOWN');
       }
@@ -340,23 +346,12 @@ export const WantedGame: React.FC = () => {
       setStickyWilds(sticky);
       setPhase('spinning');
 
-      for (let i = 1; i <= total; i++) {
+      for (let i = 1; i <= round.spins.length; i++) {
         await wait(turboRef.current ? 250 : 550);
         setPresentation(null);
         setBonusState({ bonus, spin: i, total, win: bonusWin, multiplier });
 
-        const res = evaluateWantedSpin({
-          bet: stakeBet,
-          mode: bonus,
-          stickyWilds: sticky,
-          stickyVs,
-          globalMultiplier: multiplier,
-        });
-        const room = Math.max(0, cap - alreadyWon - bonusWin);
-        if (res.totalWin > room) res.totalWin = room;
-
-        setHiddenWin((h) => h + res.totalWin);
-        await settle(0, res.totalWin, true);
+        const res = round.spins[i - 1];
         await animateReels(res, { anticipation: false, keepVs: stickyVs });
         if (bonus === 'gtr') {
           sticky = res.stickyWilds;
@@ -368,7 +363,6 @@ export const WantedGame: React.FC = () => {
         bonusWin += res.totalWin;
         setHiddenWin((h) => Math.max(0, h - res.totalWin));
         setBonusState({ bonus, spin: i, total, win: bonusWin, multiplier });
-        if (alreadyWon + bonusWin >= cap) break;
       }
 
       await wait(600);
@@ -385,13 +379,13 @@ export const WantedGame: React.FC = () => {
       setLastWin(alreadyWon + bonusWin);
       setMessage('');
     },
-    [animateReels, presentWins, settle, wait, waitClick],
+    [animateReels, presentWins, wait, waitClick],
   );
 
   const playRound = useCallback(
     async (buy: WantedBonus | null) => {
       if (busyRef.current) return;
-      const cost = buy ? bet * BONUS_INFO[buy].price : bet;
+      const cost = buy ? bet * buyPrices[buy] : bet;
       if (displayCredit < cost) {
         setMessage('SOLDE INSUFFISANT');
         setAutoLeft(0);
@@ -407,16 +401,14 @@ export const WantedGame: React.FC = () => {
       setLastWin(0);
       setMessage('');
 
-      const res = evaluateWantedSpin({ bet, forceBonus: buy ?? undefined });
-      setHiddenWin((h) => h + res.totalWin);
-      if (!(await settle(cost, res.totalWin, false))) {
-        setHiddenWin((h) => Math.max(0, h - res.totalWin));
-        setMessage('SOLDE INSUFFISANT');
+      const round = await obtainRound(buy);
+      if (!round) {
         setAutoLeft(0);
         setPhase('idle');
         busyRef.current = false;
         return;
       }
+      const res = round.base;
 
       await animateReels(res, { anticipation: !buy, keepVs: [] });
       if (res.bonus) {
@@ -427,14 +419,15 @@ export const WantedGame: React.FC = () => {
       setHiddenWin((h) => Math.max(0, h - res.totalWin));
       setLastWin(res.totalWin);
 
-      if (res.bonus) {
+      if (round.bonus) {
         await wait(1100);
-        await runBonus(res.bonus, bet, res.totalWin);
+        await runBonus(round.bonus, bet, res.totalWin);
       }
+      setHiddenWin(0);
       setPhase('idle');
       busyRef.current = false;
     },
-    [animateReels, bet, displayCredit, presentWins, runBonus, settle, wait],
+    [animateReels, bet, buyPrices, displayCredit, obtainRound, presentWins, runBonus, wait],
   );
 
   const onSpinPress = useCallback(() => {
@@ -553,12 +546,14 @@ export const WantedGame: React.FC = () => {
 
         {/* Plateau */}
         <div className="absolute inset-x-0 top-12 bottom-[150px] flex items-center justify-center gap-5 px-2 sm:px-6">
-          <SidePanel
-            className="hidden lg:flex"
-            onBuy={() => setBuyOpen(true)}
-            disabled={locked || !!bonusState}
-            bet={bet}
-          />
+          {cfg.buyEnabled && (
+            <SidePanel
+              className="hidden lg:flex"
+              onBuy={() => setBuyOpen(true)}
+              disabled={locked || !!bonusState}
+              fromPrice={bet * Math.min(buyPrices.gtr, buyPrices.duel, buyPrices.dmh)}
+            />
+          )}
           <div className="relative flex-1 h-full min-w-0 max-w-[720px] flex items-center justify-center" style={{ containerType: 'size' }}>
             <div className="relative flex flex-col items-center" style={{ width: 'min(100cqw, calc(100cqh * 0.84))' }}>
               <WantedLogo className="relative z-20 -mb-[3%]" />
@@ -614,16 +609,16 @@ export const WantedGame: React.FC = () => {
           turbo={turbo}
           muted={muted}
           canDec={betIdx > 0}
-          canInc={betIdx < BET_LEVELS.length - 1}
+          canInc={betIdx < betLevels.length - 1}
           onDec={() => setBetIdx((i) => Math.max(0, i - 1))}
-          onInc={() => setBetIdx((i) => Math.min(BET_LEVELS.length - 1, i + 1))}
+          onInc={() => setBetIdx((i) => Math.min(betLevels.length - 1, i + 1))}
           onSpin={onSpinPress}
           onAuto={() => (autoLeft > 0 ? setAutoLeft(0) : setAutoOpen(true))}
           onTurbo={() => setTurbo((t) => !t)}
           onMenu={() => setMenuOpen(true)}
           onInfo={() => setInfoOpen(true)}
           onMute={toggleMute}
-          onBuy={() => setBuyOpen(true)}
+          onBuy={cfg.buyEnabled ? () => setBuyOpen(true) : undefined}
           buyDisabled={locked || !!bonusState}
         />
 
@@ -635,7 +630,7 @@ export const WantedGame: React.FC = () => {
           <Modal title="ACHETER UN BONUS" onClose={() => setBuyOpen(false)} wide>
             <div className="grid sm:grid-cols-3 gap-3">
               {(Object.keys(BONUS_INFO) as WantedBonus[]).map((b) => {
-                const price = bet * BONUS_INFO[b].price;
+                const price = bet * buyPrices[b];
                 return (
                   <button
                     key={b}
@@ -652,7 +647,7 @@ export const WantedGame: React.FC = () => {
                     <div className="font-['Rye'] text-lg leading-tight text-center">{BONUS_INFO[b].name}</div>
                     <div className="text-xs text-center mt-1 opacity-80">{BONUS_INFO[b].tagline}</div>
                     <div className="mt-3 text-center font-['Oswald'] font-bold text-2xl">{fmt(price)}</div>
-                    <div className="text-center text-[11px] opacity-70">{BONUS_INFO[b].price}x la mise</div>
+                    <div className="text-center text-[11px] opacity-70">{buyPrices[b]}x la mise</div>
                   </button>
                 );
               })}
@@ -701,7 +696,7 @@ export const WantedGame: React.FC = () => {
             </div>
           </Modal>
         )}
-        {infoOpen && <RulesModal bet={bet} onClose={() => setInfoOpen(false)} />}
+        {infoOpen && <RulesModal bet={bet} prices={buyPrices} onClose={() => setInfoOpen(false)} />}
       </div>
     </div>
   );
@@ -1006,7 +1001,7 @@ interface ControlBarProps {
   onMenu: () => void;
   onInfo: () => void;
   onMute: () => void;
-  onBuy: () => void;
+  onBuy?: () => void;
   buyDisabled: boolean;
 }
 
@@ -1043,13 +1038,15 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
 
         {/* Centre : statut + gain */}
         <div className="col-span-2 sm:col-span-1 order-first sm:order-none flex flex-col items-center pb-1 min-w-0">
-          <button
-            onClick={p.onBuy}
-            disabled={p.buyDisabled}
-            className="lg:hidden mb-2 font-['Oswald'] font-bold text-xs rounded-full px-3 py-1 bg-[linear-gradient(180deg,#6fd0a0,#2f7a52)] border-2 border-[#1c120c] text-[#0f2a1a] disabled:opacity-40"
-          >
-            BUY BONUS
-          </button>
+          {p.onBuy && (
+            <button
+              onClick={p.onBuy}
+              disabled={p.buyDisabled}
+              className="lg:hidden mb-2 font-['Oswald'] font-bold text-xs rounded-full px-3 py-1 bg-[linear-gradient(180deg,#6fd0a0,#2f7a52)] border-2 border-[#1c120c] text-[#0f2a1a] disabled:opacity-40"
+            >
+              BUY BONUS
+            </button>
+          )}
           <div className="h-5 font-['Oswald'] font-bold tracking-wide text-[#e0b040] text-xs sm:text-sm truncate max-w-full">{p.status}</div>
           <div
             className={`font-['Oswald'] font-bold text-center whitespace-nowrap text-[15px] sm:text-2xl ${
@@ -1124,11 +1121,11 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
   </div>
 );
 
-const SidePanel: React.FC<{ className?: string; onBuy: () => void; disabled: boolean; bet: number }> = ({
+const SidePanel: React.FC<{ className?: string; onBuy: () => void; disabled: boolean; fromPrice: number }> = ({
   className = '',
   onBuy,
   disabled,
-  bet,
+  fromPrice,
 }) => (
   <div className={`${className} w-[170px] shrink-0 flex-col gap-2`}>
     <button
@@ -1137,7 +1134,7 @@ const SidePanel: React.FC<{ className?: string; onBuy: () => void; disabled: boo
       className="rounded-xl border-[3px] border-[#1c120c] bg-[linear-gradient(180deg,#6fd0a0,#2f7a52)] p-3 text-center shadow-[0_5px_0_#1c120c] hover:-translate-y-0.5 transition-transform disabled:opacity-50 disabled:hover:translate-y-0"
     >
       <div className="font-['Rye'] text-lg text-[#0f2a1a] leading-tight">BUY BONUS</div>
-      <div className="text-[11px] font-semibold text-[#0f2a1a]/80">dès {fmt(bet * BONUS_INFO.gtr.price)}</div>
+      <div className="text-[11px] font-semibold text-[#0f2a1a]/80">dès {fmt(fromPrice)}</div>
     </button>
     {(Object.keys(BONUS_INFO) as WantedBonus[]).map((b) => (
       <div key={b} className="flex items-center gap-2 rounded-lg bg-black/50 backdrop-blur p-2 border border-white/10">
@@ -1322,7 +1319,11 @@ const MenuRow: React.FC<{ icon: React.ReactNode; label: string; onClick: () => v
   </button>
 );
 
-const RulesModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, onClose }) => (
+const RulesModal: React.FC<{ bet: number; prices: Record<WantedBonus, number>; onClose: () => void }> = ({
+  bet,
+  prices,
+  onClose,
+}) => (
   <Modal title="RÈGLES DU JEU" onClose={onClose} wide>
     <p className="text-center text-white/60 text-xs mb-4">Gains pour une mise de {fmt(bet)}, de gauche à droite sur 15 lignes.</p>
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -1380,12 +1381,12 @@ const RulesModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, onClo
             {b === 'duel' && '2 BONUS + 1 DUEL. 10 tours, VS fréquents sur les 5 rouleaux, rouleaux VS collants.'}
             {b === 'dmh' && '2 BONUS + 1 DEAD. Collecte de wilds et multiplicateurs, puis 3 tours Showdown.'}
           </p>
-          <p className="mt-1 text-white/50">Achat : {BONUS_INFO[b].price}x la mise</p>
+          <p className="mt-1 text-white/50">Achat : {prices[b]}x la mise</p>
         </div>
       ))}
     </div>
     <p className="text-white/50 text-[11px] text-center mt-4">
-      Gain maximum : {fmt(MAX_WIN_X)}x la mise, le tour s'arrête dès qu'il est atteint. RTP théorique ≈ 96,4 %.
+      Gain maximum : {fmt(MAX_WIN_X)}x la mise, le tour s'arrête dès qu'il est atteint. RTP théorique ≈ 96 % (tirages effectués par le serveur).
     </p>
   </Modal>
 );

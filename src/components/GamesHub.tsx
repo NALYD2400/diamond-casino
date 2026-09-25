@@ -333,57 +333,32 @@ export const GamesHub: React.FC = () => {
           )}
         </div>
 
-        {/* Bannières */}
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Link
-            to="/slots"
-            className="group relative col-span-1 lg:col-span-2 overflow-hidden rounded-2xl min-h-[220px] sm:min-h-[260px] bg-[linear-gradient(180deg,#3fa9f5_0%,#8fd3ff_62%,#7ed957_62%,#2d7d27_100%)] shadow-lg shadow-black/50"
-          >
-            <div className="absolute right-[-4%] bottom-[-6%] w-[58%] sm:w-[44%] max-w-[360px] aspect-square transition-transform duration-300 group-hover:scale-105">
-              <DogSymbol id="wild" multiplier={3} />
-            </div>
-            <div className="absolute right-[33%] bottom-[6%] w-[14%] max-w-[120px] aspect-square -rotate-6 hidden xl:block">
-              <DogSymbol id="rottweiler" />
-            </div>
-            <div className="relative z-10 flex h-full max-w-[62%] sm:max-w-[52%] flex-col justify-center p-5 sm:p-8">
-              <span className="mb-2 w-fit rounded-md bg-[#3b1d0e] px-2 py-0.5 text-[11px] font-extrabold text-white">
-                NOUVELLE MACHINE
-              </span>
-              <h2 className="dh-font-xl text-3xl sm:text-5xl leading-none text-[#ffb300] [-webkit-text-stroke:2px_#3b1d0e] drop-shadow-[0_4px_0_#3b1d0e]">
-                THE DOG HOUSE
-              </h2>
-              <p className="mt-3 text-sm font-semibold text-[#1b2a3a] max-w-sm">
-                Wilds x2 et x3 additionnés, jusqu'à 27 tours gratuits avec wilds collants. Gain max 6 750x.
-              </p>
-              <span className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-[#3b1d0e] px-5 py-2.5 text-sm font-bold text-white group-hover:bg-[#5a2c10] transition-colors shadow-md">
-                <Play size={15} fill="currentColor" /> Jouer maintenant
-              </span>
-            </div>
-          </Link>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <Link
-              to="/roue-de-la-fortune"
-              className="group relative overflow-hidden rounded-2xl min-h-[120px] bg-[#1a2c38] border border-white/10"
-            >
-              <img src="/podium_supercar.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-500 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
-              <div className="relative p-5">
-                <div className="text-[11px] font-extrabold text-white">TOUS LES JOURS</div>
-                <div className="text-xl font-extrabold text-white">Roue de la Fortune</div>
-                <div className="mt-1 text-xs text-neutral-300">Un tour offert, la supercar du podium en jeu.</div>
-              </div>
-            </Link>
-            <Link to="/mines" className="group relative overflow-hidden rounded-2xl min-h-[120px] bg-[radial-gradient(circle_at_80%_50%,#1f4a6e,#1a2c38_60%)] border border-white/10">
-              <Gem className="absolute right-6 top-1/2 -translate-y-1/2 h-16 w-16 text-[#3dffb0] drop-shadow-[0_0_14px_rgba(61,255,176,0.7)] transition-transform group-hover:scale-110" />
-              <div className="relative p-5">
-                <div className="text-[11px] font-extrabold text-[#3dffb0]">ORIGINALS</div>
-                <div className="text-xl font-extrabold text-white">Mines</div>
-                <div className="mt-1 text-xs text-neutral-300">Révélez les diamants, encaissez avant la bombe.</div>
-              </div>
-            </Link>
+        {/* Bannière */}
+        <Link
+          to="/slots"
+          className="group relative block overflow-hidden rounded-2xl min-h-[220px] sm:min-h-[260px] bg-[linear-gradient(180deg,#3fa9f5_0%,#8fd3ff_62%,#7ed957_62%,#2d7d27_100%)] shadow-lg shadow-black/50"
+        >
+          <div className="absolute right-[-4%] bottom-[-6%] w-[58%] sm:w-[44%] max-w-[360px] aspect-square transition-transform duration-300 group-hover:scale-105">
+            <DogSymbol id="wild" multiplier={3} />
           </div>
-        </div>
+          <div className="absolute right-[33%] bottom-[6%] w-[14%] max-w-[120px] aspect-square -rotate-6 hidden xl:block">
+            <DogSymbol id="rottweiler" />
+          </div>
+          <div className="relative z-10 flex h-full max-w-[62%] sm:max-w-[52%] flex-col justify-center p-5 sm:p-8">
+            <span className="mb-2 w-fit rounded-md bg-[#3b1d0e] px-2 py-0.5 text-[11px] font-extrabold text-white">
+              NOUVELLE MACHINE
+            </span>
+            <h2 className="dh-font-xl text-3xl sm:text-5xl leading-none text-[#ffb300] [-webkit-text-stroke:2px_#3b1d0e] drop-shadow-[0_4px_0_#3b1d0e]">
+              THE DOG HOUSE
+            </h2>
+            <p className="mt-3 text-sm font-semibold text-[#1b2a3a] max-w-sm">
+              Wilds x2 et x3 additionnés, jusqu'à 27 tours gratuits avec wilds collants. Gain max 6 750x.
+            </p>
+            <span className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-[#3b1d0e] px-5 py-2.5 text-sm font-bold text-white group-hover:bg-[#5a2c10] transition-colors shadow-md">
+              <Play size={15} fill="currentColor" /> Jouer maintenant
+            </span>
+          </div>
+        </Link>
 
         {/* Recherche + catégories */}
         <div className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center">

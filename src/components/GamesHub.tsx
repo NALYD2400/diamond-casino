@@ -16,6 +16,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
+import { useCasinoAdmin } from '../context/CasinoAdminContext';
+import { Wheel } from './wheel/Wheel';
 import { BombArt, GemArt } from './mines/MinesArt';
 import { DogSymbol } from './doghouse/DogSymbols';
 import { WantedSymbol } from './wanted/WantedSymbols';
@@ -108,26 +110,42 @@ const MinesCover: React.FC = () => (
   </div>
 );
 
-const WheelCover: React.FC = () => (
-  <div className="absolute inset-0 overflow-hidden bg-neutral-950">
-    <img src="/podium_supercar.jpg" alt="" className="absolute inset-0 w-full h-full object-cover opacity-55" />
-    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
-    <div
-      className="absolute left-1/2 top-[14%] -translate-x-1/2 w-[70%] aspect-square rounded-full border-[5px] border-white shadow-[0_0_30px_rgba(255,255,255,0.35)]"
-      style={{
-        background:
-          'repeating-conic-gradient(#555555 0deg 22.5deg, #111111 22.5deg 45deg, #888888 45deg 67.5deg, #222222 67.5deg 90deg)',
-      }}
-    >
-      <div className="absolute inset-[38%] rounded-full bg-white border-4 border-black" />
+const WheelCover: React.FC = () => {
+  const { segments } = useCasinoAdmin();
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_50%_40%,#5a2a8a,#24104a_55%,#07030f)]">
+      <div
+        className="dh-rays absolute left-1/2 top-[42%] w-[260%] aspect-square -translate-x-1/2 -translate-y-1/2 opacity-70"
+        style={{ background: 'repeating-conic-gradient(rgba(255,233,138,0.1) 0deg 8deg, transparent 8deg 20deg)' }}
+      />
+      <div className="absolute inset-x-0 top-0 h-[7%] flex items-center justify-around px-1 bg-[linear-gradient(180deg,#5a2a8a,#2a1048)] border-b-[3px] border-[#140c22]">
+        {Array.from({ length: 9 }, (_, i) => (
+          <span
+            key={i}
+            className="wf-marquee w-[6px] h-[6px] rounded-full border border-[#140c22]"
+            style={{ background: i % 2 ? '#fff4b0' : '#ffffff', animationDelay: `${(i % 2) * 0.45}s` }}
+          />
+        ))}
+      </div>
+      <div className="absolute left-1/2 top-[15%] w-[74%] -translate-x-1/2 transition-transform duration-700 group-hover:rotate-[30deg]">
+        <Wheel segments={segments} className="w-full drop-shadow-[0_10px_18px_rgba(0,0,0,0.7)]" />
+      </div>
+      <div
+        className="absolute inset-x-0 bottom-[5%] text-center font-['Luckiest_Guy'] text-[clamp(18px,2.1vw,27px)] leading-[0.95]"
+        style={{
+          background: 'linear-gradient(180deg, #ffffff 0%, #fff4b0 40%, #ffd84a 70%, #d48a0c 100%)',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+          WebkitTextStroke: '1.5px #140c22',
+          filter: 'drop-shadow(0 3px 0 #140c22)',
+        }}
+      >
+        ROUE DE LA FORTUNE
+      </div>
     </div>
-    <div className="absolute inset-x-0 bottom-[7%] text-center font-black tracking-tight text-white text-[clamp(16px,2vw,24px)] leading-tight drop-shadow">
-      ROUE DE LA
-      <br />
-      FORTUNE
-    </div>
-  </div>
-);
+  );
+};
 
 const SoonCover: React.FC<{ icon: React.ReactNode; from: string; to: string; title: string }> = ({ icon, from, to, title }) => (
   <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${from}, ${to})` }}>
@@ -175,7 +193,7 @@ const GAMES: GameTile[] = [
     provider: 'Diamond Originals',
     category: 'rewards',
     link: '/roue-de-la-fortune',
-    tag: 'GRATUIT / 24H',
+    tag: 'ILLIMITÉ',
     cover: <WheelCover />,
   },
   {

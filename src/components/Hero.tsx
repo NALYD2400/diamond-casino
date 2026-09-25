@@ -33,7 +33,7 @@ export const Hero: React.FC = () => {
           {...fadeUp(0.3)}
           className="text-base sm:text-xl text-neutral-300 max-w-2xl leading-relaxed mb-8 font-normal"
         >
-          Plongez au cœur du luxe de Los Santos. Jeux de table exclusifs, salons VIP de grand prestige et Roue de la Fortune quotidienne pour tous les citoyens.
+          Plongez au cœur du luxe de Los Santos. Jeux de table exclusifs, salons VIP de grand prestige et Roue de la Fortune pour tous les citoyens.
         </motion.p>
 
         {/* Quick CTA Action Buttons */}

@@ -132,7 +132,7 @@ function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[], reward
   return {
     id: p.id,
     discordId: p.discord_id || '',
-    discordTag: p.discord_tag ? `@${p.discord_tag.replace(/^@/, '')}` : '',
+    discordTag: p.discord_tag ? p.discord_tag.replace(/^@+/, '') : '',
     avatarUrl: p.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png',
     rpFirstName: p.rp_first_name,
     rpLastName: p.rp_last_name,
@@ -156,14 +156,6 @@ function mapProfile(p: ProfilePayload, transactions: CasinoTransaction[], reward
     totalWon: Number(p.total_won) || 0,
     totalSpins: Number(p.total_spins) || 0,
   };
-}
-
-function formatCountdown(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
 }
 
 // Keys written by previous versions, which stored balances/roles in the browser
@@ -192,7 +184,6 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [pendingDiscordUser, setPendingDiscordUser] = useState<DiscordUserData | null>(null);
-  const [now, setNow] = useState<number>(() => Date.now());
   const loadSeq = useRef(0);
   const tabIdRef = useRef<string>(Math.random().toString(36).slice(2));
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
@@ -326,21 +317,9 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [user?.id, applyProfile]);
 
-  // Countdown clock — only ticks while a cooldown is running
-  const nextSpinAt = user?.nextSpinAt ?? null;
-  useEffect(() => {
-    setNow(Date.now());
-    if (!nextSpinAt || nextSpinAt <= Date.now()) return;
-    const interval = setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      if (t >= nextSpinAt) clearInterval(interval);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [nextSpinAt]);
-
-  const canSpinWheel = !!user && (!nextSpinAt || nextSpinAt <= now);
-  const timeUntilNextSpin = !user ? '' : canSpinWheel ? 'Disponible' : formatCountdown((nextSpinAt || 0) - now);
+  // La roue est payante (prix du tour débité par le serveur) : plus de délai entre deux tirages
+  const canSpinWheel = !!user;
+  const timeUntilNextSpin = '';
 
   const pendingVipTier = useMemo<VipTier | null>(() => {
     const pending = user?.transactions.find((tx) => tx.type === 'vip_request' && tx.status === 'EN ATTENTE');

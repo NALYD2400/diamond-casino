@@ -1248,7 +1248,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                         {/* Amount & Status Badge */}
                         <div className="text-right shrink-0 flex flex-col items-end gap-1">
                           {tx.amountChips !== undefined && tx.amountChips !== 0 && (
-                            <span className={`font-mono font-bold text-sm ${tx.amountChips > 0 ? 'text-white' : 'text-red-400'}`}>
+                            <span className={`font-mono font-bold text-sm ${tx.amountChips > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                               {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
                             </span>
                           )}

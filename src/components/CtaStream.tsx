@@ -70,7 +70,7 @@ export const CtaStream: React.FC<CtaStreamProps> = ({ view404 }) => {
           Entrez dans l'univers <span className="font-['Instrument_Serif'] font-normal italic text-white">The Diamond</span>
         </h2>
         <p className="text-neutral-300 text-base sm:text-lg leading-relaxed mb-10 max-w-xl">
-          Tables VIP de grand prestige, suites penthouse, Roue de la Fortune quotidienne et privilèges exclusifs réservés aux citoyens de Los Santos.
+          Tables VIP de grand prestige, suites penthouse, Roue de la Fortune et privilèges exclusifs réservés aux citoyens de Los Santos.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4">

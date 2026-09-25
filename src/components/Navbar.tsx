@@ -199,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-x-0 top-[80px] bg-black/95 backdrop-blur-2xl border-b border-white/10 z-40 p-6 flex flex-col gap-4 lg:hidden"
+            className="fixed inset-x-0 top-[80px] sm:top-[90px] bg-black/95 backdrop-blur-2xl border-b border-white/10 z-40 p-6 flex flex-col gap-4 lg:hidden"
           >
             <Link
               to="/"

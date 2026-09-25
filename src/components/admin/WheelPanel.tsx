@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Car, Clock, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Car, Coins, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import {
   DEFAULT_SEGMENTS,
   useCasinoAdmin,
@@ -22,23 +22,22 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
   const {
     segments,
     podiumVehicle,
-    wheelCooldownHours,
-    vipConfig,
+    gamesConfig,
+    saveGamesConfig,
     saveSegments,
     savePodiumVehicle,
-    saveWheelCooldownHours,
-    resetAllWheelCooldowns,
   } = useCasinoAdmin();
 
   const [draft, setDraft] = useState<WheelSegmentConfig[]>(segments);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<{ index: number; seg: WheelSegmentConfig } | null>(null);
   const [podiumDraft, setPodiumDraft] = useState<PodiumVehicleConfig>(podiumVehicle);
-  const [cooldownDraft, setCooldownDraft] = useState(wheelCooldownHours);
+  const spinPrice = gamesConfig.wheel.spinPrice;
+  const [priceDraft, setPriceDraft] = useState(spinPrice);
 
   useEffect(() => setDraft(segments), [segments]);
   useEffect(() => setPodiumDraft(podiumVehicle), [podiumVehicle]);
-  useEffect(() => setCooldownDraft(wheelCooldownHours), [wheelCooldownHours]);
+  useEffect(() => setPriceDraft(spinPrice), [spinPrice]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(segments);
   const totalWeight = draft.reduce((a, s) => a + Math.max(0, Number(s.dropRate) || 0), 0);
@@ -64,24 +63,13 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
     setDraft(next);
   };
 
-  const spinsPerDay = 24 / Math.max(1, cooldownDraft);
+  const rtp = priceDraft > 0 ? (expectedChips / priceDraft) * 100 : 0;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Roue de la Fortune"
-        subtitle="Tirage gratuit : le joueur tourne la roue une fois par période et gagne l'un des lots ci-dessous."
-        actions={
-          <Button
-            onClick={async () => {
-              if (window.confirm('Autoriser immédiatement TOUS les joueurs à retourner la roue ?') && (await resetAllWheelCooldowns())) {
-                showToast('Tous les joueurs peuvent retourner la roue.');
-              }
-            }}
-          >
-            <RefreshCw size={13} /> Débloquer tout le monde
-          </Button>
-        }
+        subtitle="Tour payant : le joueur paie le prix du tour en jetons, sans limite de tirages, et gagne l'un des lots ci-dessous."
       />
 
       <HelpBox title="Comment fonctionnent les chances ?">
@@ -100,37 +88,37 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
       </HelpBox>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Délai entre deux tirages" icon={<Clock size={15} />}>
+        <Card title="Prix d'un tour" icon={<Coins size={15} />}>
           <div className="flex flex-col gap-4">
-            <Field
-              label="Délai standard (heures)"
-              hint={`Entre 1 et 168 h. Soit ${fmt(spinsPerDay, 1)} tirage(s) par jour et par joueur. Les VIP ont leur propre délai (onglet VIP) s'il est plus court.`}
-            >
+            <Field label="Prix (jetons)" hint="Débité par le serveur à chaque tour. Aucune limite de tirages par jour.">
               <div className="flex gap-2">
-                <NumberInput value={cooldownDraft} min={1} max={168} onChange={setCooldownDraft} suffix="h" />
+                <NumberInput value={priceDraft} min={1} onChange={setPriceDraft} suffix="⛁" />
                 <Button
                   variant="primary"
-                  disabled={cooldownDraft === wheelCooldownHours}
+                  disabled={priceDraft === spinPrice || priceDraft < 1}
                   onClick={async () => {
-                    if (await saveWheelCooldownHours(cooldownDraft)) showToast(`Délai fixé à ${cooldownDraft} h.`);
+                    if (await saveGamesConfig({ ...gamesConfig, wheel: { ...gamesConfig.wheel, spinPrice: priceDraft } })) {
+                      showToast(`Prix du tour fixé à ${fmt(priceDraft)} jetons.`);
+                    }
                   }}
                 >
                   Enregistrer
                 </Button>
               </div>
             </Field>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              {(['SILVER', 'GOLD', 'DIAMOND'] as const).map((t) => (
-                <div key={t} className="rounded-xl bg-white/[0.03] border border-white/10 py-2">
-                  <div className="text-[10px] text-neutral-500">VIP {t}</div>
-                  <div className="font-mono text-sm text-white">{Math.min(vipConfig[t].wheelCooldownHours, wheelCooldownHours)} h</div>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-xl bg-white/[0.03] border border-white/10 py-2">
+                <div className="text-[10px] text-neutral-500">Gain moyen en jetons</div>
+                <div className="font-mono text-sm text-white">{fmt(expectedChips)}</div>
+              </div>
+              <div className="rounded-xl bg-white/[0.03] border border-white/10 py-2">
+                <div className="text-[10px] text-neutral-500">RTP jetons</div>
+                <div className={cx('font-mono text-sm', rtp > 100 ? 'text-rose-400' : 'text-white')}>{fmt(rtp, 1)} %</div>
+              </div>
             </div>
             <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 text-[12px] text-neutral-400">
-              Coût moyen d'un tirage pour le casino : <b className="text-white font-mono">{fmt(expectedChips)} jetons</b> (+ les lots
-              non monétaires). Soit ≈ <b className="text-white font-mono">{fmt(expectedChips * spinsPerDay * 30)}</b> jetons créés par joueur
-              actif et par mois au délai standard.
+              Le casino garde en moyenne <b className="text-white font-mono">{fmt(Math.max(0, priceDraft - expectedChips))} jetons</b> par
+              tour, avant les lots non monétaires (véhicules, objets). Au-dessus de 100 % de RTP, la roue fait perdre des jetons au casino.
             </div>
           </div>
         </Card>

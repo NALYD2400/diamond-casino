@@ -43,7 +43,8 @@ export interface GamesConfig {
   mines: MinesConfig;
   doghouse: DogHouseConfig;
   wanted: WantedConfig;
-  wheel: { enabled: boolean };
+  /** Roue payante : prix d'un tour en jetons (plus de délai entre deux tirages) */
+  wheel: { enabled: boolean; spinPrice: number };
 }
 
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
@@ -57,7 +58,7 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
     buyPrices: { gtr: 80, duel: 200, dmh: 400 },
     maxPayout: 10000000,
   },
-  wheel: { enabled: true },
+  wheel: { enabled: true, spinPrice: 25000 },
 };
 
 export interface VipTierConfig {

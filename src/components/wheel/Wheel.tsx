@@ -1,29 +1,37 @@
-import React, { forwardRef, useMemo } from 'react';
-import { Car, Coins, Gift, Shirt, type LucideIcon } from 'lucide-react';
+import React, { forwardRef, useId, useMemo } from 'react';
 import type { RewardType, WheelSegmentConfig } from '../../context/CasinoAdminContext';
+
+/**
+ * Roue de la Fortune façon machine à sous : quartiers colorés, trait sombre épais,
+ * couronne d'ampoules et pointeur « cartoon ». Même encre que Diamond Mines.
+ */
 
 export type WheelMode = 'idle' | 'spinning' | 'won';
 
 interface WheelProps {
   segments: WheelSegmentConfig[];
-  /** Index of the segment to highlight once the wheel has stopped */
+  /** Quartier à mettre en avant une fois la roue arrêtée */
   highlightIndex?: number | null;
   mode?: WheelMode;
-  /** Pointer element, so the parent can make it flick on each pin */
+  /** Pointeur, pour que le parent le fasse claquer à chaque picot */
   pointerRef?: React.Ref<HTMLDivElement>;
   className?: string;
 }
 
-// Geometry in a -110..110 viewBox
-const R_ROTOR = 86;
-const R_HUB = 25;
+const INK = '#140c22';
+// Géométrie dans une viewBox -110..110
+const R_ROTOR = 93;
+const R_HUB = 22;
 const BULBS = 32;
 
-const ICONS: Record<RewardType, LucideIcon> = {
-  vehicle: Car,
-  chips: Coins,
-  mystery: Gift,
-  clothing: Shirt,
+const PALETTES: Record<RewardType | 'chipsA' | 'chipsB' | 'chipsC', { light: string; dark: string; text: string; sub: string }> = {
+  chipsA: { light: '#8f6bff', dark: '#3a1d8f', text: '#ffffff', sub: '#d9ccff' },
+  chipsB: { light: '#4a8cff', dark: '#15327f', text: '#ffffff', sub: '#c9dcff' },
+  chipsC: { light: '#b45cff', dark: '#4e1480', text: '#ffffff', sub: '#ecd2ff' },
+  chips: { light: '#8f6bff', dark: '#3a1d8f', text: '#ffffff', sub: '#d9ccff' },
+  vehicle: { light: '#ffe98a', dark: '#d48a0c', text: '#ffffff', sub: '#fff4c2' },
+  mystery: { light: '#ff7fd4', dark: '#a0137a', text: '#ffffff', sub: '#ffd6f2' },
+  clothing: { light: '#6ff0ff', dark: '#10789f', text: '#ffffff', sub: '#d2fbff' },
 };
 
 function polar(radius: number, angleDeg: number): [number, number] {
@@ -31,312 +39,167 @@ function polar(radius: number, angleDeg: number): [number, number] {
   return [radius * Math.cos(a), radius * Math.sin(a)];
 }
 
-function fmtChips(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('fr-FR')}M`;
-  return n.toLocaleString('fr-FR').replace(/ | /g, ' ');
+function shortChips(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })}M`;
+  if (n >= 10_000) return `${(n / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })}K`;
+  return n.toLocaleString('fr-FR').replace(/\s/g, ' ');
 }
 
-interface WedgeTextData {
-  primary: string;
-  secondary: string;
-  fontSize: number;
-}
-
-/** Compute clean, non-overflowing text labels */
-function formatWedgeText(seg: WheelSegmentConfig): WedgeTextData {
-  if (seg.type === 'chips' && typeof seg.value === 'number') {
-    const primary = fmtChips(seg.value);
-    return {
-      primary,
-      secondary: 'JETONS',
-      fontSize: primary.length > 7 ? 4.2 : 4.8,
-    };
-  }
-
-  if (seg.type === 'vehicle') {
-    return {
-      primary: 'VÉHICULE',
-      secondary: 'PODIUM',
-      fontSize: 4.2,
-    };
-  }
-
-  if (seg.type === 'clothing') {
-    return {
-      primary: 'VÊTEMENT',
-      secondary: 'VIP STYLE',
-      fontSize: 4.0,
-    };
-  }
-
-  if (seg.type === 'mystery') {
-    return {
-      primary: 'MYSTÈRE',
-      secondary: 'DIAMOND',
-      fontSize: 4.1,
-    };
-  }
-
-  // Fallback for custom configured admin labels
+function wedgeText(seg: WheelSegmentConfig): { primary: string; secondary: string; emoji: string } {
+  if (seg.type === 'chips' && typeof seg.value === 'number') return { primary: shortChips(seg.value), secondary: 'JETONS', emoji: '' };
+  if (seg.type === 'vehicle') return { primary: 'VÉHICULE', secondary: 'JACKPOT', emoji: '🏎️' };
+  if (seg.type === 'clothing') return { primary: 'VÊTEMENT', secondary: 'VIP', emoji: '👔' };
   const words = seg.label.trim().split(/\s+/);
-  if (words.length === 1) {
-    const primary = words[0].slice(0, 12);
-    return {
-      primary,
-      secondary: '',
-      fontSize: Math.min(4.6, 26 / Math.max(primary.length * 0.65, 1)),
-    };
-  }
-
-  const mid = Math.ceil(words.length / 2);
-  const primary = words.slice(0, mid).join(' ').slice(0, 12);
-  const secondary = words.slice(mid).join(' ').slice(0, 14);
-  const longest = Math.max(primary.length, secondary.length);
   return {
-    primary,
-    secondary,
-    fontSize: Math.min(4.2, 26 / Math.max(longest * 0.65, 1)),
+    primary: (words[0] || 'MYSTÈRE').slice(0, 9).toUpperCase(),
+    secondary: words.slice(1).join(' ').slice(0, 11).toUpperCase(),
+    emoji: seg.icon && seg.icon.length <= 4 ? seg.icon : '🎁',
   };
 }
 
-function getWedgeTheme(seg: WheelSegmentConfig, index: number) {
-  if (seg.type === 'vehicle') {
-    return {
-      fill: 'url(#w-platinum-wedge)',
-      primaryColor: '#ffffff',
-      secondaryColor: '#cbd5e1',
-      iconColor: '#ffffff',
-      accentColor: '#ffffff',
-      isPodium: true,
-    };
-  }
-  if (seg.type === 'mystery') {
-    return {
-      fill: index % 2 ? 'url(#w-wedge-a)' : 'url(#w-wedge-b)',
-      primaryColor: '#ffffff',
-      secondaryColor: '#94a3b8',
-      iconColor: '#e2e8f0',
-      accentColor: '#cbd5e1',
-      isPodium: false,
-    };
-  }
-  if (seg.type === 'clothing') {
-    return {
-      fill: index % 2 ? 'url(#w-wedge-a)' : 'url(#w-wedge-b)',
-      primaryColor: '#ffffff',
-      secondaryColor: '#94a3b8',
-      iconColor: '#e2e8f0',
-      accentColor: '#cbd5e1',
-      isPodium: false,
-    };
-  }
-  // Standard chips
-  const fill = index % 2 ? 'url(#w-wedge-a)' : 'url(#w-wedge-b)';
-  return {
-    fill,
-    primaryColor: '#ffffff',
-    secondaryColor: '#64748b',
-    iconColor: '#ffffff',
-    accentColor: '#94a3b8',
-    isPodium: false,
-  };
+function paletteFor(seg: WheelSegmentConfig, chipsRank: number) {
+  if (seg.type !== 'chips') return PALETTES[seg.type] || PALETTES.mystery;
+  return [PALETTES.chipsA, PALETTES.chipsB, PALETTES.chipsC][chipsRank % 3];
 }
 
 export const Wheel = forwardRef<HTMLDivElement, WheelProps>(
   ({ segments, highlightIndex = null, mode = 'idle', pointerRef, className = '' }, rotorRef) => {
+    const uid = useId().replace(/:/g, '');
     const n = Math.max(segments.length, 1);
     const deg = 360 / n;
 
-    const wedges = useMemo(
-      () =>
-        segments.map((seg, i) => {
-          const start = i * deg - 90;
-          const end = (i + 1) * deg - 90;
-          const [x1, y1] = polar(R_ROTOR, start);
-          const [x2, y2] = polar(R_ROTOR, end);
-          const centre = start + deg / 2;
-          const text = formatWedgeText(seg);
-          const theme = getWedgeTheme(seg, i);
-          const Icon = ICONS[seg.type] || Gift;
+    const wedges = useMemo(() => {
+      let chipsRank = 0;
+      return segments.map((seg, i) => {
+        const start = i * deg - 90;
+        const end = (i + 1) * deg - 90;
+        const [x1, y1] = polar(R_ROTOR, start);
+        const [x2, y2] = polar(R_ROTOR, end);
+        const pal = paletteFor(seg, seg.type === 'chips' ? chipsRank++ : 0);
+        const text = wedgeText(seg);
+        const longest = Math.max(text.primary.length, 4);
+        return {
+          seg,
+          i,
+          pal,
+          text,
+          fontSize: Math.min(10, 48 / longest),
+          path: `M0 0 L${x1.toFixed(3)} ${y1.toFixed(3)} A${R_ROTOR} ${R_ROTOR} 0 ${deg > 180 ? 1 : 0} 1 ${x2.toFixed(3)} ${y2.toFixed(3)} Z`,
+          divider: polar(R_ROTOR, start),
+          centre: start + deg / 2,
+        };
+      });
+    }, [segments, deg]);
 
-          return {
-            seg,
-            i,
-            path: `M0 0 L${x1.toFixed(3)} ${y1.toFixed(3)} A${R_ROTOR} ${R_ROTOR} 0 ${deg > 180 ? 1 : 0} 1 ${x2.toFixed(3)} ${y2.toFixed(3)} Z`,
-            divider: polar(R_ROTOR, start),
-            centre,
-            text,
-            theme,
-            Icon,
-          };
-        }),
-      [segments, deg, n],
-    );
-
-    const perimeterPips = useMemo(
-      () => Array.from({ length: BULBS }, (_, i) => polar(92.5, (i * 360) / BULBS - 90)),
-      [],
-    );
+    const bulbs = useMemo(() => Array.from({ length: BULBS }, (_, i) => polar(99.6, (i * 360) / BULBS - 90)), []);
 
     return (
       <div className={`relative aspect-square select-none wheel-root wheel-${mode} ${className}`}>
-        <svg width="0" height="0" className="absolute" aria-hidden="true">
-          <defs>
-            {/* Bezel Ring Titanium Monochrome */}
-            <radialGradient id="w-bezel-rim" cx="50%" cy="50%" r="50%">
-              <stop offset="82%" stopColor="#07080a" />
-              <stop offset="90%" stopColor="#1a1d26" />
-              <stop offset="97%" stopColor="#0f1117" />
-              <stop offset="100%" stopColor="#050608" />
-            </radialGradient>
-
-            {/* Alternating Sleek Wedges Monochrome */}
-            <radialGradient id="w-wedge-a" cx="0" cy="0" r={R_ROTOR} gradientUnits="userSpaceOnUse">
-              <stop offset="25%" stopColor="#07080a" />
-              <stop offset="75%" stopColor="#0f1116" />
-              <stop offset="100%" stopColor="#141720" />
-            </radialGradient>
-
-            <radialGradient id="w-wedge-b" cx="0" cy="0" r={R_ROTOR} gradientUnits="userSpaceOnUse">
-              <stop offset="25%" stopColor="#0b0d12" />
-              <stop offset="75%" stopColor="#151821" />
-              <stop offset="100%" stopColor="#1d222e" />
-            </radialGradient>
-
-            {/* Special Vehicle Luxury Platinum Wedge */}
-            <radialGradient id="w-platinum-wedge" cx="0" cy="0" r={R_ROTOR} gradientUnits="userSpaceOnUse">
-              <stop offset="20%" stopColor="#10131a" />
-              <stop offset="65%" stopColor="#222838" />
-              <stop offset="100%" stopColor="#323b52" />
-            </radialGradient>
-
-            {/* Specular Sheen */}
-            <radialGradient id="w-gloss-overlay" cx="30%" cy="20%" r="75%">
-              <stop offset="0%" stopColor="rgba(255,255,255,0.06)" />
-              <stop offset="50%" stopColor="rgba(255,255,255,0.01)" />
-              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-            </radialGradient>
-
-            {/* Minimalist Center Hub */}
-            <radialGradient id="w-hub-body" cx="45%" cy="35%" r="65%">
-              <stop offset="0%" stopColor="#1c202a" />
-              <stop offset="60%" stopColor="#0d0f14" />
-              <stop offset="100%" stopColor="#050608" />
-            </radialGradient>
-
-            {/* Soft Shadow Filter for Text */}
-            <filter id="w-clean-shadow" x="-20%" y="-40%" width="140%" height="180%">
-              <feDropShadow dx="0" dy="0.8" stdDeviation="0.8" floodColor="#000000" floodOpacity="0.95" />
-            </filter>
-          </defs>
-        </svg>
-
-        {/* ============================================================ */}
-        {/* STATIC BEZEL: Sleek Swiss Horology Outer Chassis              */}
-        {/* ============================================================ */}
+        {/* ----- Châssis fixe : jante, ampoules ----- */}
         <svg viewBox="-110 -110 220 220" className="absolute inset-0 w-full h-full" aria-hidden="true">
-          {/* Outer Chassis */}
-          <circle r="98" fill="url(#w-bezel-rim)" stroke="#1a1d26" strokeWidth="1" />
-          <circle r="95.5" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" />
-          <circle r="88" fill="none" stroke="#262b38" strokeWidth="1.2" />
-
-          {/* Precision Perimeter Indices */}
-          <g>
-            {perimeterPips.map(([x, y], i) => (
+          <defs>
+            <linearGradient id={`${uid}rim`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#ffffff" />
+              <stop offset="0.35" stopColor="#cbd5e1" />
+              <stop offset="0.7" stopColor="#64748b" />
+              <stop offset="1" stopColor="#1e293b" />
+            </linearGradient>
+            <radialGradient id={`${uid}ring`} cx="0.5" cy="0.4" r="0.6">
+              <stop offset="0" stopColor="#4a2c8a" />
+              <stop offset="1" stopColor="#1a0d3a" />
+            </radialGradient>
+          </defs>
+          <circle r="107.5" fill={INK} />
+          <circle r="105.5" fill={`url(#${uid}rim)`} />
+          <circle r="103" fill={`url(#${uid}ring)`} stroke={INK} strokeWidth="2" />
+          {bulbs.map(([x, y], i) => (
+            <g key={i}>
+              <circle cx={x} cy={y} r="2.8" fill={INK} />
               <circle
-                key={i}
                 cx={x}
                 cy={y}
-                r="1.2"
-                className="wheel-pip transition-opacity duration-300"
-                style={{ '--i': i } as React.CSSProperties}
+                r="2"
+                className="wheel-bulb wf-bulb"
+                style={{ '--i': i, fill: i % 2 ? '#fff4b0' : '#ffffff' } as React.CSSProperties}
               />
-            ))}
-          </g>
+            </g>
+          ))}
+          <circle r={R_ROTOR + 3} fill={INK} />
         </svg>
 
-        {/* ============================================================ */}
-        {/* ROTOR: Rotating disc containing wedges, icons & labels       */}
-        {/* ============================================================ */}
+        {/* ----- Rotor ----- */}
         <div ref={rotorRef} className="absolute inset-0 will-change-transform" style={{ transform: 'rotate(0deg)' }}>
           <svg viewBox="-110 -110 220 220" className="w-full h-full" role="img" aria-label="Roue de la Fortune">
-            {/* Wedge Wedges */}
-            {wedges.map(({ seg, i, path, theme }) => (
-              <path key={`w-${seg.id}-${i}`} d={path} fill={theme.fill} />
+            <defs>
+              {wedges.map(({ i, pal }) => (
+                <radialGradient key={i} id={`${uid}w${i}`} cx="0" cy="0" r={R_ROTOR} gradientUnits="userSpaceOnUse">
+                  <stop offset="0.2" stopColor={pal.dark} />
+                  <stop offset="0.75" stopColor={pal.light} />
+                  <stop offset="1" stopColor={pal.dark} />
+                </radialGradient>
+              ))}
+              <radialGradient id={`${uid}gloss`} cx="0.35" cy="0.2" r="0.8">
+                <stop offset="0" stopColor="rgba(255,255,255,0.28)" />
+                <stop offset="0.5" stopColor="rgba(255,255,255,0.04)" />
+                <stop offset="1" stopColor="rgba(255,255,255,0)" />
+              </radialGradient>
+            </defs>
+
+            {wedges.map(({ i, path }) => (
+              <path key={`w${i}`} d={path} fill={`url(#${uid}w${i})`} />
             ))}
 
-            {/* Win Highlight: dim others, subtly illuminate winner */}
             {highlightIndex !== null &&
               wedges.map(({ i, path }) =>
                 i === highlightIndex ? (
-                  <path
-                    key={`hl-${i}`}
-                    d={path}
-                    fill="rgba(255,255,255,0.18)"
-                    stroke="#ffffff"
-                    strokeWidth="1.2"
-                    className="wheel-win-pulse"
-                  />
+                  <path key={`h${i}`} d={path} fill="rgba(255,255,255,0.22)" stroke="#fff4b0" strokeWidth="2.4" className="wheel-win-pulse" />
                 ) : (
-                  <path key={`dim-${i}`} d={path} fill="rgba(0,0,0,0.65)" />
+                  <path key={`d${i}`} d={path} fill="rgba(10,4,20,0.62)" />
                 ),
               )}
 
-            {/* Hairline Wedge Dividers */}
-            {wedges.map(({ i, divider: [dx, dy], seg }) => (
-              <line
-                key={`d-${i}`}
-                x1="0"
-                y1="0"
-                x2={dx}
-                y2={dy}
-                stroke={seg.type === 'vehicle' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.08)'}
-                strokeWidth="0.75"
-              />
+            {/* Séparations */}
+            {wedges.map(({ i, divider: [dx, dy] }) => (
+              <line key={`l${i}`} x1="0" y1="0" x2={dx} y2={dy} stroke={INK} strokeWidth="2.2" />
             ))}
 
-            {/* Wedge Labels & Icons — Radially Oriented with zero overflow */}
-            {wedges.map(({ i, centre, text, theme, Icon }) => (
-              <g key={`content-${i}`} transform={`rotate(${centre})`}>
-                {/* Minimalist Category Icon near outer rim (r = 73) */}
-                <g transform="translate(73, 0) rotate(90)">
-                  <Icon
-                    x={-3.4}
-                    y={-3.4}
-                    width={6.8}
-                    height={6.8}
-                    color={theme.iconColor}
-                    strokeWidth={1.8}
-                  />
-                </g>
-
-                {/* Primary & Secondary Label (Centered at r = 51) */}
-                <g transform="translate(51, 0)" filter="url(#w-clean-shadow)">
-                  {/* Primary Hero Label */}
+            {/* Libellés : lecture du centre vers l'extérieur */}
+            {wedges.map(({ i, centre, text, pal, fontSize }) => (
+              <g key={`t${i}`} transform={`rotate(${centre})`}>
+                {text.emoji && (
+                  <text x={83} y={0} fontSize={8.5} textAnchor="middle" dominantBaseline="central" transform="rotate(90 83 0)">
+                    {text.emoji}
+                  </text>
+                )}
+                <g transform={`translate(${text.emoji ? 57 : 62}, 0)`}>
                   <text
                     x={0}
-                    y={text.secondary ? -2.2 : 0}
-                    fill={theme.primaryColor}
-                    fontSize={text.fontSize}
-                    fontFamily='"Inter Tight", "Inter", sans-serif'
-                    fontWeight={800}
-                    letterSpacing={0.4}
+                    y={text.secondary ? -2.6 : 0}
+                    fill={pal.text}
+                    stroke={INK}
+                    strokeWidth={2.2}
+                    paintOrder="stroke"
+                    strokeLinejoin="round"
+                    fontSize={fontSize}
+                    fontFamily="'Luckiest Guy', 'Lilita One', system-ui, sans-serif"
+                    letterSpacing={0.3}
                     textAnchor="middle"
                     dominantBaseline="central"
                   >
                     {text.primary}
                   </text>
-
-                  {/* Secondary Sub Label */}
                   {text.secondary && (
                     <text
                       x={0}
-                      y={2.4}
-                      fill={theme.secondaryColor}
-                      fontSize={2.5}
-                      fontFamily='"Geist Mono", monospace'
-                      fontWeight={600}
-                      letterSpacing={0.8}
+                      y={fontSize / 2 + 1.8}
+                      fill={pal.sub}
+                      stroke={INK}
+                      strokeWidth={1.2}
+                      paintOrder="stroke"
+                      fontSize={3.4}
+                      fontFamily="'Oswald', system-ui, sans-serif"
+                      fontWeight={700}
+                      letterSpacing={0.5}
                       textAnchor="middle"
                       dominantBaseline="central"
                     >
@@ -347,67 +210,57 @@ export const Wheel = forwardRef<HTMLDivElement, WheelProps>(
               </g>
             ))}
 
-            {/* Precision Rim Studs at Segment Outer Dividers (r = 86) */}
+            {/* Picots aux séparations */}
             {wedges.map(({ i, divider: [dx, dy] }) => (
-              <g key={`stud-${i}`}>
-                <circle cx={dx} cy={dy} r="1.5" fill="#141720" stroke="#94a3b8" strokeWidth="0.5" />
-                <circle cx={dx - 0.3} cy={dy - 0.3} r="0.4" fill="#ffffff" opacity="0.95" />
+              <g key={`p${i}`}>
+                <circle cx={dx * 0.97} cy={dy * 0.97} r="2.6" fill={INK} />
+                <circle cx={dx * 0.97} cy={dy * 0.97} r="1.7" fill="#f1f5f9" />
+                <circle cx={dx * 0.97 - 0.5} cy={dy * 0.97 - 0.5} r="0.6" fill="#fff" />
               </g>
             ))}
 
-            {/* Subtle Surface Gloss Ring */}
-            <circle r={R_ROTOR} fill="url(#w-gloss-overlay)" pointerEvents="none" />
+            <circle r={R_ROTOR} fill={`url(#${uid}gloss)`} pointerEvents="none" />
+            <circle r={R_ROTOR} fill="none" stroke={INK} strokeWidth="2.5" />
           </svg>
         </div>
 
-        {/* ============================================================ */}
-        {/* STATIC CENTER HUB: Minimalist Luxury Monochrome Medallion    */}
-        {/* ============================================================ */}
+        {/* ----- Moyeu fixe ----- */}
         <svg viewBox="-110 -110 220 220" className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
-          {/* Bevel Shadow & Concentric Precision Rings */}
-          <circle r={R_HUB} fill="#050608" stroke="#252a36" strokeWidth="1" />
-          <circle r="23" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.6" />
-          <circle r="21.5" fill="url(#w-hub-body)" />
-          <circle r="19" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
-
-          {/* Requested Center Logo */}
-          <image
-            href="/wheel_hub_logo.png"
-            x="-19"
-            y="-19"
-            width="38"
-            height="38"
-            preserveAspectRatio="xMidYMid meet"
-            className="select-none pointer-events-none drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]"
-          />
+          <defs>
+            <radialGradient id={`${uid}hub`} cx="0.4" cy="0.3" r="0.8">
+              <stop offset="0" stopColor="#3a2470" />
+              <stop offset="1" stopColor="#0d0620" />
+            </radialGradient>
+            <linearGradient id={`${uid}hubrim`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#ffffff" />
+              <stop offset="0.5" stopColor="#cbd5e1" />
+              <stop offset="1" stopColor="#475569" />
+            </linearGradient>
+          </defs>
+          <circle r={R_HUB + 4} fill={INK} />
+          <circle r={R_HUB + 1.5} fill={`url(#${uid}hubrim)`} />
+          <circle r={R_HUB - 1} fill={`url(#${uid}hub)`} stroke={INK} strokeWidth="1.5" />
+          <image href="/wheel_hub_logo.png" x="-18" y="-18" width="36" height="36" preserveAspectRatio="xMidYMid meet" />
         </svg>
 
-        {/* ============================================================ */}
-        {/* FLAPPER POINTER: Razor-sharp Titanium Monochrome Needle      */}
-        {/* ============================================================ */}
+        {/* ----- Pointeur ----- */}
         <div
           ref={pointerRef}
-          className="absolute left-1/2 top-[2%] z-20 w-[6%] max-w-[30px] min-w-[20px] -translate-x-1/2 origin-[50%_15%] transition-transform duration-75 pointer-events-none"
+          className="absolute left-1/2 top-[-3%] z-20 w-[11%] max-w-[64px] min-w-[34px] -translate-x-1/2 origin-[50%_30%] pointer-events-none"
           aria-hidden="true"
         >
-          <svg viewBox="0 0 28 44" className="w-full drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)]" fill="none">
-            {/* Sleek Minimalist Arrow Indicator */}
-            <path
-              d="M14 42 L3 12 A11 11 0 1 1 25 12 Z"
-              fill="#0a0c10"
-              stroke="#ffffff"
-              strokeWidth="1.2"
-              strokeLinejoin="round"
-            />
-            {/* Inner Chamfer */}
-            <path
-              d="M14 38 L6 13 A8 8 0 1 1 22 13 Z"
-              fill="#181c26"
-            />
-            {/* Center Pivot Jewel */}
-            <circle cx="14" cy="12" r="4.5" fill="#0b0d13" stroke="#cbd5e1" strokeWidth="0.8" />
-            <circle cx="14" cy="12" r="2.2" fill="#ffffff" />
-            <circle cx="13" cy="11" r="0.6" fill="#cbd5e1" />
+          <svg viewBox="0 0 60 80" className="w-full drop-shadow-[0_6px_0_rgba(20,12,34,0.6)]">
+            <defs>
+              <linearGradient id={`${uid}ptr`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#ffffff" />
+                <stop offset="0.5" stopColor="#ffe98a" />
+                <stop offset="1" stopColor="#d48a0c" />
+              </linearGradient>
+            </defs>
+            <path d="M30 76 L6 28 A26 26 0 1 1 54 28 Z" fill={`url(#${uid}ptr)`} stroke={INK} strokeWidth="5" strokeLinejoin="round" />
+            <path d="M14 22 A17 17 0 0 1 30 8" stroke="#fff" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.85" />
+            <circle cx="30" cy="24" r="9" fill="#ff4a8a" stroke={INK} strokeWidth="4" />
+            <circle cx="27" cy="21" r="2.6" fill="#fff" opacity="0.9" />
           </svg>
         </div>
       </div>

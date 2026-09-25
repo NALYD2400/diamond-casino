@@ -63,7 +63,7 @@ export const Discovery: React.FC = () => {
             <ArrowUpRight size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <p className="text-neutral-400 text-sm leading-relaxed mb-4">
-            1 tirage quotidien gratuit offert à chaque citoyen. Remportez la Supercar exposée sur le podium central.
+            Tours illimités, payés en jetons. Remportez la Supercar exposée sur le podium central.
           </p>
           <span className="font-['Geist_Mono'] text-xs text-neutral-400 tracking-wider uppercase mt-auto">
             LOT 02 // VÉHICULE PODIUM ➔

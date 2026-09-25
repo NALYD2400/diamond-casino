@@ -12,7 +12,6 @@ import { Hero } from './components/Hero';
 import { Discovery } from './components/Discovery';
 import { Mission } from './components/Mission';
 import { Architecture } from './components/Architecture';
-import { Gallery } from './components/Gallery';
 import { CtaStream } from './components/CtaStream';
 import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
@@ -66,7 +65,6 @@ function LandingPage() {
       <Discovery />
       <Mission />
       <Architecture />
-      <Gallery />
       <CtaStream view404={false} />
       <Footer />
     </motion.div>

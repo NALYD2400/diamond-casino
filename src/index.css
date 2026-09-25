@@ -80,6 +80,15 @@ html, body {
   background: #404040;
 }
 
+/* Utility: hide scrollbars while preserving scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Winning wedge pulse on the fortune wheel */
 @keyframes wheel-win-pulse {
   0%, 100% { opacity: 0.35; }
@@ -335,4 +344,14 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .mn-mote, .mn-swing, .mn-glow, .mn-lantern-glow, .mn-twinkle { animation: none; }
+}
+
+/* ---- Roue de la Fortune ---- */
+.wf-glow { filter: drop-shadow(0 0 28px rgba(255, 216, 74, 0.55)); transition: filter 0.5s ease; }
+.wf-marquee { animation: wf-marquee 0.9s steps(1, end) infinite; box-shadow: 0 0 8px rgba(255, 244, 176, 0.9); }
+@keyframes wf-marquee { 50% { opacity: 0.25; box-shadow: none; } }
+.wheel-root .wf-bulb { filter: drop-shadow(0 0 2px rgba(255, 244, 176, 0.9)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-marquee { animation: none; }
 }

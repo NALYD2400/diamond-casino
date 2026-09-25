@@ -185,31 +185,28 @@ export const VipSubscriptions: React.FC = () => {
   const [submittingTier, setSubmittingTier] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [confirmTier, setConfirmTier] = useState<TierData | null>(null);
-  const { vipConfig, wheelCooldownHours } = useCasinoAdmin();
+  const { vipConfig } = useCasinoAdmin();
 
   // Prix, dotation et délai de roue viennent des réglages (console → VIP)
   const tiers = useMemo<TierData[]>(
     () =>
       TIERS.map((t) => {
         const cfg = vipConfig[t.id];
-        const spins = Math.max(1, Math.floor(24 / Math.min(cfg.wheelCooldownHours, wheelCooldownHours)));
         const fmtN = (n: number) => n.toLocaleString('fr-FR');
         return {
           ...t,
           priceChips: cfg.price,
           chipsBonus: cfg.bonus,
           priceRP: `${fmtN(cfg.price)} jetons / ${vipConfig.durationDays} jours`,
-          dailySpins: spins,
           cashback: 'Aucun',
           perks: [
             t.perks[0],
-            `${spins} tirage${spins > 1 ? 's' : ''} de Roue par jour`,
             `${fmtN(cfg.bonus)} jetons offerts à l'activation`,
             `Carte valable ${vipConfig.durationDays} jours`,
           ],
         };
       }),
-    [vipConfig, wheelCooldownHours],
+    [vipConfig],
   );
 
   const showToast = (msg: string) => {

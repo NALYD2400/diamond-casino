@@ -17,8 +17,7 @@ import {
   AlertCircle, 
   X, 
   ChevronRight, 
-  Search,
-  ExternalLink
+  Search
 } from 'lucide-react';
 import { useCasinoUser, type CasinoTransaction } from '../context/CasinoUserContext';
 import { sanitizeText, isValidCitizenId, isValidRPName, isValidPhoneNumber } from '../lib/security';
@@ -31,6 +30,10 @@ interface MemberPortalProps {
 }
 
 type ConsoleTab = 'overview' | 'lots' | 'vault' | 'profile' | 'vip';
+
+const formatTxLabel = (label: string): string => {
+  return label.replace(/\b(\d{4,})\b/g, (m) => Number(m).toLocaleString('fr-FR'));
+};
 
 export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavigateToWheel }) => {
   const { 
@@ -45,7 +48,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
     logout, 
     updateProfile, 
     canSpinWheel, 
-    timeUntilNextSpin, 
   } = useCasinoUser();
 
   const [activeTab, setActiveTab] = useState<ConsoleTab>('overview');
@@ -272,7 +274,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   Espace Membre
                 </h1>
                 <p className="text-xs text-neutral-400 leading-relaxed mb-6">
-                  Connectez votre compte Discord pour gérer vos jetons, vos tirages quotidiens et vos accès VIP.
+                  Connectez votre compte Discord pour gérer vos jetons, vos lots de la Roue et vos accès VIP.
                 </p>
 
                 <button
@@ -351,7 +353,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       <input
                         type="text"
                         required
-                        placeholder="Ex: Dylan"
+                        placeholder="Ex: Marco"
                         value={onboardFirst}
                         onChange={(e) => setOnboardFirst(e.target.value)}
                         className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs text-white focus:outline-none focus:border-white transition-colors"
@@ -362,7 +364,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       <input
                         type="text"
                         required
-                        placeholder="Ex: Carter"
+                        placeholder="Ex: Delgado"
                         value={onboardLast}
                         onChange={(e) => setOnboardLast(e.target.value)}
                         className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs text-white focus:outline-none focus:border-white transition-colors"
@@ -375,7 +377,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     <input
                       type="text"
                       required
-                      placeholder="Ex: 3932"
+                      placeholder="Ex: 7418"
                       value={onboardCitizenId}
                       onChange={(e) => setOnboardCitizenId(e.target.value)}
                       className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs font-mono text-white focus:outline-none focus:border-white transition-colors"
@@ -428,7 +430,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // VIEW C : ESPACE MEMBRE AUTHENTIFIÉ (DESIGN VERCEL PUR ET CLAIR)
   // =========================================================================
   return (
-    <div className="w-full min-h-screen bg-black text-white flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
+    <div className="w-full min-h-screen bg-black text-white flex flex-col font-sans selection:bg-neutral-800 selection:text-white pt-[80px] sm:pt-[90px]">
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
@@ -436,7 +438,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="fixed top-5 right-5 z-50 px-4 py-2.5 rounded-lg bg-white text-black font-medium text-xs shadow-xl flex items-center gap-2"
+            className="fixed top-24 sm:top-28 right-5 sm:right-8 z-50 px-4 py-2.5 rounded-lg bg-white text-black font-medium text-xs shadow-xl flex items-center gap-2"
           >
             <CheckCircle2 size={16} className="text-black" />
             <span>{toastMessage}</span>
@@ -444,96 +446,70 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         )}
       </AnimatePresence>
 
-      {/* Top Navbar */}
-      <header className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              onClick={() => onBackToHome?.()}
-              className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-xs font-mono"
-            >
-              <ArrowLeft size={14} />
-              <span className="hidden sm:inline">Casino</span>
-            </Link>
-            <span className="text-neutral-700">/</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-white">Espace Membre</span>
-              <span className="text-[11px] font-mono text-neutral-500">#{user.citizenId}</span>
-            </div>
+      {/* Subnav Tabs Bar (Directly below Global Navbar) */}
+      <nav className="border-b border-neutral-800 bg-neutral-950/95 backdrop-blur-md sticky top-[80px] sm:top-[90px] z-30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0">
+            {[
+              { id: 'overview', label: "Vue d'ensemble" },
+              { 
+                id: 'lots', 
+                label: 'Mes récompenses', 
+                count: user.rewards.filter((r) => r.status === 'IN_INVENTORY').length 
+              },
+              { id: 'vault', label: 'Historique des jetons' },
+              { id: 'profile', label: 'Mon profil' },
+              { id: 'vip', label: 'Avantages VIP' },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as ConsoleTab)}
+                  className={`relative py-3.5 px-3 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                    isActive ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white text-black font-bold">
+                      {tab.count}
+                    </span>
+                  )}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTabUnderline"
+                      className="absolute bottom-0 inset-x-0 h-0.5 bg-white"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Quick Action Badges: Admin (if staff) & Déconnexion */}
+          <div className="flex items-center gap-2 shrink-0 py-2">
             {isOwnerOrAdmin && (
               <Link
                 to="/admin"
-                className="px-2.5 py-1 rounded border border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:text-white text-xs font-mono transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:text-white text-xs font-mono transition-colors"
               >
-                Admin
+                <ShieldCheck size={12} />
+                <span>Admin</span>
               </Link>
             )}
 
-            <div className="flex items-center gap-2.5 pl-3 border-l border-neutral-800">
-              <img
-                src={user.avatarUrl}
-                alt={user.rpFirstName}
-                className="w-6 h-6 rounded-full border border-neutral-700 object-cover"
-              />
-              <span className="text-xs font-medium text-white hidden sm:inline">
-                {user.rpFirstName} {user.rpLastName}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsLogoutModalOpen(true)}
-                title="Se déconnecter"
-                className="p-1 rounded text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsLogoutModalOpen(true)}
+              title="Se déconnecter"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-neutral-400 hover:text-red-400 hover:bg-neutral-900 border border-neutral-800/80 hover:border-red-900/50 text-xs font-medium transition-colors cursor-pointer"
+            >
+              <LogOut size={13} />
+              <span className="hidden sm:inline">Déconnexion</span>
+            </button>
           </div>
-        </div>
-      </header>
-
-      {/* Subnav Tabs (Vercel Style Underline) */}
-      <nav className="border-b border-neutral-800 bg-black sticky top-14 z-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-1 overflow-x-auto no-scrollbar">
-          {[
-            { id: 'overview', label: "Vue d'ensemble" },
-            { 
-              id: 'lots', 
-              label: 'Mes récompenses', 
-              count: user.rewards.filter((r) => r.status === 'IN_INVENTORY').length 
-            },
-            { id: 'vault', label: 'Historique des jetons' },
-            { id: 'profile', label: 'Mon profil' },
-            { id: 'vip', label: 'Avantages VIP' },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as ConsoleTab)}
-                className={`relative py-3 px-3 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2 ${
-                  isActive ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <span>{tab.label}</span>
-                {tab.count !== undefined && tab.count > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white text-black font-bold">
-                    {tab.count}
-                  </span>
-                )}
-                {isActive && (
-                  <motion.div
-                    layoutId="activeTabUnderline"
-                    className="absolute bottom-0 inset-x-0 h-0.5 bg-white"
-                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </button>
-            );
-          })}
         </div>
       </nav>
 
@@ -553,7 +529,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   Bonjour, {user.rpFirstName}
                 </h1>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  Matricule #{user.citizenId} &bull; Compte Discord @{user.discordTag || 'connecté'} &bull; Adhésion {user.vipTier ? `VIP ${user.vipTier}` : 'Standard'}
+                  Matricule #{user.citizenId} &bull; Compte Discord {user.discordTag ? `@${user.discordTag.replace(/^@+/, '')}` : 'connecté'} &bull; Adhésion {user.vipTier ? `VIP ${user.vipTier}` : 'Standard'}
                 </p>
               </div>
 
@@ -568,7 +544,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   }`}
                 >
                   <Disc size={14} className={canSpinWheel ? 'animate-spin' : ''} style={{ animationDuration: '6s' }} />
-                  <span>{canSpinWheel ? 'Tourner la Roue' : 'Roue quotidienne'}</span>
+                  <span>Tourner la Roue</span>
                 </Link>
 
                 <button
@@ -609,21 +585,15 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               {/* Card 2: Roue de la fortune */}
               <div className="p-4 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
                 <div className="flex items-center justify-between text-neutral-400 text-xs">
-                  <span className="font-mono text-[11px] uppercase">Roue quotidienne</span>
+                  <span className="font-mono text-[11px] uppercase">Roue de la Fortune</span>
                   <Disc size={14} className="text-neutral-500" />
                 </div>
                 <div className="my-2.5">
                   <div className="text-sm font-semibold text-white">
-                    {canSpinWheel ? (
-                      <span className="text-white flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-white" />
-                        Tirage disponible
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400 font-mono">
-                        Dans {timeUntilNextSpin || '24h'}
-                      </span>
-                    )}
+                    <span className="text-white flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-white" />
+                      Tours illimités
+                    </span>
                   </div>
                   <span className="text-[11px] text-neutral-500 font-mono">
                     {user.totalSpins || 0} tirage{(user.totalSpins || 0) > 1 ? 's' : ''} effectué{(user.totalSpins || 0) > 1 ? 's' : ''}
@@ -634,7 +604,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   onClick={() => onNavigateToWheel?.()}
                   className="text-[11px] text-neutral-400 hover:text-white flex items-center justify-between pt-2 border-t border-neutral-900 transition-colors"
                 >
-                  <span>{canSpinWheel ? 'Lancer maintenant' : 'Voir le podium'}</span>
+                  <span>Lancer maintenant</span>
                   <ChevronRight size={12} />
                 </Link>
               </div>
@@ -650,11 +620,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     {user.vipTier ? `VIP ${user.vipTier}` : 'Membre Standard'}
                   </div>
                   <span className="text-[11px] text-neutral-500 font-mono">
-                    {user.vipTier === 'DIAMOND' 
-                      ? '3 tirages / jour (8h cooldown)' 
-                      : user.vipTier === 'GOLD' 
-                      ? '2 tirages / jour (12h cooldown)' 
-                      : '1 tirage / jour (24h cooldown)'}
+                    {user.vipTier ? 'Avantages VIP actifs' : 'Aucune carte VIP'}
                   </span>
                 </div>
                 <Link
@@ -715,37 +681,68 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
                 <div className="space-y-2">
                   {user.transactions && user.transactions.length > 0 ? (
-                    user.transactions.slice(0, 4).map((tx) => (
-                      <div
-                        key={tx.id}
-                        className="py-2.5 px-3 rounded-lg bg-black border border-neutral-900 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-medium text-white block truncate">
-                            {tx.label}
-                          </span>
-                          <span className="text-[10px] text-neutral-500 font-mono">
-                            {new Date(tx.date).toLocaleDateString('fr-FR', {
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })} &bull; {tx.category}
-                          </span>
+                    user.transactions.slice(0, 4).map((tx) => {
+                      const isPositive = tx.amountChips > 0;
+                      const isNegative = tx.amountChips < 0;
+                      return (
+                        <div
+                          key={tx.id}
+                          className="py-2.5 px-3 rounded-lg bg-black border border-neutral-900 flex items-center justify-between gap-3 text-xs hover:border-neutral-800 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`w-7 h-7 rounded-md border flex items-center justify-center shrink-0 ${
+                                isPositive
+                                  ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                                  : isNegative
+                                  ? 'bg-red-500/10 border-red-500/25 text-red-400'
+                                  : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                              }`}
+                            >
+                              {tx.type === 'spin_reward' ? (
+                                <Disc size={12} />
+                              ) : tx.type === 'vip_subscription' ? (
+                                <Crown size={12} />
+                              ) : (
+                                <Coins size={12} />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-medium text-white block truncate">
+                                {formatTxLabel(tx.label)}
+                              </span>
+                              <span className="text-[10px] text-neutral-500 font-mono">
+                                {new Date(tx.date).toLocaleDateString('fr-FR', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })} &bull; {tx.category}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            {tx.amountChips !== 0 ? (
+                              <span
+                                className={`font-mono font-semibold tracking-tight ${
+                                  isPositive
+                                    ? 'text-emerald-400'
+                                    : isNegative
+                                    ? 'text-red-400'
+                                    : 'text-neutral-400'
+                                }`}
+                              >
+                                {isPositive ? `+${tx.amountChips.toLocaleString('fr-FR')}` : tx.amountChips.toLocaleString('fr-FR')} ⛁
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono text-neutral-400">
+                                {tx.status}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          {tx.amountChips !== 0 ? (
-                            <span className={`font-mono font-medium ${tx.amountChips > 0 ? 'text-white' : 'text-neutral-400'}`}>
-                              {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono text-neutral-400">
-                              {tx.status}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="py-8 text-center text-xs text-neutral-500 font-mono">
                       Aucune transaction récente
@@ -922,53 +919,74 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 </div>
               ) : (
                 <div className="divide-y divide-neutral-900">
-                  {filteredTransactions.map((tx) => (
-                    <div
-                      key={tx.id}
-                      className="p-3.5 sm:px-4 flex items-center justify-between gap-4 hover:bg-neutral-950/50 transition-colors text-xs"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center shrink-0 text-neutral-400">
-                          {tx.type === 'spin_reward' ? (
-                            <Disc size={14} />
-                          ) : tx.type === 'vip_subscription' ? (
-                            <Crown size={14} />
-                          ) : (
-                            <Coins size={14} />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-medium text-white block truncate">
-                            {tx.label}
-                          </span>
-                          <span className="text-[11px] text-neutral-500 font-mono">
-                            {new Date(tx.date).toLocaleDateString('fr-FR', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })} &bull; {tx.category}
-                          </span>
-                        </div>
-                      </div>
+                  {filteredTransactions.map((tx) => {
+                    const isPositive = tx.amountChips > 0;
+                    const isNegative = tx.amountChips < 0;
 
-                      <div className="text-right shrink-0">
-                        {tx.amountChips !== 0 ? (
-                          <div className={`font-mono font-medium ${tx.amountChips > 0 ? 'text-white' : 'text-neutral-400'}`}>
-                            {tx.amountChips > 0 ? `+${tx.amountChips.toLocaleString()}` : tx.amountChips.toLocaleString()} ⛁
+                    return (
+                      <div
+                        key={tx.id}
+                        className="p-3.5 sm:px-4 flex items-center justify-between gap-4 hover:bg-neutral-900/40 transition-colors text-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                              isPositive
+                                ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                                : isNegative
+                                ? 'bg-red-500/10 border-red-500/25 text-red-400'
+                                : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                            }`}
+                          >
+                            {tx.type === 'spin_reward' ? (
+                              <Disc size={14} />
+                            ) : tx.type === 'vip_subscription' ? (
+                              <Crown size={14} />
+                            ) : (
+                              <Coins size={14} />
+                            )}
                           </div>
-                        ) : (
-                          <div className="text-[11px] font-mono text-neutral-400 uppercase">
-                            {tx.type === 'vip_request' ? 'Demande VIP' : 'Lot'}
+                          <div className="min-w-0">
+                            <span className="font-medium text-white block truncate">
+                              {formatTxLabel(tx.label)}
+                            </span>
+                            <span className="text-[11px] text-neutral-500 font-mono">
+                              {new Date(tx.date).toLocaleDateString('fr-FR', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })} &bull; {tx.category}
+                            </span>
                           </div>
-                        )}
-                        <span className="text-[10px] font-mono text-neutral-500 uppercase">
-                          {tx.status}
-                        </span>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          {tx.amountChips !== 0 ? (
+                            <div
+                              className={`font-mono font-semibold tracking-tight ${
+                                isPositive
+                                  ? 'text-emerald-400'
+                                  : isNegative
+                                  ? 'text-red-400'
+                                  : 'text-neutral-300'
+                              }`}
+                            >
+                              {isPositive ? `+${tx.amountChips.toLocaleString('fr-FR')}` : tx.amountChips.toLocaleString('fr-FR')} ⛁
+                            </div>
+                          ) : (
+                            <div className="text-[11px] font-mono text-neutral-400 uppercase">
+                              {tx.type === 'vip_request' ? 'Demande VIP' : 'Lot'}
+                            </div>
+                          )}
+                          <span className="text-[10px] font-mono text-neutral-500 uppercase block mt-0.5">
+                            {tx.status}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1077,13 +1095,39 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       Compte Discord relié
                     </span>
                     <span className="text-[11px] font-mono text-neutral-500">
-                      @{user.discordTag || user.discordId}
+                      {user.discordTag || user.discordId ? `@${(user.discordTag || user.discordId).replace(/^@+/, '')}` : 'Non renseigné'}
                     </span>
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-neutral-900 border border-neutral-800 text-neutral-400">
                   Vérifié
                 </span>
+              </div>
+            </div>
+
+            {/* Session Management Actions */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs text-neutral-500 font-mono">
+                Session active &bull; Diamond Casino Resort
+              </div>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                {isOwnerOrAdmin && (
+                  <Link
+                    to="/admin"
+                    className="flex-1 sm:flex-none h-9 px-4 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-xs font-mono text-neutral-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <ShieldCheck size={14} />
+                    <span>Console Admin</span>
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsLogoutModalOpen(true)}
+                  className="flex-1 sm:flex-none h-9 px-4 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-red-950/40 hover:border-red-800/60 text-xs font-medium text-neutral-300 hover:text-red-400 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <LogOut size={14} />
+                  <span>Se déconnecter</span>
+                </button>
               </div>
             </div>
 
@@ -1129,7 +1173,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   <ul className="space-y-2.5 text-xs text-neutral-400">
                     <li className="flex items-center gap-2">
                       <Check size={14} className="text-white shrink-0" />
-                      <span>1 tirage de Roue toutes les 24h</span>
+                      <span>Roue de la Fortune en tours illimités</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check size={14} className="text-white shrink-0" />
@@ -1157,10 +1201,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   </div>
                   <h3 className="text-base font-semibold text-white mb-4">High Roller</h3>
                   <ul className="space-y-2.5 text-xs text-neutral-300">
-                    <li className="flex items-center gap-2">
-                      <Check size={14} className="text-white shrink-0" />
-                      <span><strong>2 tirages / jour</strong> (Cooldown 12h)</span>
-                    </li>
                     <li className="flex items-center gap-2">
                       <Check size={14} className="text-white shrink-0" />
                       <span>+60 000 jetons offerts à l'adhésion</span>
@@ -1191,10 +1231,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   </div>
                   <h3 className="text-base font-semibold text-white mb-4">Maître du Resort</h3>
                   <ul className="space-y-2.5 text-xs text-neutral-400">
-                    <li className="flex items-center gap-2">
-                      <Check size={14} className="text-white shrink-0" />
-                      <span><strong>3 tirages / jour</strong> (Cooldown 8h)</span>
-                    </li>
                     <li className="flex items-center gap-2">
                       <Check size={14} className="text-white shrink-0" />
                       <span>+150 000 jetons offerts à l'adhésion</span>

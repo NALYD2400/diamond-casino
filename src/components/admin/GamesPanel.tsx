@@ -253,10 +253,10 @@ export const GamesPanel: React.FC<{ showToast: (m: string) => void; goTo: (t: Ad
             checked={draft.wheel.enabled}
             onChange={(v) => set('wheel', { enabled: v })}
             label="Roue ouverte"
-            hint="Tirage gratuit, limité par un délai entre deux tirages."
+            hint="Tour payant, sans limite de tirages."
           />
           <div className={cx('text-[13px] text-neutral-400')}>
-            Les lots, leurs chances et le délai se règlent dans l'onglet{' '}
+            Le prix du tour, les lots et leurs chances se règlent dans l'onglet{' '}
             <button type="button" className="text-white underline cursor-pointer" onClick={() => goTo('wheel')}>
               Roue de la Fortune
             </button>

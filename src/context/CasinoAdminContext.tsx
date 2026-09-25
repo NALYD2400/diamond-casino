@@ -24,6 +24,11 @@ import {
 } from '../lib/supabase';
 import { hasAdminPermissions } from '../lib/discord';
 import { useCasinoUser, type CasinoTransaction } from './CasinoUserContext';
+import {
+  DEFAULT_SLOT_MACHINES,
+  type SlotMachineConfig,
+  type SlotSymbolConfig,
+} from '../components/slots/slotsEngine';
 
 export type RewardType = 'vehicle' | 'chips' | 'mystery' | 'clothing';
 
@@ -115,6 +120,14 @@ interface CasinoAdminContextType {
   updatePodiumVehicle: (patch: Partial<PodiumVehicleConfig>) => void;
   setWheelCooldownHours: (hours: number) => void;
   resetWheelDefaults: () => void;
+
+  // Slots Settings (public read, staff write)
+  slotMachines: SlotMachineConfig[];
+  updateSlotMachine: (id: string, patch: Partial<SlotMachineConfig>) => void;
+  updateSlotSymbol: (machineId: string, symbolId: string, patch: Partial<SlotSymbolConfig>) => void;
+  addSlotMachine: (machine: SlotMachineConfig) => void;
+  deleteSlotMachine: (id: string) => void;
+  resetSlotMachinesDefaults: () => void;
 
   // Economy Settings
   economy: CasinoEconomyConfig;
@@ -249,6 +262,16 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [podiumVehicle, setPodiumVehicle] = useState<PodiumVehicleConfig>(DEFAULT_PODIUM);
   const [wheelCooldownHours, setWheelCooldownHoursState] = useState<number>(24);
   const [economy, setEconomyState] = useState<CasinoEconomyConfig>(DEFAULT_ECONOMY);
+  const [slotMachines, setSlotMachines] = useState<SlotMachineConfig[]>(() => {
+    try {
+      const cached = localStorage.getItem('diamond_slots_machines_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_SLOT_MACHINES;
+  });
   const [citizens, setCitizens] = useState<MockCitizen[]>([]);
   const [vipRequestRows, setVipRequestRows] = useState<SupabaseTransaction[]>([]);
   const [logs, setLogs] = useState<AdminLogEntry[]>([]);
@@ -262,14 +285,15 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   // ---------------------------------------------------------------
-  // Public configuration (wheel + economy) — read-only for everyone
+  // Public configuration (wheel + economy + slots) — read-only for everyone
   // ---------------------------------------------------------------
   const loadConfig = useCallback(async () => {
-    const [remoteSegments, remotePodium, remoteCooldown, remoteEconomy] = await Promise.all([
+    const [remoteSegments, remotePodium, remoteCooldown, remoteEconomy, remoteSlots] = await Promise.all([
       dbGetSetting<unknown>('wheel_segments'),
       dbGetSetting<PodiumVehicleConfig>('podium_vehicle'),
       dbGetSetting<number>('wheel_cooldown'),
       dbGetSetting<CasinoEconomyConfig>('economy_config'),
+      dbGetSetting<SlotMachineConfig[]>('slots_machines'),
     ]);
     if (isValidSegments(remoteSegments)) {
       // Single currency: a legacy « cash » segment is shown (and paid) as chips
@@ -280,6 +304,12 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     if (typeof remoteCooldown === 'number') setWheelCooldownHoursState(remoteCooldown);
     if (remoteEconomy && typeof remoteEconomy === 'object') setEconomyState({ ...DEFAULT_ECONOMY, ...remoteEconomy });
+    if (Array.isArray(remoteSlots) && remoteSlots.length > 0) {
+      setSlotMachines(remoteSlots);
+      try {
+        localStorage.setItem('diamond_slots_machines_cache', JSON.stringify(remoteSlots));
+      } catch {}
+    }
   }, []);
 
   useEffect(() => {
@@ -492,6 +522,78 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 
   // ---------------------------------------------------------------
+  // Slot Machines settings
+  // ---------------------------------------------------------------
+  const updateSlotMachine = useCallback(
+    (id: string, patch: Partial<SlotMachineConfig>) => {
+      const next = slotMachines.map((m) => {
+        if (m.id !== id) return m;
+        return { ...m, ...patch };
+      });
+      setSlotMachines(next);
+      try {
+        localStorage.setItem('diamond_slots_machines_cache', JSON.stringify(next));
+      } catch {}
+      persistSetting('slots_machines', next);
+      addLog('Machine à sous modifiée', 'ECONOMY', `Machine ${patch.name || id} mise à jour`);
+    },
+    [slotMachines, persistSetting, addLog],
+  );
+
+  const updateSlotSymbol = useCallback(
+    (machineId: string, symbolId: string, patch: Partial<SlotSymbolConfig>) => {
+      const next = slotMachines.map((m) => {
+        if (m.id !== machineId) return m;
+        const nextSymbols = m.symbols.map((s) => (s.id === symbolId ? { ...s, ...patch } : s));
+        return { ...m, symbols: nextSymbols };
+      });
+      setSlotMachines(next);
+      try {
+        localStorage.setItem('diamond_slots_machines_cache', JSON.stringify(next));
+      } catch {}
+      persistSetting('slots_machines', next);
+      addLog('Symbole de slot modifié', 'ECONOMY', `Symbole ${symbolId} modifié sur ${machineId}`);
+    },
+    [slotMachines, persistSetting, addLog],
+  );
+
+  const addSlotMachine = useCallback(
+    (machine: SlotMachineConfig) => {
+      const next = [...slotMachines, machine];
+      setSlotMachines(next);
+      try {
+        localStorage.setItem('diamond_slots_machines_cache', JSON.stringify(next));
+      } catch {}
+      persistSetting('slots_machines', next);
+      addLog('Nouvelle machine à sous', 'ECONOMY', `Machine ${machine.name} créée`);
+    },
+    [slotMachines, persistSetting, addLog],
+  );
+
+  const deleteSlotMachine = useCallback(
+    (id: string) => {
+      if (slotMachines.length <= 1) return;
+      const next = slotMachines.filter((m) => m.id !== id);
+      setSlotMachines(next);
+      try {
+        localStorage.setItem('diamond_slots_machines_cache', JSON.stringify(next));
+      } catch {}
+      persistSetting('slots_machines', next);
+      addLog('Machine à sous supprimée', 'ECONOMY', `Machine ID ${id} retirée`);
+    },
+    [slotMachines, persistSetting, addLog],
+  );
+
+  const resetSlotMachinesDefaults = useCallback(() => {
+    setSlotMachines(DEFAULT_SLOT_MACHINES);
+    try {
+      localStorage.setItem('diamond_slots_machines_cache', JSON.stringify(DEFAULT_SLOT_MACHINES));
+    } catch {}
+    persistSetting('slots_machines', DEFAULT_SLOT_MACHINES);
+    addLog('Réinitialisation Machines à sous', 'ECONOMY', 'Valeurs constructeur rétablies');
+  }, [persistSetting, addLog]);
+
+  // ---------------------------------------------------------------
   // Citizens
   // ---------------------------------------------------------------
   const updateCitizen = useCallback(
@@ -610,6 +712,12 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
       updatePodiumVehicle,
       setWheelCooldownHours,
       resetWheelDefaults,
+      slotMachines,
+      updateSlotMachine,
+      updateSlotSymbol,
+      addSlotMachine,
+      deleteSlotMachine,
+      resetSlotMachinesDefaults,
       economy,
       updateEconomy,
       citizens,
@@ -638,6 +746,12 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
       updatePodiumVehicle,
       setWheelCooldownHours,
       resetWheelDefaults,
+      slotMachines,
+      updateSlotMachine,
+      updateSlotSymbol,
+      addSlotMachine,
+      deleteSlotMachine,
+      resetSlotMachinesDefaults,
       economy,
       updateEconomy,
       citizens,

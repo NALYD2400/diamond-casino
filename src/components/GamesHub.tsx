@@ -10,6 +10,7 @@ import {
   Play,
   ChevronRight,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 
@@ -68,6 +69,25 @@ export const GamesHub: React.FC = () => {
         { label: 'Attribution', value: 'Instantanée en jeu' },
       ],
       tagline: 'JEU 02 // PODIUM SHOWROOM VINEWOOD',
+    },
+    {
+      id: 'slots',
+      title: 'Diamond Reels & Slots',
+      subtitle: 'Machines à Sous Multilignes · 5x3 & 3x3',
+      badge: 'NOUVEAU · JACKPOT 1.5M+',
+      badgeType: 'hot',
+      description:
+        'Faites tourner les rouleaux haute vitesse de nos machines officielles. Alignez les Diamants, déclenchez les Multiplicateurs WILD et décrochez le Mega Jackpot progressif.',
+      image: '/diamond_chips_jackpot.jpg',
+      icon: <Sparkles className="w-8 h-8 text-amber-400" />,
+      link: '/slots',
+      metrics: [
+        { label: 'Jackpot progressif', value: '1 500 000+ jetons' },
+        { label: 'Lignes actives', value: 'Jusqu’à 20 lignes' },
+        { label: 'Bonus en jeu', value: 'Free Spins & Wilds x5' },
+        { label: 'Algorithme', value: 'Provably Fair SHA-256' },
+      ],
+      tagline: 'JEU 03 // MACHINE À SOUS OFFICIELLE DIAMOND',
     },
   ];
 
@@ -187,8 +207,8 @@ export const GamesHub: React.FC = () => {
           )}
         </motion.div>
 
-        {/* Games Grid (Only the 2 real casino games) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Games Grid (The 3 real casino games) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {games.map((game, index) => (
             <motion.div
               key={game.id}

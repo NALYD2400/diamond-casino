@@ -18,6 +18,7 @@ import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
 import { WheelOfFortune } from './components/WheelOfFortune';
 import { MinesGame } from './components/MinesGame';
+import { SlotsGame } from './components/SlotsGame';
 import { GamesHub } from './components/GamesHub';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
@@ -114,6 +115,24 @@ function MinesPage() {
       transition={{ duration: 0.3 }}
     >
       <MinesGame />
+      <Footer />
+    </motion.div>
+  );
+}
+
+/**
+ * Slots Casino Machine Route Component (/slots)
+ */
+function SlotsPage() {
+  return (
+    <motion.div
+      key="slots-page"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <SlotsGame />
       <Footer />
     </motion.div>
   );
@@ -226,6 +245,12 @@ const minesRoute = createRoute({
   component: MinesPage,
 });
 
+const slotsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/slots',
+  component: SlotsPage,
+});
+
 const gamesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/jeux',
@@ -262,6 +287,7 @@ const routeTree = rootRoute.addChildren([
   memberPortalRoute,
   luckyWheelRoute,
   minesRoute,
+  slotsRoute,
   gamesRoute,
   subscriptionsRoute,
   adminRoute,

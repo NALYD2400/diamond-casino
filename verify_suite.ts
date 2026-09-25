@@ -18,6 +18,13 @@ import {
   STRATEGY_PRESETS,
   sha256Hex,
 } from './src/components/mines/minesMath';
+import {
+  evaluateSlotSpin,
+  simulateMachineRTP,
+  DEFAULT_SLOT_MACHINES,
+  PAYLINES_5X3,
+  PAYLINES_3X3,
+} from './src/components/slots/slotsEngine';
 
 type TestCase = [string, boolean | Promise<boolean>];
 
@@ -173,6 +180,34 @@ async function main() {
       const validHash = await sha256Hex(`${b.serverSeed}:${boardStr}`);
       const tamperedHash = await sha256Hex(`tampered_${b.serverSeed}:${boardStr}`);
       return validHash === b.hash && tamperedHash !== b.hash;
+    })()],
+  ]);
+
+  await runGroup('SLOTS ENGINE & MATHEMATICS', [
+    ['DEFAULT_SLOT_MACHINES has at least 3 configured machines', DEFAULT_SLOT_MACHINES.length >= 3],
+    ['PAYLINES_5X3 has exactly 20 distinct lines and PAYLINES_3X3 has 5 lines', PAYLINES_5X3.length === 20 && PAYLINES_3X3.length === 5],
+    ['evaluateSlotSpin produces exact grid dimensions (5x3 for 5-reel)', (() => {
+      const res = evaluateSlotSpin({ machine: DEFAULT_SLOT_MACHINES[0], bet: 100 });
+      return res.grid.length === 5 && res.grid.every((col) => col.length === 3);
+    })()],
+    ['evaluateSlotSpin produces exact grid dimensions (3x3 for 3-reel)', (() => {
+      const classic = DEFAULT_SLOT_MACHINES.find((m) => m.reelsCount === 3) || DEFAULT_SLOT_MACHINES[2];
+      const res = evaluateSlotSpin({ machine: classic, bet: 100 });
+      return res.grid.length === 3 && res.grid.every((col) => col.length === 3);
+    })()],
+    ['evaluateSlotSpin calculates non-negative win and multiplier', (() => {
+      const res = evaluateSlotSpin({ machine: DEFAULT_SLOT_MACHINES[0], bet: 200 });
+      return res.totalWin >= 0 && res.totalMultiplier >= 0 && typeof res.hash === 'string';
+    })()],
+    ['simulateMachineRTP runs 2,000 spins and outputs reasonable RTP and hit rate', (() => {
+      const report = simulateMachineRTP(DEFAULT_SLOT_MACHINES[0], 2000);
+      return (
+        report.iterations === 2000 &&
+        report.simulatedRtp >= 50 &&
+        report.simulatedRtp <= 200 &&
+        report.hitRatePct >= 10 &&
+        report.durationMs < 500
+      );
     })()],
   ]);
 

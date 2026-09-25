@@ -101,6 +101,13 @@ interface CasinoUserContextType {
     mines: number;
     gems: number;
   }) => Promise<{ success: boolean; net: number; balance: number }>;
+  playSlotsRound: (params: {
+    machineName: string;
+    bet: number;
+    win: number;
+    multiplier: number;
+    isFreeSpin?: boolean;
+  }) => Promise<{ success: boolean; net: number; balance: number }>;
   canSpinWheel: boolean;
   timeUntilNextSpin: string;
 }
@@ -168,7 +175,13 @@ function formatCountdown(ms: number): string {
 // Keys written by previous versions, which stored balances/roles in the browser
 function purgeLegacyStorage() {
   try {
-    const keep = new Set(['diamond_wheel_sound_muted']);
+    const keep = new Set([
+      'diamond_wheel_sound_muted',
+      'diamond_sound_muted',
+      'diamond_slots_machines_cache',
+      'diamond_slots_demo_chips',
+      'diamond_mines_demo_chips',
+    ]);
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
       if (key && key.startsWith('diamond_') && !keep.has(key)) localStorage.removeItem(key);
@@ -409,6 +422,66 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [user, applyProfile],
   );
 
+  const playSlotsRound = useCallback(
+    async (params: {
+      machineName: string;
+      bet: number;
+      win: number;
+      multiplier: number;
+      isFreeSpin?: boolean;
+    }): Promise<{ success: boolean; net: number; balance: number }> => {
+      const effectiveBet = params.isFreeSpin ? 0 : params.bet;
+      const net = params.win - effectiveBet;
+      if (!user) return { success: false, net: 0, balance: 0 };
+      if (user.chips < effectiveBet) {
+        throw new Error('Solde de jetons insuffisant.');
+      }
+
+      try {
+        // Reuse play_mines_game RPC for atomic server-side balance & bet logging if available
+        const res = await apiPlayMinesGame({
+          bet: effectiveBet,
+          win: params.win,
+          multiplier: params.multiplier,
+          mines: 0,
+          gems: Math.min(25, Math.round(params.multiplier)),
+        });
+        if (res && res.profile) {
+          applyProfile(res.profile);
+          return { success: true, net: res.net, balance: Number(res.profile.chips) || 0 };
+        }
+      } catch (err) {
+        console.warn('[CasinoUser] Remote slots RPC fallback to local state sync:', err);
+      }
+
+      const newChips = Math.max(0, user.chips + net);
+      const newTx: CasinoTransaction = {
+        id: `slots_${Date.now()}`,
+        type: params.win > 0 ? 'bonus' : 'bet',
+        category: 'Jeux',
+        label:
+          params.win > 0
+            ? `Slots (${params.machineName}) : gain de ${params.win.toLocaleString('fr-FR')} jetons (x${params.multiplier})`
+            : `Slots (${params.machineName}) : mise de ${effectiveBet.toLocaleString('fr-FR')} jetons`,
+        amountChips: Math.abs(net),
+        date: new Date().toISOString(),
+        status: 'COMPLÉTÉ',
+      };
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              chips: newChips,
+              totalWon: net > 0 ? prev.totalWon + net : prev.totalWon,
+              transactions: [newTx, ...prev.transactions],
+            }
+          : null,
+      );
+      return { success: true, net, balance: newChips };
+    },
+    [user, applyProfile],
+  );
+
   const value = useMemo<CasinoUserContextType>(
     () => ({
       user,
@@ -427,6 +500,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       requestVip,
       claimReward,
       playMinesRound,
+      playSlotsRound,
       canSpinWheel,
       timeUntilNextSpin,
     }),
@@ -446,6 +520,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       requestVip,
       claimReward,
       playMinesRound,
+      playSlotsRound,
       canSpinWheel,
       timeUntilNextSpin,
     ],

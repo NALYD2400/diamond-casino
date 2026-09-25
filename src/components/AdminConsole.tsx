@@ -52,10 +52,11 @@ import { dbCheckHealth, type SupabaseHealthResult, supabase } from '../lib/supab
 import { getDefaultDiscordAvatar, hasAdminPermissions } from '../lib/discord';
 import { CitizenProfileSheet } from './CitizenProfileSheet';
 import { RewardsPanel } from './admin/RewardsPanel';
+import { SlotsAdminPanel } from './admin/SlotsAdminPanel';
 import { VehiclePicker } from './admin/VehiclePicker';
 import { vehicleDisplayName } from '../lib/rewards';
 
-export type AdminTab = 'overview' | 'stats' | 'citizens' | 'wheel' | 'rewards' | 'economy' | 'logs' | 'system' | 'dev';
+export type AdminTab = 'overview' | 'stats' | 'citizens' | 'wheel' | 'slots' | 'rewards' | 'economy' | 'logs' | 'system' | 'dev';
 
 interface AdminConsoleProps {
   initialTab?: AdminTab;
@@ -572,6 +573,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               <nav className="flex flex-col gap-1">
                 {[
                   { id: 'wheel', icon: Disc, label: 'Roue de Fortune' },
+                  { id: 'slots', icon: Sparkles, label: 'Machines à Sous' },
                   { id: 'rewards', icon: Car, label: 'Lots & Véhicules' },
                   { id: 'economy', icon: Coins, label: 'Économie & Caisse' },
                 ].map((item) => {
@@ -1483,6 +1485,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               </div>
             </div>
           )}
+
+          {/* TAB: SLOTS MACHINES */}
+          {activeTab === 'slots' && <SlotsAdminPanel showToast={showToast} />}
 
           {/* TAB 4: ECONOMY & VAULT */}
           {activeTab === 'rewards' && <RewardsPanel showToast={showToast} />}

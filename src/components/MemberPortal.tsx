@@ -882,7 +882,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     className="px-4 py-3 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-white font-medium text-xs sm:text-sm flex items-center gap-2 transition-all hover:scale-105 cursor-pointer"
                   >
                     <Edit3 size={15} />
-                    <span>Modifier infos RP</span>
+                    <span>Modifier infos</span>
                   </button>
                 </div>
               </div>

@@ -3,19 +3,17 @@ import { motion } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
 import { Disc, User } from 'lucide-react';
 import { fadeUp } from '../constants/animations';
+import { FallingDiamonds } from './FallingDiamonds';
 
 export const Hero: React.FC = () => {
   return (
     <section id="home" className="relative w-full min-h-[100svh] flex flex-col justify-center items-center overflow-hidden pt-28 pb-16">
-      {/* Background Video */}
-      <video
-        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260325_120549_0cd82c36-56b3-4dd9-b190-069cfc3a623f.mp4"
-        className="absolute inset-0 w-full h-full object-cover z-0 opacity-80"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
+      {/* Background: pluie de diamants */}
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,#1c1c1c_0%,#000_70%)]" />
+      <FallingDiamonds className="absolute inset-0 w-full h-full z-0" />
+
+      {/* Assombrit le centre pour garder le texte lisible */}
+      <div className="absolute inset-0 z-[1] pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_center,rgba(0,0,0,0.75),transparent)]" />
 
       {/* Gradient Masking for smooth blend to black */}
       <div className="absolute bottom-0 left-0 right-0 h-48 sm:h-72 bg-gradient-to-t from-black via-black/70 to-transparent z-[1] pointer-events-none" />

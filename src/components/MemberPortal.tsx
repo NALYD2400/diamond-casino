@@ -62,7 +62,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   const [onboardFirst, setOnboardFirst] = useState<string>('');
   const [onboardLast, setOnboardLast] = useState<string>('');
   const [onboardCitizenId, setOnboardCitizenId] = useState<string>('');
-  const [onboardPhone, setOnboardPhone] = useState<string>('');
   const [rulesAccepted, setRulesAccepted] = useState<boolean>(true);
   const [onboardSubmitting, setOnboardSubmitting] = useState<boolean>(false);
   const [onboardError, setOnboardError] = useState<string | null>(null);
@@ -100,7 +99,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
     const cleanFirst = sanitizeText(onboardFirst.trim(), 25);
     const cleanLast = sanitizeText(onboardLast.trim(), 25);
     const cleanId = sanitizeText(onboardCitizenId.trim(), 15);
-    const cleanPhone = sanitizeText(onboardPhone.trim(), 15);
 
     if (!cleanFirst || !cleanLast || !cleanId) {
       setOnboardError('Veuillez renseigner votre Prénom RP, Nom RP et Numéro Citoyen.');
@@ -118,10 +116,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
       setOnboardError('ID Citoyen invalide (chiffres, lettres et tirets uniquement).');
       return;
     }
-    if (cleanPhone && !isValidPhoneNumber(cleanPhone)) {
-      setOnboardError('Numéro de téléphone in-game invalide.');
-      return;
-    }
     if (!rulesAccepted) {
       setOnboardError('Veuillez accepter le règlement du Diamond Casino.');
       return;
@@ -133,7 +127,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         rpFirstName: cleanFirst.charAt(0).toUpperCase() + cleanFirst.slice(1),
         rpLastName: cleanLast.charAt(0).toUpperCase() + cleanLast.slice(1),
         citizenId: cleanId,
-        phoneNumber: cleanPhone,
       });
       showToast(`Bienvenue au Diamond Casino, ${cleanFirst} ! Profil créé.`);
     } catch (err: any) {
@@ -353,7 +346,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       <input
                         type="text"
                         required
-                        placeholder="Ex: Marco"
+                        placeholder="Prénom"
                         value={onboardFirst}
                         onChange={(e) => setOnboardFirst(e.target.value)}
                         className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs text-white focus:outline-none focus:border-white transition-colors"
@@ -364,7 +357,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       <input
                         type="text"
                         required
-                        placeholder="Ex: Delgado"
+                        placeholder="Nom"
                         value={onboardLast}
                         onChange={(e) => setOnboardLast(e.target.value)}
                         className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs text-white focus:outline-none focus:border-white transition-colors"
@@ -377,20 +370,9 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     <input
                       type="text"
                       required
-                      placeholder="Ex: 7418"
+                      placeholder="Votre ID"
                       value={onboardCitizenId}
                       onChange={(e) => setOnboardCitizenId(e.target.value)}
-                      className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs font-mono text-white focus:outline-none focus:border-white transition-colors"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-neutral-400">Téléphone in-game (optionnel)</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: 555-0142"
-                      value={onboardPhone}
-                      onChange={(e) => setOnboardPhone(e.target.value)}
                       className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs font-mono text-white focus:outline-none focus:border-white transition-colors"
                     />
                   </div>
@@ -635,12 +617,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               {/* Card 4: Fiche Citoyenne */}
               <div className="p-4 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
                 <div className="flex items-center justify-between text-neutral-400 text-xs">
-                  <span className="font-mono text-[11px] uppercase">Téléphone in-game</span>
+                  <span className="font-mono text-[11px] uppercase">Fiche citoyenne</span>
                   <User size={14} className="text-neutral-500" />
                 </div>
                 <div className="my-2.5">
-                  <div className="text-sm font-mono font-medium text-white truncate">
-                    {user.phoneNumber || 'Non renseigné'}
+                  <div className="text-sm font-medium text-white truncate">
+                    {user.rpFirstName} {user.rpLastName}
                   </div>
                   <span className="text-[11px] text-neutral-500 font-mono">
                     ID #{user.citizenId}
@@ -1061,15 +1043,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
                 <div>
                   <span className="text-[11px] font-mono text-neutral-500 uppercase block mb-1">
-                    Téléphone In-Game
-                  </span>
-                  <span className="font-mono text-neutral-300 text-sm">
-                    {user.phoneNumber || 'Non renseigné'}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-mono text-neutral-500 uppercase block mb-1">
                     Date d'inscription
                   </span>
                   <span className="font-mono text-neutral-300 text-sm">
@@ -1322,18 +1295,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     disabled
                     value={editCitizenId}
                     className="w-full h-8 rounded-lg bg-neutral-900 border border-neutral-800 px-2.5 text-xs font-mono text-neutral-500 cursor-not-allowed"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] text-neutral-400">Téléphone in-game</label>
-                  <input
-                    type="text"
-                    maxLength={15}
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="555-0142"
-                    className="w-full h-8 rounded-lg bg-black border border-neutral-800 px-2.5 text-xs font-mono text-white focus:outline-none focus:border-white transition-colors"
                   />
                 </div>
 

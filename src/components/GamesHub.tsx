@@ -363,11 +363,13 @@ export const GamesHub: React.FC = () => {
           to="/slots"
           className="group relative block overflow-hidden rounded-2xl min-h-[220px] sm:min-h-[260px] bg-[linear-gradient(180deg,#3fa9f5_0%,#8fd3ff_62%,#7ed957_62%,#2d7d27_100%)] shadow-lg shadow-black/50"
         >
-          <div className="absolute right-[-4%] bottom-[-6%] w-[58%] sm:w-[44%] max-w-[360px] aspect-square transition-transform duration-300 group-hover:scale-105">
-            <DogSymbol id="wild" multiplier={3} />
-          </div>
-          <div className="absolute right-[33%] bottom-[6%] w-[14%] max-w-[120px] aspect-square -rotate-6 hidden xl:block">
-            <DogSymbol id="rottweiler" />
+          <div className="absolute right-4 sm:right-8 md:right-12 bottom-3 sm:bottom-4 h-[75%] sm:h-[82%] max-h-[210px] flex items-end gap-2 sm:gap-3 pointer-events-none">
+            <div className="w-[70px] sm:w-[85px] aspect-square -rotate-6 hidden lg:block shrink-0 mb-1 drop-shadow-md">
+              <DogSymbol id="rottweiler" />
+            </div>
+            <div className="h-full aspect-square shrink-0 transition-transform duration-300 group-hover:scale-105 origin-bottom-right drop-shadow-lg">
+              <DogSymbol id="wild" multiplier={3} />
+            </div>
           </div>
           <div className="relative z-10 flex h-full max-w-[62%] sm:max-w-[52%] flex-col justify-center p-5 sm:p-8">
             <span className="mb-2 w-fit rounded-md bg-[#3b1d0e] px-2 py-0.5 text-[11px] font-extrabold text-white">

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FullscreenButton } from './FullscreenButton';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, Gift, History, Info, Menu, RotateCw, ShieldCheck, Trophy, Volume2, VolumeX, X } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
@@ -426,17 +427,21 @@ export const WheelOfFortune: React.FC = () => {
   return (
     <div className="relative bg-[#07050f] pt-[80px] sm:pt-[90px]">
       <MachineClosedBanner state={closedState} demo={false} />
-      <div className="relative w-full overflow-hidden select-none" style={{ height: 'max(720px, calc(100svh - 90px))' }}>
+      <div data-fullscreen-root
+        className="relative w-full overflow-hidden select-none" style={{ height: 'max(720px, calc(100svh - 90px))' }}>
         <WheelBackdrop mood={mood} />
 
         {/* Haut */}
         <div className="absolute top-8 sm:top-10 left-3 sm:left-6 right-3 sm:right-6 z-30 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
           <Link
             to="/jeux"
             className="flex items-center gap-2 rounded-full bg-black/80 hover:bg-black border border-white/20 hover:border-white/40 shadow-lg backdrop-blur-md px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-white transition-all hover:scale-105 active:scale-95"
           >
             <ArrowLeft size={16} /> Lobby
           </Link>
+            <FullscreenButton />
+          </div>
           <div className="flex items-center rounded-full bg-black/80 border border-white/20 shadow-lg backdrop-blur-md p-1 sm:p-1.5 text-xs sm:text-sm font-extrabold tracking-wide">
             <button
               onClick={() => !spinning && isAuthenticated && setMode('real')}

@@ -101,7 +101,6 @@ function LuckyWheelPage() {
       transition={{ duration: 0.3 }}
     >
       <WheelOfFortune />
-      <Footer />
     </motion.div>
   );
 }
@@ -119,7 +118,6 @@ function MinesPage() {
       transition={{ duration: 0.3 }}
     >
       <MinesGame />
-      <Footer />
     </motion.div>
   );
 }
@@ -137,7 +135,6 @@ function SlotsPage() {
       transition={{ duration: 0.3 }}
     >
       <DogHouseGame />
-      <Footer />
     </motion.div>
   );
 }
@@ -155,7 +152,6 @@ function WantedPage() {
       transition={{ duration: 0.3 }}
     >
       <WantedGame />
-      <Footer />
     </motion.div>
   );
 }

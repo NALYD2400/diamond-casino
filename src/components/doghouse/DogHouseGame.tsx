@@ -1342,9 +1342,9 @@ const BuyBonusButton: React.FC<{
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`${className} w-[150px] shrink-0 flex-col items-center rounded-2xl border-[4px] border-[#3b1d0e] bg-gradient-to-b from-[#ff5ab4] to-[#9a1566] p-3 shadow-[0_6px_0_#3b1d0e] hover:-translate-y-0.5 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 cursor-pointer disabled:cursor-not-allowed`}
+      className={`${className} w-[150px] shrink-0 flex flex-col items-center rounded-2xl border-[4px] border-[#3b1d0e] bg-gradient-to-b from-[#ff5ab4] to-[#9a1566] p-3 shadow-[0_6px_0_#3b1d0e] hover:-translate-y-0.5 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 cursor-pointer disabled:cursor-not-allowed`}
     >
-      <div className="w-16 h-16 -mt-1">
+      <div className="w-16 h-16 -mt-1 flex items-center justify-center">
         <DogSymbol id="scatter" />
       </div>
       <div className="dh-font text-white text-lg leading-tight mt-1">ACHETER</div>

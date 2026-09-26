@@ -6,7 +6,8 @@ import {
   Info,
   Minus,
   Plus,
-  RotateCw,
+  Play,
+  RefreshCw,
   Settings,
   Volume2,
   VolumeX,
@@ -1226,28 +1227,29 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
         </div>
 
         {/* Droite : − SPIN + / auto / turbo */}
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2 sm:gap-3">
+        <div
+          className="justify-self-end flex flex-col items-center gap-2"
+          style={{ '--slot-accent': '#ffcf3f', '--slot-glow': 'rgba(255,207,63,0.55)' } as React.CSSProperties}
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
             <button
               onClick={p.onDec}
               disabled={p.locked || !p.canDec}
               title="Diminuer la mise"
               aria-label="Diminuer la mise"
-              className="w-10 h-10 rounded-lg bg-black/40 text-white flex items-center justify-center hover:bg-black/60 disabled:opacity-30"
+              className="slot-ctrl"
             >
-              <Minus size={22} strokeWidth={3} />
+              <Minus size={24} strokeWidth={3} />
             </button>
             <button
               onClick={p.onSpin}
               aria-label="Tourner"
               title="Tourner (ESPACE)"
-              className={`dh-spin-btn relative w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform ${
-                p.spinning ? 'dh-spinning' : ''
-              }`}
+              className={`slot-spin w-[80px] h-[80px] sm:w-[96px] sm:h-[96px] ${p.spinning ? 'is-spinning' : ''}`}
             >
-              <RotateCw className="dh-spin-arrows w-full h-full" strokeWidth={2.2} />
+              <RefreshCw className={`slot-spin-icon ${p.autoLeft > 0 ? 'opacity-30' : ''}`} strokeWidth={2.6} />
               {p.autoLeft > 0 && (
-                <span className="absolute inset-0 flex items-center justify-center dh-font text-xl text-[#ffe14a]">
+                <span className="absolute inset-0 flex items-center justify-center dh-font text-2xl text-[#ffe14a]">
                   {p.autoLeft}
                 </span>
               )}
@@ -1257,26 +1259,25 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
               disabled={p.locked || !p.canInc}
               title="Augmenter la mise"
               aria-label="Augmenter la mise"
-              className="w-10 h-10 rounded-lg bg-black/40 text-white flex items-center justify-center hover:bg-black/60 disabled:opacity-30"
+              className="slot-ctrl"
             >
-              <Plus size={22} strokeWidth={3} />
+              <Plus size={24} strokeWidth={3} />
             </button>
           </div>
-          <div className="flex items-center gap-2 pr-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={p.onTurbo}
-              className={`flex items-center gap-1 dh-font text-[11px] px-2 py-0.5 rounded-full border ${
-                p.turbo ? 'bg-[#ffcf3f] text-[#3b1d0e] border-[#ffcf3f]' : 'text-white border-white/50'
-              }`}
+              aria-pressed={p.turbo}
+              className={`slot-pill dh-font ${p.turbo ? '!bg-[#ffcf3f] !text-[#3b1d0e] !border-[#ffcf3f]' : ''}`}
             >
-              <Zap size={11} /> TURBO
+              <Zap size={13} fill={p.turbo ? 'currentColor' : 'none'} /> TURBO
             </button>
             <button
               onClick={p.onAuto}
-              className={`dh-font text-[11px] px-2 py-0.5 rounded-full border ${
-                p.autoLeft > 0 ? 'bg-[#ff5a5a] text-white border-[#ff5a5a]' : 'text-white border-white/50'
-              }`}
+              aria-pressed={p.autoLeft > 0}
+              className={`slot-pill dh-font ${p.autoLeft > 0 ? '!bg-[#ff5a5a] !border-[#ff5a5a]' : ''}`}
             >
+              {p.autoLeft > 0 ? <X size={13} /> : <Play size={12} fill="currentColor" />}
               {p.autoLeft > 0 ? 'STOP AUTO' : 'AUTOPLAY'}
             </button>
           </div>

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FullscreenButton } from '../FullscreenButton';
 import { Link } from '@tanstack/react-router';
-import { ArrowLeft, Info, Menu, Minus, Play, Plus, RotateCw, Volume2, VolumeX, X, Zap } from 'lucide-react';
+import { ArrowLeft, Info, Menu, Minus, Play, Plus, RefreshCw, RotateCw, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
@@ -1127,28 +1127,29 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
         </div>
 
         {/* Droite : − SPIN + / turbo / auto */}
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2 sm:gap-3">
+        <div
+          className="justify-self-end flex flex-col items-center gap-2"
+          style={{ '--slot-accent': '#e0b040', '--slot-glow': 'rgba(224,176,64,0.55)' } as React.CSSProperties}
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
             <button
               onClick={p.onDec}
               disabled={p.locked || !p.canDec}
               title="Diminuer la mise"
               aria-label="Diminuer la mise"
-              className="w-10 h-10 rounded-lg bg-black/40 text-white flex items-center justify-center hover:bg-black/60 disabled:opacity-30"
+              className="slot-ctrl"
             >
-              <Minus size={22} strokeWidth={3} />
+              <Minus size={24} strokeWidth={3} />
             </button>
             <button
               onClick={p.onSpin}
               aria-label="Tourner"
               title="Tourner (ESPACE)"
-              className={`dh-spin-btn relative w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform ${
-                p.spinning ? 'dh-spinning' : ''
-              }`}
+              className={`slot-spin w-[80px] h-[80px] sm:w-[96px] sm:h-[96px] ${p.spinning ? 'is-spinning' : ''}`}
             >
-              <RotateCw className="dh-spin-arrows w-full h-full" strokeWidth={2.2} />
+              <RefreshCw className={`slot-spin-icon ${p.autoLeft > 0 ? 'opacity-30' : ''}`} strokeWidth={2.6} />
               {p.autoLeft > 0 && (
-                <span className="absolute inset-0 flex items-center justify-center font-['Oswald'] font-bold text-xl text-[#e0b040]">
+                <span className="absolute inset-0 flex items-center justify-center font-['Oswald'] font-bold text-2xl text-[#e0b040]">
                   {p.autoLeft}
                 </span>
               )}
@@ -1158,29 +1159,29 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
               disabled={p.locked || !p.canInc}
               title="Augmenter la mise"
               aria-label="Augmenter la mise"
-              className="w-10 h-10 rounded-lg bg-black/40 text-white flex items-center justify-center hover:bg-black/60 disabled:opacity-30"
+              className="slot-ctrl"
             >
-              <Plus size={22} strokeWidth={3} />
+              <Plus size={24} strokeWidth={3} />
             </button>
           </div>
-          <div className="flex items-center gap-2 pr-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={p.onTurbo}
               aria-pressed={p.turbo}
-              className={`flex items-center gap-1 font-['Oswald'] font-bold tracking-wide text-[11px] px-2 py-0.5 rounded-full border ${
-                p.turbo ? 'bg-[#e0b040] text-[#1c120c] border-[#e0b040]' : 'text-white border-white/50'
+              className={`slot-pill font-['Oswald'] font-bold tracking-wide ${
+                p.turbo ? '!bg-[#e0b040] !text-[#1c120c] !border-[#e0b040]' : ''
               }`}
             >
-              <Zap size={11} fill={p.turbo ? 'currentColor' : 'none'} /> TURBO
+              <Zap size={13} fill={p.turbo ? 'currentColor' : 'none'} /> TURBO
             </button>
             <button
               onClick={p.onAuto}
               aria-pressed={p.autoLeft > 0}
-              className={`flex items-center gap-1 font-['Oswald'] font-bold tracking-wide text-[11px] px-2 py-0.5 rounded-full border ${
-                p.autoLeft > 0 ? 'bg-[#c2231a] text-white border-[#c2231a]' : 'text-white border-white/50'
+              className={`slot-pill font-['Oswald'] font-bold tracking-wide ${
+                p.autoLeft > 0 ? '!bg-[#c2231a] !border-[#c2231a]' : ''
               }`}
             >
-              {p.autoLeft > 0 ? <X size={11} /> : <Play size={10} fill="currentColor" />}
+              {p.autoLeft > 0 ? <X size={13} /> : <Play size={12} fill="currentColor" />}
               {p.autoLeft > 0 ? 'STOP AUTO' : 'AUTOPLAY'}
             </button>
           </div>

@@ -9,12 +9,57 @@ export const SUPABASE_URL: string =
 export const SUPABASE_ANON_KEY: string =
   import.meta.env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_COqb4-9k3vwQUTj6vu_eyw_uuWGps01';
 
+// -------------------------------------------------------------
+// Disjoncteur anti-boucle : chaque requête HTTP vers Supabase produit une
+// ligne de log (quota « Log Ingestion »). Si un même endpoint est appelé
+// anormalement souvent (bug de boucle de rendu, onglet oublié…), on coupe
+// côté navigateur au lieu d'inonder le serveur. Les actions de jeu
+// (tours, clics mines) ont un plafond large pour ne pas gêner l'autoplay.
+// -------------------------------------------------------------
+const BREAKER_WINDOW_MS = 60_000;
+const BREAKER_DEFAULT_MAX = 40;
+const BREAKER_GAME_MAX = 240;
+const GAME_ENDPOINTS = /\/(functions\/v1\/slot-round|rest\/v1\/rpc\/(mines_reveal|mines_start|mines_cashout|spin_wheel))$/;
+const breakerHits = new Map<string, number[]>();
+const breakerWarned = new Set<string>();
+
+const guardedFetch: typeof fetch = (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+  const path = url.replace(SUPABASE_URL, '').split('?')[0];
+  // Les jetons d'auth doivent toujours pouvoir se rafraîchir
+  if (path.startsWith('/auth/')) return fetch(input, init);
+
+  const key = `${method} ${path}`;
+  const now = Date.now();
+  const hits = (breakerHits.get(key) ?? []).filter((t) => now - t < BREAKER_WINDOW_MS);
+  const max = GAME_ENDPOINTS.test(path) ? BREAKER_GAME_MAX : BREAKER_DEFAULT_MAX;
+  if (hits.length >= max) {
+    breakerHits.set(key, hits);
+    if (!breakerWarned.has(key)) {
+      breakerWarned.add(key);
+      console.error(`[Supabase] Disjoncteur : ${key} appelé ${hits.length}× en 1 min — requêtes bloquées (boucle probable).`);
+      setTimeout(() => breakerWarned.delete(key), BREAKER_WINDOW_MS);
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ message: 'CLIENT_RATE_LIMIT', code: 'CLIENT_RATE_LIMIT' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  }
+  hits.push(now);
+  breakerHits.set(key, hits);
+  return fetch(input, init);
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },
+  global: { fetch: guardedFetch },
 });
 
 // -------------------------------------------------------------

@@ -6,7 +6,7 @@ import { fadeUp } from '../constants/animations';
 
 export const Hero: React.FC = () => {
   return (
-    <section id="home" className="relative w-full min-h-[100svh] flex flex-col justify-between items-center overflow-hidden pt-28 pb-16 sm:pb-24">
+    <section id="home" className="relative w-full h-[100svh] flex flex-col justify-between items-center overflow-hidden pt-28 pb-10 sm:pb-14">
       {/* Background: vidéo animée de diamants */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <video

@@ -9,10 +9,6 @@ import {
 import { motion } from 'framer-motion';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
-import { Discovery } from './components/Discovery';
-import { Mission } from './components/Mission';
-import { Architecture } from './components/Architecture';
-import { CtaStream } from './components/CtaStream';
 import { Footer } from './components/Footer';
 import { MemberPortal } from './components/MemberPortal';
 import { WheelOfFortune } from './components/WheelOfFortune';
@@ -60,13 +56,9 @@ function LandingPage() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4 }}
+      className="h-[100svh] overflow-hidden"
     >
       <Hero />
-      <Discovery />
-      <Mission />
-      <Architecture />
-      <CtaStream view404={false} />
-      <Footer />
     </motion.div>
   );
 }

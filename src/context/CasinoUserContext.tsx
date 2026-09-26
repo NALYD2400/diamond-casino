@@ -99,6 +99,8 @@ interface CasinoUserContextType {
   claimReward: (rewardId: string) => Promise<void>;
   /** Applique un profil renvoyé par le serveur (après une manche de jeu) */
   applyServerProfile: (profile: ProfilePayload) => void;
+  /** À appeler dans un useEffect par les écrans qui affichent l'historique ; renvoie le désabonnement */
+  watchHistory: () => () => void;
   canSpinWheel: boolean;
   timeUntilNextSpin: string;
 }
@@ -164,6 +166,7 @@ function purgeLegacyStorage() {
     const keep = new Set([
       'diamond_wheel_sound_muted',
       'diamond_sound_muted',
+      'diamond_sound_volume',
       'diamond_slots_machines_cache',
       'diamond_slots_demo_chips',
       'diamond_mines_demo_chips',
@@ -188,9 +191,20 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const tabIdRef = useRef<string>(Math.random().toString(36).slice(2));
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
 
+  // L'historique (transactions + récompenses) n'est affiché que dans l'espace
+  // membre : on ne le recharge que si un écran l'affiche, sinon on le marque
+  // « à recharger ». Évite 2 requêtes de 50 lignes après chaque tour de jeu.
+  const historyWatchers = useRef(0);
+  const historyStale = useRef(true);
+  const profileIdRef = useRef<string | null>(null);
+  // Dernier profil appliqué : l'écho temps réel d'un tour qu'on vient de jouer
+  // porte le même solde, inutile de relire le profil au serveur.
+  const lastApplied = useRef({ at: 0, chips: NaN });
+
   const loadTransactions = useCallback(async (profileId: string) => {
     try {
       const [rows, rewards] = await Promise.all([dbFetchTransactions(profileId, 50), dbFetchMyRewards(profileId)]);
+      historyStale.current = false;
       setUser((prev) =>
         prev && prev.id === profileId ? { ...prev, transactions: rows.map(mapTransaction), rewards } : prev,
       );
@@ -198,6 +212,14 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.warn('[CasinoUser] history unavailable:', err);
     }
   }, []);
+
+  const watchHistory = useCallback(() => {
+    historyWatchers.current++;
+    if (historyStale.current && profileIdRef.current) void loadTransactions(profileIdRef.current);
+    return () => {
+      historyWatchers.current--;
+    };
+  }, [loadTransactions]);
 
   const applyProfile = useCallback(
     (profile: ProfilePayload, broadcast = true) => {
@@ -209,7 +231,10 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ),
       );
       setPendingDiscordUser(null);
-      void loadTransactions(profile.id);
+      profileIdRef.current = profile.id;
+      lastApplied.current = { at: Date.now(), chips: profile.chips };
+      historyStale.current = true;
+      if (historyWatchers.current > 0) void loadTransactions(profile.id);
 
       if (broadcast && typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         try {
@@ -300,7 +325,12 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
-        () => {
+        (payload) => {
+          // Écho d'un changement déjà appliqué ici (tour de jeu, roue…) : rien à relire.
+          // Un ajustement staff change le solde, donc passe toujours.
+          const next = payload.new as { chips?: number };
+          const last = lastApplied.current;
+          if (Date.now() - last.at < 3000 && next?.chips === last.chips) return;
           if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
           realtimeTimer.current = setTimeout(() => {
             apiGetMyProfile()
@@ -342,6 +372,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const logout = useCallback(async () => {
     loadSeq.current++;
+    profileIdRef.current = null;
     setUser(null);
     setPendingDiscordUser(null);
     await supabase.auth.signOut().catch(() => {});
@@ -437,6 +468,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       buyVipWithChips,
       claimReward,
       applyServerProfile,
+      watchHistory,
       canSpinWheel,
       timeUntilNextSpin,
     }),
@@ -457,6 +489,7 @@ export const CasinoUserProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       buyVipWithChips,
       claimReward,
       applyServerProfile,
+      watchHistory,
       canSpinWheel,
       timeUntilNextSpin,
     ],

@@ -1,6 +1,32 @@
+import { SampleBank, getSharedAudioContext } from '../slots/sampleBank';
+
+const BASE_URL = '/sounds/wheel/';
+
+const SAMPLES = {
+  spin: 'spin.mp3',
+  tick1: 'tick-1.mp3',
+  tick2: 'tick-2.mp3',
+  tick3: 'tick-3.mp3',
+  stop: 'stop.mp3',
+  suspense: 'suspense.mp3',
+  bell: 'bell.mp3',
+  winSmall: 'win-small.mp3',
+  winMedium: 'win-medium.mp3',
+  winBig: 'win-big.mp3',
+  coin1: 'coin-1.mp3',
+  coin2: 'coin-2.mp3',
+  coin3: 'coin-3.mp3',
+  coinsShower: 'coins-shower.mp3',
+} as const;
+
+type WheelSampleName = keyof typeof SAMPLES;
+
 /**
- * Synthesised sound design for the fortune wheel (Web Audio API, no audio files).
- * The AudioContext must be created from a user gesture: call `unlock()` in the click handler.
+ * Realistic sound design for the fortune wheel:
+ * - Real recorded mechanical flapper ratchet clicks against pegs
+ * - Real mechanical wheel spin whirr
+ * - Real casino jackpot bells and celebration jingles
+ * - Web Audio procedural synthesis as zero-dependency fallback
  */
 export class WheelAudio {
   private ctx: AudioContext | null = null;
@@ -8,19 +34,45 @@ export class WheelAudio {
   private noise: AudioBuffer | null = null;
   private drone: { nodes: AudioScheduledSourceNode[]; gain: GainNode; filter: BiquadFilterNode } | null = null;
   private lastTickAt = 0;
-  muted = false;
+  private _muted = false;
+  private _volume = 0.8;
+  private readonly bank = new SampleBank<WheelSampleName>(BASE_URL, SAMPLES);
+
+  get muted() {
+    return this._muted;
+  }
+  set muted(v: boolean) {
+    this._muted = v;
+    this.bank.muted = v;
+    this.applyGain();
+  }
+
+  get volume() {
+    return this._volume;
+  }
+  set volume(v: number) {
+    this._volume = Math.max(0, Math.min(1, v));
+    this.bank.volume = this._volume;
+    this.applyGain();
+  }
+
+  private applyGain(): void {
+    if (this.master && this.ctx) {
+      const target = this._muted ? 0 : this._volume * 0.9;
+      this.master.gain.setValueAtTime(target, this.ctx.currentTime);
+    }
+  }
 
   unlock(): void {
+    this.bank.unlock();
     try {
-      if (!this.ctx || this.ctx.state === 'closed') {
-        const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (!Ctor) return;
-        this.ctx = new Ctor();
+      this.ctx = getSharedAudioContext();
+      if (this.ctx && (!this.master || this.master.context !== this.ctx)) {
         const compressor = this.ctx.createDynamicsCompressor();
         compressor.threshold.value = -14;
         compressor.ratio.value = 4;
         this.master = this.ctx.createGain();
-        this.master.gain.value = 0.9;
+        this.master.gain.value = this._muted ? 0 : this._volume * 0.9;
         this.master.connect(compressor).connect(this.ctx.destination);
 
         const length = Math.floor(this.ctx.sampleRate * 1.5);
@@ -28,14 +80,14 @@ export class WheelAudio {
         const data = this.noise.getChannelData(0);
         for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
       }
-      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume();
     } catch {
       this.ctx = null;
     }
   }
 
   private ready(): AudioContext | null {
-    return this.muted || !this.ctx || !this.master ? null : this.ctx;
+    return this._muted || !this.ctx || !this.master ? null : this.ctx;
   }
 
   private noiseSource(ctx: AudioContext): AudioBufferSourceNode {
@@ -44,84 +96,105 @@ export class WheelAudio {
     return src;
   }
 
-  /** Launch: airy whoosh */
+  /** Launch: subtle mechanical wheel spin whoosh & bearing engagement */
   whoosh(): void {
+    if (this.bank.play('spin', 0.50)) return;
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
     const src = this.noiseSource(ctx);
     const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.Q.value = 1.2;
-    filter.frequency.setValueAtTime(2800, t);
-    filter.frequency.exponentialRampToValueAtTime(350, t + 1.1);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(320, t);
+    filter.frequency.exponentialRampToValueAtTime(140, t + 0.55);
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    gain.gain.exponentialRampToValueAtTime(0.08, t + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
     src.connect(filter).connect(gain).connect(this.master!);
-    src.start(t);
-    src.stop(t + 1.25);
+    src.start(t, Math.random() * 0.5);
+    src.stop(t + 0.58);
   }
 
   /** Ratchet click when a stud hits the flapper. `speed` 0..1 (1 = full speed). */
   tick(speed: number): void {
-    const ctx = this.ready();
-    if (!ctx || !this.noise) return;
     const now = performance.now();
-    if (now - this.lastTickAt < 18) return; // avoid a wall of sound at full speed
+    // Progressive throttle at high speed to avoid an abrasive machine-gun burst
+    const minInterval = speed > 0.65 ? 36 : 22;
+    if (now - this.lastTickAt < minInterval) return;
     this.lastTickAt = now;
 
+    // Soft, realistic mechanical flapper ratchet clicks against brass pins
+    const pick = (Math.random() < 0.4 ? 'tick1' : Math.random() < 0.7 ? 'tick2' : 'tick3') as WheelSampleName;
+    const rate = 0.94 + 0.14 * speed + (Math.random() * 0.06 - 0.03);
+    // Subtle, balanced volume: soft flutter at high speed, satisfying tactile pop at slow speed
+    const volume = 0.20 + 0.14 * (1 - speed);
+
+    if (this.bank.play(pick, volume, rate)) {
+      return;
+    }
+
+    const ctx = this.ready();
+    if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
-    const volume = 0.22 + 0.18 * (1 - speed); // slower = more distinct, heavier clicks
+    const synthVolume = 0.10 + 0.08 * (1 - speed);
 
-    // Sharp wooden click
+    // Warm, muted wooden/leather flapper click (no piercing highs)
     const click = this.noiseSource(ctx);
-    const hp = ctx.createBiquadFilter();
-    hp.type = 'bandpass';
-    hp.frequency.value = 3200 - 1200 * (1 - speed);
-    hp.Q.value = 2.5;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1350 - 350 * (1 - speed);
+    bp.Q.value = 1.8;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1800;
     const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(volume, t);
-    clickGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
-    click.connect(hp).connect(clickGain).connect(this.master!);
+    clickGain.gain.setValueAtTime(synthVolume, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.022);
+    click.connect(bp).connect(lp).connect(clickGain).connect(this.master!);
     click.start(t, Math.random() * 1.2);
-    click.stop(t + 0.03);
+    click.stop(t + 0.025);
 
-    // Body knock
+    // Subtle low-mid wooden resonance
     const body = ctx.createOscillator();
     body.type = 'sine';
-    body.frequency.setValueAtTime(420, t);
-    body.frequency.exponentialRampToValueAtTime(110, t + 0.05);
+    body.frequency.setValueAtTime(260, t);
+    body.frequency.exponentialRampToValueAtTime(85, t + 0.04);
     const bodyGain = ctx.createGain();
-    bodyGain.gain.setValueAtTime(volume * 0.8, t);
-    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    bodyGain.gain.setValueAtTime(synthVolume * 0.55, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
     body.connect(bodyGain).connect(this.master!);
     body.start(t);
-    body.stop(t + 0.07);
+    body.stop(t + 0.05);
+  }
+
+  /** Stop mechanical latch impact when the wheel settles */
+  stop(): void {
+    this.bank.play('stop', 1.0);
   }
 
   /** Rising tension drone for the final crawl */
   startSuspense(durationSec: number): void {
+    if (this.bank.play('suspense', 0.85)) return;
     const ctx = this.ready();
     if (!ctx || this.drone) return;
     const t = ctx.currentTime;
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.Q.value = 6;
+    filter.Q.value = 4;
     filter.frequency.setValueAtTime(180, t);
-    filter.frequency.exponentialRampToValueAtTime(1400, t + durationSec);
+    filter.frequency.exponentialRampToValueAtTime(480, t + durationSec);
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(0.09, t + durationSec * 0.8);
     filter.connect(gain).connect(this.master!);
 
     const nodes: AudioScheduledSourceNode[] = [];
-    [55, 55.6, 82.4].forEach((freq) => {
+    [55, 110, 165].forEach((freq) => {
       const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
+      osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, t);
-      osc.frequency.linearRampToValueAtTime(freq * 1.5, t + durationSec);
+      osc.frequency.linearRampToValueAtTime(freq * 1.25, t + durationSec);
       osc.connect(filter);
       osc.start(t);
       nodes.push(osc);
@@ -160,6 +233,11 @@ export class WheelAudio {
 
   /** Stop impact + victory fanfare (longer for rare prizes) */
   win(big: boolean): void {
+    this.bank.play('bell', 0.9);
+    if (this.bank.play(big ? 'winBig' : 'winMedium', 0.95)) {
+      this.bank.play('coinsShower', 0.7);
+      return;
+    }
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -217,8 +295,10 @@ export class WheelAudio {
 
   close(): void {
     this.stopSuspense();
-    this.ctx?.close().catch(() => {});
-    this.ctx = null;
+    this.bank.close();
+    this.master?.disconnect();
     this.master = null;
+    this.ctx = null;
   }
 }
+

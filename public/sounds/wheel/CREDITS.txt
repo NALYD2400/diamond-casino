@@ -1,0 +1,9 @@
+Sons de la Roue de la Fortune (The Diamond Casino) — CC0 (domaine public).
+
+- Lancement de la roue (spin) : Impulsion mécanique bois & roulement fluide aérodynamique (Kenney Impact Sounds & synth acoustique)
+- Tics du clapet / picots (tick-1, tick-2, tick-3) : "Interface Sounds" par Kenney
+- Clapet d'arrêt & Verrouillage (stop) : "Impact Sounds" (impactWood_heavy) & "RPG Audio" par Kenney
+- Cloche du Jackpot (bell) : "Impact Sounds" (impactBell_heavy) par Kenney
+- Jingles & Pièces : "Music Jingles" & "Casino Audio" par Kenney
+
+Fichiers traités et masterisés en MP3 avec ffmpeg.

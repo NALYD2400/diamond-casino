@@ -3,11 +3,13 @@ import { Link } from '@tanstack/react-router';
 import { ArrowLeft, Info, Menu, Minus, Play, Plus, RotateCw, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
+import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
 import { clampBetLevels } from '../../lib/gamesConfig';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
 import { WantedAudio } from './wantedAudio';
+import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
 import { WantedLogo, WantedSymbol } from './WantedSymbols';
 import {
   BONUS_INFO,
@@ -80,6 +82,7 @@ export const WantedGame: React.FC = () => {
   const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
   const { gamesConfig } = useCasinoAdmin();
   const cfg = gamesConfig.wanted;
+  const closed = useMachineClosed('wanted');
   const buyPrices = cfg.buyPrices;
   const betLevels = useMemo(() => clampBetLevels(BET_LEVELS, cfg.minBet, cfg.maxBet), [cfg.minBet, cfg.maxBet]);
 
@@ -119,6 +122,9 @@ export const WantedGame: React.FC = () => {
   const balance = mode === 'real' ? (user?.chips ?? 0) : demoChips;
   const [hiddenWin, setHiddenWin] = useState(0);
   const displayCredit = Math.max(0, balance - hiddenWin);
+  // Machine fermée par la direction : plus de mise en jetons (le serveur refuse aussi)
+  const blockedRef = useRef(false);
+  blockedRef.current = !!closed && mode === 'real';
 
   // ---------------------------------------------------------------------------
   // État de jeu
@@ -161,9 +167,33 @@ export const WantedGame: React.FC = () => {
       return false;
     }
   });
+  const [volume, setVolume] = useState(() => {
+    try {
+      const v = localStorage.getItem('diamond_sound_volume');
+      if (v !== null) {
+        const parsed = parseFloat(v);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
+      }
+      return 0.8;
+    } catch {
+      return 0.8;
+    }
+  });
+
   const audio = useRef(new WantedAudio());
+  audio.current.volume = volume;
   audio.current.muted = muted;
   useEffect(() => () => audio.current.close(), []);
+
+  const handleVolumeChange = useCallback((newVol: number) => {
+    const clamped = Math.max(0, Math.min(1, Math.round(newVol * 100) / 100));
+    setVolume(clamped);
+    if (clamped > 0 && muted) {
+      setMuted(false);
+      try { localStorage.setItem('diamond_sound_muted', 'false'); } catch {}
+    }
+    try { localStorage.setItem('diamond_sound_volume', String(clamped)); } catch {}
+  }, [muted]);
 
   const turboRef = useRef(turbo);
   turboRef.current = turbo;
@@ -395,6 +425,11 @@ export const WantedGame: React.FC = () => {
   const playRound = useCallback(
     async (buy: WantedBonus | null) => {
       if (busyRef.current) return;
+      if (blockedRef.current) {
+        setMessage('MACHINE FERMÉE');
+        setAutoLeft(0);
+        return;
+      }
       const cost = buy ? bet * buyPrices[buy] : bet;
       if (displayCredit < cost) {
         setMessage('SOLDE INSUFFISANT');
@@ -524,6 +559,7 @@ export const WantedGame: React.FC = () => {
 
   return (
     <div className="relative bg-[#120a07] pt-[80px] sm:pt-[90px]">
+      <MachineClosedBanner state={closed} />
       <div className="relative w-full overflow-hidden select-none" style={{ height: 'max(680px, calc(100svh - 90px))' }}>
         <Backdrop theme={theme} />
 
@@ -622,6 +658,7 @@ export const WantedGame: React.FC = () => {
           autoLeft={autoLeft}
           turbo={turbo}
           muted={muted}
+          volume={volume}
           canDec={betIdx > 0}
           canInc={betIdx < betLevels.length - 1}
           onDec={() => setBetIdx((i) => Math.max(0, i - 1))}
@@ -632,6 +669,7 @@ export const WantedGame: React.FC = () => {
           onMenu={() => setMenuOpen(true)}
           onInfo={() => setInfoOpen(true)}
           onMute={toggleMute}
+          onVolumeChange={handleVolumeChange}
           onBuy={cfg.buyEnabled ? () => setBuyOpen(true) : undefined}
           buyDisabled={locked || !!bonusState}
         />
@@ -690,7 +728,13 @@ export const WantedGame: React.FC = () => {
         {menuOpen && (
           <Modal title="MENU" onClose={() => setMenuOpen(false)}>
             <div className="space-y-2">
-              <MenuRow icon={muted ? <VolumeX size={18} /> : <Volume2 size={18} />} label={muted ? 'Activer le son' : 'Couper le son'} onClick={toggleMute} />
+              <GameVolumeModalRow
+                muted={muted}
+                volume={volume}
+                onMute={toggleMute}
+                onVolumeChange={handleVolumeChange}
+                accentClass="accent-[#e0b040]"
+              />
               <MenuRow icon={<Zap size={18} />} label={turbo ? 'Désactiver le turbo' : 'Activer le turbo'} onClick={() => setTurbo((t) => !t)} />
               <MenuRow
                 icon={<Info size={18} />}
@@ -1005,6 +1049,7 @@ interface ControlBarProps {
   autoLeft: number;
   turbo: boolean;
   muted: boolean;
+  volume: number;
   canDec: boolean;
   canInc: boolean;
   onDec: () => void;
@@ -1015,6 +1060,7 @@ interface ControlBarProps {
   onMenu: () => void;
   onInfo: () => void;
   onMute: () => void;
+  onVolumeChange: (vol: number) => void;
   onBuy?: () => void;
   buyDisabled: boolean;
 }
@@ -1033,9 +1079,13 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
             <button onClick={p.onInfo} title="Table des gains et règles" aria-label="Table des gains" className="text-white/85 hover:text-white">
               <Info size={18} />
             </button>
-            <button onClick={p.onMute} title={p.muted ? 'Activer le son' : 'Couper le son'} aria-label="Son" className="text-white/85 hover:text-white">
-              {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </button>
+            <GameVolumeButton
+              muted={p.muted}
+              volume={p.volume}
+              onMute={p.onMute}
+              onVolumeChange={p.onVolumeChange}
+              accentClass="accent-[#e0b040]"
+            />
           </div>
           <div className="leading-tight min-w-0 font-['Oswald'] font-bold tracking-wide">
             <div className="text-[13px] sm:text-base whitespace-nowrap">

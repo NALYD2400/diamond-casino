@@ -19,10 +19,12 @@ import {
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
+import { MachineClosedBanner, useMachineClosed } from './MachineClosedBanner';
 import { apiMinesCashout, apiMinesCurrent, apiMinesReveal, apiMinesStart, CasinoApiError, type MinesRoundState } from '../lib/supabase';
 import { clampBetLevels } from '../lib/gamesConfig';
 import { MinesAudio } from './mines/minesAudio';
 import { SampleBank } from './slots/sampleBank';
+import { GameVolumeButton, GameVolumeModalRow } from './VolumeControl';
 import { useSlotTimeline } from './slots/useSlotTimeline';
 import { BlastArt, BombArt, GemArt, MinesBackdrop, MinesLogo, RockChips, RockFace, type MinesMood } from './mines/MinesArt';
 import {
@@ -69,6 +71,9 @@ export const MinesGame: React.FC = () => {
   const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
   const { gamesConfig } = useCasinoAdmin();
   const cfg = gamesConfig.mines;
+  const closed = useMachineClosed('mines');
+  const closedRef = useRef(closed);
+  closedRef.current = closed;
   const rtp = cfg.rtp / 100;
   const betLevels = useMemo(() => clampBetLevels(BET_LEVELS, cfg.minBet, cfg.maxBet), [cfg.minBet, cfg.maxBet]);
 
@@ -132,9 +137,22 @@ export const MinesGame: React.FC = () => {
       return false;
     }
   });
+  const [volume, setVolume] = useState(() => {
+    try {
+      const v = localStorage.getItem('diamond_sound_volume');
+      if (v !== null) {
+        const parsed = parseFloat(v);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
+      }
+      return 0.8;
+    } catch {
+      return 0.8;
+    }
+  });
+
   const audio = useRef(new MinesAudio());
   const samples = useRef(
-    new SampleBank<SampleName>('/sounds/wanted/', {
+    new SampleBank<SampleName>('/sounds/mines/', {
       coin1: 'coin-1.mp3',
       coin2: 'coin-2.mp3',
       coin3: 'coin-3.mp3',
@@ -144,6 +162,8 @@ export const MinesGame: React.FC = () => {
       shower: 'coins-shower.mp3',
     }),
   );
+  audio.current.volume = volume;
+  samples.current.volume = volume;
   audio.current.muted = muted;
   samples.current.muted = muted;
   useEffect(
@@ -153,6 +173,16 @@ export const MinesGame: React.FC = () => {
     },
     [],
   );
+
+  const handleVolumeChange = useCallback((newVol: number) => {
+    const clamped = Math.max(0, Math.min(1, Math.round(newVol * 100) / 100));
+    setVolume(clamped);
+    if (clamped > 0 && muted) {
+      setMuted(false);
+      try { localStorage.setItem('diamond_sound_muted', 'false'); } catch {}
+    }
+    try { localStorage.setItem('diamond_sound_volume', String(clamped)); } catch {}
+  }, [muted]);
   const unlockAudio = () => {
     audio.current.unlock();
     samples.current.unlock();
@@ -219,6 +249,11 @@ export const MinesGame: React.FC = () => {
     if (busyRef.current || phase !== 'idle') return;
     unlockAudio();
     if (mode === 'real') {
+      // Machine fermée par la direction (le serveur refuse aussi la mise)
+      if (closedRef.current) {
+        setMessage('MACHINE FERMÉE');
+        return;
+      }
       if (!isAuthenticated || !user) {
         setMode('demo');
         setMessage('CONNECTEZ-VOUS POUR MISER VOS JETONS');
@@ -480,6 +515,7 @@ export const MinesGame: React.FC = () => {
 
   return (
     <div className="relative bg-[#07050f] pt-[80px] sm:pt-[90px]">
+      <MachineClosedBanner state={closed} />
       <div className="relative w-full overflow-hidden select-none" style={{ height: 'max(700px, calc(100svh - 90px))' }}>
         <MinesBackdrop mood={mood} />
 
@@ -616,6 +652,7 @@ export const MinesGame: React.FC = () => {
           potential={potentialWin}
           multiplier={multiplier}
           muted={muted}
+          volume={volume}
           canDec={phase === 'idle' && betIdx > 0}
           canInc={phase === 'idle' && betIdx < betLevels.length - 1}
           onDec={() => changeBet(-1)}
@@ -626,6 +663,7 @@ export const MinesGame: React.FC = () => {
           onMenu={() => setMenuOpen(true)}
           onInfo={() => setInfoOpen(true)}
           onMute={toggleMute}
+          onVolumeChange={handleVolumeChange}
         />
 
         {bigWin && <BigWinOverlay amount={bigWin.shown} mult={bigWin.mult} onClick={skipAll} />}
@@ -645,7 +683,13 @@ export const MinesGame: React.FC = () => {
         {menuOpen && (
           <Modal title="MENU" onClose={() => setMenuOpen(false)}>
             <div className="space-y-2">
-              <MenuRow icon={muted ? <VolumeX size={18} /> : <Volume2 size={18} />} label={muted ? 'Activer le son' : 'Couper le son'} onClick={toggleMute} />
+              <GameVolumeModalRow
+                muted={muted}
+                volume={volume}
+                onMute={toggleMute}
+                onVolumeChange={handleVolumeChange}
+                accentClass="accent-[#3fd2f2]"
+              />
               <MenuRow
                 icon={<Info size={18} />}
                 label="Règles et équité"
@@ -955,6 +999,7 @@ interface ControlBarProps {
   potential: number;
   multiplier: number;
   muted: boolean;
+  volume: number;
   canDec: boolean;
   canInc: boolean;
   onDec: () => void;
@@ -965,6 +1010,7 @@ interface ControlBarProps {
   onMenu: () => void;
   onInfo: () => void;
   onMute: () => void;
+  onVolumeChange: (vol: number) => void;
 }
 
 const ControlBar: React.FC<ControlBarProps> = (p) => {
@@ -983,9 +1029,13 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
               <button onClick={p.onInfo} title="Règles" aria-label="Règles" className="text-white/85 hover:text-white">
                 <Info size={18} />
               </button>
-              <button onClick={p.onMute} title={p.muted ? 'Activer le son' : 'Couper le son'} aria-label="Son" className="text-white/85 hover:text-white">
-                {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-              </button>
+              <GameVolumeButton
+                muted={p.muted}
+                volume={p.volume}
+                onMute={p.onMute}
+                onVolumeChange={p.onVolumeChange}
+                accentClass="accent-[#3fd2f2]"
+              />
             </div>
             <div className="leading-tight min-w-0 font-['Oswald'] font-bold tracking-wide">
               <div className="text-[13px] sm:text-base whitespace-nowrap">

@@ -592,6 +592,75 @@ export interface AdminDashboard {
 
 export const apiAdminDashboard = (days: number) => rpc<AdminDashboard>('admin_dashboard', { p_days: days });
 
+export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel';
+
+interface GameStatsPlayer {
+  id: string;
+  name: string;
+  citizen_id: string;
+  role: ProfileRole;
+  rounds: number;
+  wagered: number;
+  paid: number;
+  net: number;
+}
+
+export interface AdminGameStats {
+  game: StatsGameId;
+  days: number;
+  summary: {
+    rounds: number;
+    players: number;
+    wagered: number;
+    paid: number;
+    profit: number;
+    rtp: number | null;
+    avg_bet: number;
+    win_rate: number | null;
+    bonus_rounds: number;
+    biggest_win: number;
+    biggest_multiplier: number;
+    first_at: string | null;
+    last_at: string | null;
+  };
+  /** Mode de jeu (slots), nombre de mines (Mines) ou lot tiré (roue) */
+  breakdown: { key: string; rounds: number; players: number; wagered: number; paid: number; rtp: number | null }[];
+  distribution: { ord: number; label: string; rounds: number; paid: number }[];
+  daily: { day: string; rounds: number; players: number; wagered: number; paid: number }[];
+  hours: { hour: number; rounds: number }[];
+  winners: GameStatsPlayer[];
+  losers: GameStatsPlayer[];
+  biggest: { created_at: string; bet: number; win: number; multiplier: number; name: string | null; citizen_id: string | null; result_data: Record<string, unknown> }[];
+}
+
+export const apiAdminGameStats = (game: StatsGameId, days: number) =>
+  rpc<AdminGameStats>('admin_game_stats', { p_game: game, p_days: days });
+
+export type HistoryExportKind = 'bets' | 'transactions';
+const EXPORT_PAGE = 2000;
+
+/** Récupère tout l'historique encore en base (les lignes de jeu sont purgées après 30 jours), page par page */
+export async function apiAdminExportHistory(
+  kind: HistoryExportKind,
+  onProgress?: (rows: number) => void,
+): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  let after: { created_at: string; id: string } | null = null;
+  for (;;) {
+    const page: Record<string, unknown>[] = await rpc<Record<string, unknown>[]>('admin_export_history', {
+      p_kind: kind,
+      p_after_created: after?.created_at ?? null,
+      p_after_id: after?.id ?? null,
+      p_limit: EXPORT_PAGE,
+    });
+    all.push(...page);
+    onProgress?.(all.length);
+    if (page.length < EXPORT_PAGE) return all;
+    const last = page[page.length - 1] as { created_at: string; id: string };
+    after = { created_at: last.created_at, id: last.id };
+  }
+}
+
 // -------------------------------------------------------------
 // Health
 // -------------------------------------------------------------

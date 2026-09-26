@@ -25,6 +25,10 @@ const SAMPLES = {
   coin2: 'coin-2.mp3',
   coin3: 'coin-3.mp3',
   coinsShower: 'coins-shower.mp3',
+  switch: 'switch.mp3',
+  slam: 'slam.mp3',
+  reelSpin: 'reel-spin.mp3',
+  reelTick: 'reel-tick.mp3',
 } as const;
 
 type SampleName = keyof typeof SAMPLES;
@@ -33,6 +37,7 @@ export class DogHouseAudio {
   readonly synth = new SlotsAudio();
   private readonly bank = new SampleBank<SampleName>(BASE_URL, SAMPLES);
   private lastCoin = 0;
+  private _volume = 0.8;
 
   // Anticipation & rouleaux
   private anticipTimer: ReturnType<typeof setInterval> | null = null;
@@ -43,6 +48,18 @@ export class DogHouseAudio {
   private musicGain: GainNode | null = null;
   private musicStep = 0;
 
+  get volume() {
+    return this._volume;
+  }
+  set volume(v: number) {
+    this._volume = Math.max(0, Math.min(1, v));
+    this.bank.volume = this._volume;
+    this.synth.volume = this._volume;
+    if (this.musicGain && this.bank.context) {
+      this.musicGain.gain.setValueAtTime(this.sfxMuted ? 0 : this._volume * 0.14, this.bank.context.currentTime);
+    }
+  }
+
   get sfxMuted() {
     return this.bank.muted;
   }
@@ -50,8 +67,15 @@ export class DogHouseAudio {
     this.bank.muted = v;
     this.synth.muted = v;
     if (this.musicGain && this.bank.context) {
-      this.musicGain.gain.setValueAtTime(v ? 0 : 0.14, this.bank.context.currentTime);
+      this.musicGain.gain.setValueAtTime(v ? 0 : this._volume * 0.14, this.bank.context.currentTime);
     }
+  }
+
+  get muted() {
+    return this.sfxMuted;
+  }
+  set muted(v: boolean) {
+    this.sfxMuted = v;
   }
 
   /** À appeler sur un geste utilisateur */
@@ -78,55 +102,55 @@ export class DogHouseAudio {
     this.synth.click();
   }
 
-  /** Son de bascule du Boost Ante Bet (ON: carillon énergique ascendant, OFF: cliquetis) */
+  /** Son de bascule du Boost Ante Bet (vrai commutateur mécanique + carillon) */
   boostToggle(enabled: boolean) {
-    const actx = this.getAudioContext();
-    if (!actx) return;
-    const { ctx, out } = actx;
-    const t = ctx.currentTime;
-
-    if (enabled) {
-      [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, t + idx * 0.04);
-        g.gain.setValueAtTime(0.0001, t + idx * 0.04);
-        g.gain.exponentialRampToValueAtTime(0.2, t + idx * 0.04 + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + idx * 0.04 + 0.18);
-        osc.connect(g).connect(out);
-        osc.start(t + idx * 0.04);
-        osc.stop(t + idx * 0.04 + 0.2);
-      });
-    } else {
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(440, t);
-      osc.frequency.exponentialRampToValueAtTime(220, t + 0.06);
-      g.gain.setValueAtTime(0.12, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-      osc.connect(g).connect(out);
-      osc.start(t);
-      osc.stop(t + 0.08);
-    }
+    this.play('switch', enabled ? 1.0 : 0.85);
   }
 
   spinStart() {
-    this.synth.spinStart();
-    this.startReelRoll();
+    this.stopReelRoll();
+    if (this.play('reelSpin', 0.80)) return;
+
+    const actx = this.getAudioContext();
+    if (!actx) {
+      this.synth.spinStart();
+      return;
+    }
+    const { ctx, out } = actx;
+    const t = ctx.currentTime;
+
+    // Doux roulement feutré de départ
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(160, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.25);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.06, t + 0.03);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    osc.connect(og).connect(out);
+    osc.start(t);
+    osc.stop(t + 0.30);
+
+    // Carillon marimba doux Do-Mi-Sol
+    [523.25, 659.25, 783.99].forEach((freq, i) => {
+      const chime = ctx.createOscillator();
+      chime.type = 'sine';
+      const st = t + i * 0.04;
+      chime.frequency.setValueAtTime(freq, st);
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(0.0001, st);
+      cg.gain.exponentialRampToValueAtTime(0.05, st + 0.01);
+      cg.gain.exponentialRampToValueAtTime(0.0001, st + 0.18);
+      chime.connect(cg).connect(out);
+      chime.start(st);
+      chime.stop(st + 0.20);
+    });
   }
 
   /** Bruit de roulement mécanique continu pendant que les rouleaux tournent */
   startReelRoll() {
     this.stopReelRoll();
-    let tick = 0;
-    this.rollTimer = setInterval(() => {
-      tick++;
-      if (tick % 2 === 0) {
-        this.synth.reelTick();
-      }
-    }, 45);
   }
 
   stopReelRoll() {
@@ -230,6 +254,7 @@ export class DogHouseAudio {
    * Coup de marteau en bois puissant + aboiement jovial
    */
   stickyWildSlam() {
+    this.play('slam', 1.0);
     const actx = this.getAudioContext();
     if (actx) {
       const { ctx, out } = actx;

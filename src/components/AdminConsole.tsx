@@ -18,7 +18,7 @@ import { useCasinoUser } from '../context/CasinoUserContext';
 import { hasAdminPermissions } from '../lib/discord';
 import { DashboardPanel } from './admin/DashboardPanel';
 import { PlayersPanel } from './admin/PlayersPanel';
-import { GamesPanel } from './admin/GamesPanel';
+import { MachinesPanel } from './admin/MachinesPanel';
 import { WheelPanel } from './admin/WheelPanel';
 import { VipPanel } from './admin/VipPanel';
 import { RewardsPanel } from './admin/RewardsPanel';
@@ -39,21 +39,26 @@ interface NavItem {
 
 const NAV: { group: string; items: NavItem[] }[] = [
   {
-    group: 'Suivi',
+    group: 'Pilotage',
     items: [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, description: 'Bénéfices, activité, alertes' },
-      { id: 'players', label: 'Joueurs', icon: Users, description: 'Comptes, soldes, fiches' },
-      { id: 'logs', label: 'Journal', icon: ScrollText, description: 'Qui a fait quoi' },
+      { id: 'games', label: 'Machines', icon: Gamepad2, description: 'Ouvrir, fermer, stats, calibrage' },
+      { id: 'wheel', label: 'Lots de la roue', icon: Disc, description: 'Lots, chances, prix' },
     ],
   },
   {
-    group: 'Réglages',
+    group: 'Joueurs',
     items: [
-      { id: 'games', label: 'Jeux', icon: Gamepad2, description: 'Ouvrir, fermer, mises, RTP' },
-      { id: 'wheel', label: 'Roue de la Fortune', icon: Disc, description: 'Lots, chances, délai' },
+      { id: 'players', label: 'Joueurs', icon: Users, description: 'Comptes, soldes, fiches' },
       { id: 'vip', label: 'VIP', icon: Crown, description: 'Demandes et offres' },
       { id: 'rewards', label: 'Lots & véhicules', icon: Car, description: 'Livraisons en jeu' },
-      { id: 'system', label: 'Système', icon: Server, description: 'Maintenance, tests' },
+    ],
+  },
+  {
+    group: 'Administration',
+    items: [
+      { id: 'logs', label: 'Journal', icon: ScrollText, description: 'Qui a fait quoi' },
+      { id: 'system', label: 'Système', icon: Server, description: 'Maintenance, export, tests' },
     ],
   },
 ];
@@ -153,7 +158,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
         <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
-            onClick={() => goTo('system')}
+            onClick={() => goTo('games')}
             className={cx(
               'hidden sm:flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[11px] font-semibold cursor-pointer',
               economy.maintenanceMode ? 'border-rose-500/40 bg-rose-500/10 text-rose-300' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300',
@@ -238,7 +243,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
           <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
             {tab === 'dashboard' && <DashboardPanel goTo={goTo} />}
             {tab === 'players' && <PlayersPanel showToast={showToast} />}
-            {tab === 'games' && <GamesPanel showToast={showToast} goTo={goTo} />}
+            {tab === 'games' && <MachinesPanel showToast={showToast} goTo={goTo} />}
             {tab === 'wheel' && <WheelPanel showToast={showToast} />}
             {tab === 'vip' && <VipPanel showToast={showToast} />}
             {tab === 'rewards' && <RewardsPanel showToast={showToast} />}

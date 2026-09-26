@@ -21,6 +21,10 @@ const SAMPLES = {
   coin2: 'coin-2.mp3',
   coin3: 'coin-3.mp3',
   coinsShower: 'coins-shower.mp3',
+  gunshot: 'gunshot.mp3',
+  ricochet: 'ricochet.mp3',
+  duel: 'duel.mp3',
+  churchBell: 'church-bell.mp3',
 } as const;
 
 type SampleName = keyof typeof SAMPLES;
@@ -31,6 +35,14 @@ export class WantedAudio {
   private noise: AudioBuffer | null = null;
   private lastCoin = 0;
   private anticipTimer: ReturnType<typeof setInterval> | null = null;
+
+  get volume() {
+    return this.bank.volume;
+  }
+  set volume(v: number) {
+    this.bank.volume = v;
+    this.synth.volume = v;
+  }
 
   get muted() {
     return this.bank.muted;
@@ -61,6 +73,8 @@ export class WantedAudio {
 
   /** Chute de scatter (DEAD, DUEL ou FS) : armement métallique sec de percuteur */
   scatterDrop(count: number) {
+    this.synth.click();
+    this.bank.play('churchBell', 0.85, count === 1 ? 0.9 : count === 2 ? 1.05 : 1.25);
     const ctx = this.bank.context;
     const out = this.bank.output;
     if (!ctx || !out || this.bank.muted) return;
@@ -127,8 +141,9 @@ export class WantedAudio {
     }
   }
 
-  /** Coup de revolver : bruit filtré à attaque sèche + « thump » grave */
+  /** Coup de revolver : vrai tir western percutant */
   gunshot(volume = 0.9) {
+    if (this.bank.play('gunshot', volume)) return;
     const ctx = this.bank.context;
     const out = this.bank.output;
     if (!ctx || !out || this.bank.muted) return;
@@ -169,12 +184,14 @@ export class WantedAudio {
    */
   vsClash(multiplier = 2) {
     this.gunshot(0.95);
+    this.bank.play('duel', 0.95);
+    this.bank.play('ricochet', 0.85);
     const ctx = this.bank.context;
     const out = this.bank.output;
     if (!ctx || !out || this.bank.muted) return;
     const t = ctx.currentTime + 0.06;
 
-    // Ricochet siffleur métallique (whistle ricochet)
+    // Ricochet siffleur métallique (whistle ricochet fallback)
     const rico = ctx.createOscillator();
     rico.type = 'sine';
     rico.frequency.setValueAtTime(1800, t);

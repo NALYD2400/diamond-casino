@@ -3,10 +3,12 @@ import { Link } from '@tanstack/react-router';
 import { ArrowLeft, Gift, History, Info, Menu, RotateCw, ShieldCheck, Trophy, Volume2, VolumeX, X } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin, type WheelSegmentConfig } from '../context/CasinoAdminContext';
+import { MachineClosedBanner, useMachineClosed } from './MachineClosedBanner';
 import { apiRecentWheelWins, CasinoApiError, type WheelWin } from '../lib/supabase';
 import { Wheel } from './wheel/Wheel';
 import { WheelAudio } from './wheel/wheelAudio';
 import { SampleBank } from './slots/sampleBank';
+import { GameVolumeButton, GameVolumeModalRow } from './VolumeControl';
 import { useSlotTimeline } from './slots/useSlotTimeline';
 
 const DEMO_KEY = 'diamond_wheel_demo_chips';
@@ -85,7 +87,8 @@ export const WheelOfFortune: React.FC = () => {
   const { user, isAuthenticated, spinWheel } = useCasinoUser();
   const { segments, podiumVehicle, economy, gamesConfig } = useCasinoAdmin();
   const price = gamesConfig.wheel.spinPrice;
-  const closed = economy.maintenanceMode || !gamesConfig.wheel.enabled;
+  const closedState = useMachineClosed('wheel');
+  const closed = closedState !== null;
 
   // ---------------------------------------------------------------------------
   // Solde
@@ -133,9 +136,22 @@ export const WheelOfFortune: React.FC = () => {
       return false;
     }
   });
+  const [volume, setVolume] = useState(() => {
+    try {
+      const v = localStorage.getItem('diamond_sound_volume');
+      if (v !== null) {
+        const parsed = parseFloat(v);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
+      }
+      return 0.8;
+    } catch {
+      return 0.8;
+    }
+  });
+
   const audio = useRef(new WheelAudio());
   const samples = useRef(
-    new SampleBank<SampleName>('/sounds/wanted/', {
+    new SampleBank<SampleName>('/sounds/wheel/', {
       coin1: 'coin-1.mp3',
       coin2: 'coin-2.mp3',
       coin3: 'coin-3.mp3',
@@ -145,8 +161,20 @@ export const WheelOfFortune: React.FC = () => {
       shower: 'coins-shower.mp3',
     }),
   );
+  audio.current.volume = volume;
+  samples.current.volume = volume;
   audio.current.muted = muted;
   samples.current.muted = muted;
+
+  const handleVolumeChange = useCallback((newVol: number) => {
+    const clamped = Math.max(0, Math.min(1, Math.round(newVol * 100) / 100));
+    setVolume(clamped);
+    if (clamped > 0 && muted) {
+      setMuted(false);
+      try { localStorage.setItem('diamond_sound_muted', 'false'); } catch {}
+    }
+    try { localStorage.setItem('diamond_sound_volume', String(clamped)); } catch {}
+  }, [muted]);
 
   const rotorRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef<HTMLDivElement>(null);
@@ -229,6 +257,7 @@ export const WheelOfFortune: React.FC = () => {
         skipSpinRef.current = null;
         rotationRef.current = to;
         audio.current.stopSuspense();
+        audio.current.stop();
         resolve();
       };
       rafRef.current = requestAnimationFrame(frame);
@@ -313,7 +342,6 @@ export const WheelOfFortune: React.FC = () => {
     const ratio = r.chipsWon / price;
     if (segment.type !== 'chips') {
       audio.current.win(true);
-      samples.current.play('winBig', 0.7);
       setPrizeWon(r);
     } else if (ratio >= 2) {
       if (!samples.current.play('winBig', 0.8)) audio.current.win(true);
@@ -397,6 +425,7 @@ export const WheelOfFortune: React.FC = () => {
 
   return (
     <div className="relative bg-[#07050f] pt-[80px] sm:pt-[90px]">
+      <MachineClosedBanner state={closedState} demo={false} />
       <div className="relative w-full overflow-hidden select-none" style={{ height: 'max(720px, calc(100svh - 90px))' }}>
         <WheelBackdrop mood={mood} />
 
@@ -467,10 +496,12 @@ export const WheelOfFortune: React.FC = () => {
           phase={phase}
           disabled={closed || (!spinning && balance < price)}
           muted={muted}
+          volume={volume}
           onMain={mainAction}
           onMenu={() => setMenuOpen(true)}
           onInfo={() => setInfoOpen(true)}
           onMute={toggleMute}
+          onVolumeChange={handleVolumeChange}
         />
 
         {bigWin && <BigWinOverlay amount={bigWin.shown} ratio={bigWin.ratio} onClick={skipAll} />}
@@ -479,7 +510,13 @@ export const WheelOfFortune: React.FC = () => {
         {menuOpen && (
           <Modal title="MENU" onClose={() => setMenuOpen(false)}>
             <div className="space-y-2">
-              <MenuRow icon={muted ? <VolumeX size={18} /> : <Volume2 size={18} />} label={muted ? 'Activer le son' : 'Couper le son'} onClick={toggleMute} />
+              <GameVolumeModalRow
+                muted={muted}
+                volume={volume}
+                onMute={toggleMute}
+                onVolumeChange={handleVolumeChange}
+                accentClass="accent-[#ffd84a]"
+              />
               <MenuRow
                 icon={<Info size={18} />}
                 label="Règles et lots"
@@ -801,10 +838,12 @@ interface ControlBarProps {
   phase: Phase;
   disabled: boolean;
   muted: boolean;
+  volume: number;
   onMain: () => void;
   onMenu: () => void;
   onInfo: () => void;
   onMute: () => void;
+  onVolumeChange: (vol: number) => void;
 }
 
 const ControlBar: React.FC<ControlBarProps> = (p) => {
@@ -821,9 +860,13 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
               <button onClick={p.onInfo} title="Règles" aria-label="Règles" className="text-white/85 hover:text-white">
                 <Info size={18} />
               </button>
-              <button onClick={p.onMute} title={p.muted ? 'Activer le son' : 'Couper le son'} aria-label="Son" className="text-white/85 hover:text-white">
-                {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-              </button>
+              <GameVolumeButton
+                muted={p.muted}
+                volume={p.volume}
+                onMute={p.onMute}
+                onVolumeChange={p.onVolumeChange}
+                accentClass="accent-[#ffd84a]"
+              />
             </div>
             <div className="leading-tight min-w-0 font-['Oswald'] font-bold tracking-wide">
               <div className="text-[13px] sm:text-base whitespace-nowrap">

@@ -3,42 +3,35 @@ import { motion } from 'framer-motion';
 import { Link } from '@tanstack/react-router';
 import { Disc, User } from 'lucide-react';
 import { fadeUp } from '../constants/animations';
-import { FallingDiamonds } from './FallingDiamonds';
 
 export const Hero: React.FC = () => {
   return (
-    <section id="home" className="relative w-full min-h-[100svh] flex flex-col justify-center items-center overflow-hidden pt-28 pb-16">
-      {/* Background: pluie de diamants */}
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,#1c1c1c_0%,#000_70%)]" />
-      <FallingDiamonds className="absolute inset-0 w-full h-full z-0" />
+    <section id="home" className="relative w-full min-h-[100svh] flex flex-col justify-between items-center overflow-hidden pt-28 pb-16 sm:pb-24">
+      {/* Background: vidéo animée de diamants */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <video
+          src="/fond_diamants_tombant.mp4"
+          className="w-full h-full object-cover"
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+      </div>
 
-      {/* Assombrit le centre pour garder le texte lisible */}
-      <div className="absolute inset-0 z-[1] pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_center,rgba(0,0,0,0.75),transparent)]" />
-
-      {/* Gradient Masking for smooth blend to black */}
+      {/* Gradient Masking for smooth blend to black at the bottom */}
       <div className="absolute bottom-0 left-0 right-0 h-48 sm:h-72 bg-gradient-to-t from-black via-black/70 to-transparent z-[1] pointer-events-none" />
 
-      {/* Hero Content */}
-      <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-5xl">
-        {/* Hero Title with Instrument Serif accent */}
-        <motion.h1
-          {...fadeUp(0.2)}
-          className="text-5xl sm:text-7xl lg:text-8xl xl:text-9xl text-white tracking-tight leading-tight mb-6 font-['Instrument_Serif'] font-normal"
-        >
-          The <em className="italic text-white font-normal">Diamond</em> Casino
-        </motion.h1>
+      {/* Titre accessible SEO - le logo visuel est animé dans la vidéo de fond */}
+      <h1 className="sr-only">The Diamond Casino &amp; Resort</h1>
 
-        {/* Subtitle */}
-        <motion.p
-          {...fadeUp(0.3)}
-          className="text-base sm:text-xl text-neutral-300 max-w-2xl leading-relaxed mb-8 font-normal"
-        >
-          Plongez au cœur du luxe de Los Santos. Jeux de table exclusifs, salons VIP de grand prestige et Roue de la Fortune pour tous les citoyens.
-        </motion.p>
+      {/* Espace flexible pour laisser le logo animé de la vidéo totalement dégagé */}
+      <div className="flex-1 pointer-events-none" aria-hidden="true" />
 
-        {/* Quick CTA Action Buttons */}
+      {/* Quick CTA Action Buttons placés sous 'CASINO & RESORT' */}
+      <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-5xl mb-6 sm:mb-10">
         <motion.div
-          {...fadeUp(0.35)}
+          {...fadeUp(0.25)}
           className="flex flex-wrap items-center justify-center gap-4"
         >
           <Link

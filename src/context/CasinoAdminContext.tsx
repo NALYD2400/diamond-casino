@@ -261,7 +261,13 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [vipConfig, setVipConfig] = useState<VipConfig>(DEFAULT_VIP_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
 
-  const [citizens, setCitizens] = useState<MockCitizen[]>([]);
+  // Profils bruts : les citoyens en sont dérivés, pour qu'un rechargement de la
+  // config (retour sur l'onglet) ne relance pas la lecture des 1000 profils.
+  const [profileRows, setProfileRows] = useState<SupabaseProfile[]>([]);
+  const citizens = useMemo<MockCitizen[]>(
+    () => profileRows.map((p) => toCitizen(p, wheelCooldownHours, vipConfig)),
+    [profileRows, wheelCooldownHours, vipConfig],
+  );
   const [vipRequestRows, setVipRequestRows] = useState<SupabaseTransaction[]>([]);
   const [logs, setLogs] = useState<AdminLogEntry[]>([]);
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
@@ -312,15 +318,30 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   useEffect(() => {
     void reloadConfig();
-    // Les joueurs voient les changements (maintenance, mises…) sans recharger la page
-    const interval = setInterval(() => void reloadConfig(), 60_000);
-    const onFocus = () => void reloadConfig();
+    // Les joueurs voient les changements (machine fermée, maintenance, mises…)
+    // instantanément grâce au temps réel ; le rechargement périodique et au
+    // retour sur l'onglet ne sert que de filet si la connexion a sauté.
+    const channel = supabase
+      .channel('casino-settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'casino_settings' }, (payload) => {
+        const row = payload.new as { key?: string; value?: unknown };
+        if (row?.key && PUBLIC_SETTING_KEYS.includes(row.key)) applySetting(row.key, row.value);
+      })
+      .subscribe();
+    const interval = setInterval(() => void reloadConfig(), 5 * 60_000);
+    let lastFocusReload = Date.now();
+    const onFocus = () => {
+      if (Date.now() - lastFocusReload < 30_000) return;
+      lastFocusReload = Date.now();
+      void reloadConfig();
+    };
     window.addEventListener('focus', onFocus);
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
+      void supabase.removeChannel(channel);
     };
-  }, [reloadConfig]);
+  }, [reloadConfig, applySetting]);
 
   // ---------------------------------------------------------------
   // Données gérance
@@ -329,12 +350,12 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!isStaff) return;
     try {
       const [profiles, requests] = await Promise.all([dbFetchProfiles(1000), dbFetchPendingVipRequests()]);
-      setCitizens(profiles.map((p) => toCitizen(p, wheelCooldownHours, vipConfig)));
+      setProfileRows(profiles);
       setVipRequestRows(requests);
     } catch (err) {
       reportError(err);
     }
-  }, [isStaff, wheelCooldownHours, vipConfig, reportError]);
+  }, [isStaff, reportError]);
 
   const refreshLogs = useCallback(async () => {
     if (!isStaff) return;
@@ -363,7 +384,7 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   useEffect(() => {
     if (!isStaff) {
-      setCitizens([]);
+      setProfileRows([]);
       setVipRequestRows([]);
       setLogs([]);
       setDashboard(null);

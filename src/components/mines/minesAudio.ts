@@ -1,23 +1,78 @@
+import { SampleBank, getSharedAudioContext } from '../slots/sampleBank';
+
+const BASE_URL = '/sounds/mines/';
+
+const SAMPLES = {
+  deal: 'deal.mp3',
+  tileClick: 'tile-click.mp3',
+  tileHover: 'tile-hover.mp3',
+  gem1: 'gem-1.mp3',
+  gem2: 'gem-2.mp3',
+  gem3: 'gem-3.mp3',
+  gem4: 'gem-4.mp3',
+  gem5: 'gem-5.mp3',
+  gem6: 'gem-6.mp3',
+  explosion: 'explosion.mp3',
+  cashout: 'cashout.mp3',
+  winSmall: 'win-small.mp3',
+  winMedium: 'win-medium.mp3',
+  winBig: 'win-big.mp3',
+  coin1: 'coin-1.mp3',
+  coin2: 'coin-2.mp3',
+  coin3: 'coin-3.mp3',
+  coinsShower: 'coins-shower.mp3',
+} as const;
+
+type MinesSampleName = keyof typeof SAMPLES;
+
 /**
- * Web Audio API Sound Synthesizer for the Mines Game (The Diamond Casino & Resort)
- * 100% synthesized sound design: zero external MP3 assets, zero latency, runs offline.
+ * Realistic Sound Design for the Mines Game (The Diamond Casino & Resort)
+ * - Real casino card slide / deal on felt (game start)
+ * - Real casino chip placement / tile flip click
+ * - Real crystalline diamond sparkle / glass bell rings for gem reveals
+ * - Visceral explosive bomb detonation (heavy sub-bass thump + fiery crunch)
+ * - Real golden cascading coins & win fanfare
+ * - Web Audio procedural synthesis as zero-dependency fallback
  */
 export class MinesAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
-  muted = false;
+  private _muted = false;
+  private _volume = 0.8;
+  private readonly bank = new SampleBank<MinesSampleName>(BASE_URL, SAMPLES);
+
+  get muted() {
+    return this._muted;
+  }
+  set muted(v: boolean) {
+    this._muted = v;
+    this.bank.muted = v;
+    this.applyGain();
+  }
+
+  get volume() {
+    return this._volume;
+  }
+  set volume(v: number) {
+    this._volume = Math.max(0, Math.min(1, v));
+    this.bank.volume = this._volume;
+    this.applyGain();
+  }
+
+  private applyGain(): void {
+    if (this.master && this.ctx) {
+      const target = this._muted ? 0 : this._volume * 0.85;
+      this.master.gain.setValueAtTime(target, this.ctx.currentTime);
+    }
+  }
 
   unlock(): void {
+    this.bank.unlock();
     if (typeof window === 'undefined') return;
     try {
-      if (!this.ctx || this.ctx.state === 'closed') {
-        const Ctor =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (!Ctor) return;
-        this.ctx = new Ctor();
-
+      this.ctx = getSharedAudioContext();
+      if (this.ctx && (!this.master || this.master.context !== this.ctx)) {
         const compressor = this.ctx.createDynamicsCompressor();
         compressor.threshold.value = -12;
         compressor.knee.value = 8;
@@ -26,7 +81,7 @@ export class MinesAudio {
         compressor.release.value = 0.2;
 
         this.master = this.ctx.createGain();
-        this.master.gain.value = 0.85;
+        this.master.gain.value = this._muted ? 0 : this._volume * 0.85;
         this.master.connect(compressor).connect(this.ctx.destination);
 
         // Pre-create 1-second white noise buffer for clicks & blast
@@ -37,7 +92,7 @@ export class MinesAudio {
           data[i] = Math.random() * 2 - 1;
         }
       }
-      if (this.ctx.state === 'suspended') {
+      if (this.ctx && this.ctx.state === 'suspended') {
         void this.ctx.resume();
       }
     } catch {
@@ -46,7 +101,7 @@ export class MinesAudio {
   }
 
   private ready(): AudioContext | null {
-    if (this.muted || !this.ctx || !this.master) return null;
+    if (this._muted || !this.ctx || !this.master) return null;
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     return this.ctx;
   }
@@ -59,6 +114,7 @@ export class MinesAudio {
 
   /** Soft mechanical tile hover / focus tick */
   hover(): void {
+    if (this.bank.play('tileHover', 0.4)) return;
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -76,6 +132,7 @@ export class MinesAudio {
 
   /** Satisfying mechanical card/tile click */
   click(): void {
+    if (this.bank.play('tileClick', 0.95)) return;
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
@@ -108,6 +165,7 @@ export class MinesAudio {
 
   /** Game start deal sound (crisp casino card deal whoosh) */
   start(): void {
+    if (this.bank.play('deal', 1.0)) return;
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
@@ -135,6 +193,14 @@ export class MinesAudio {
    * creating an exhilarating rush as the combo grows!
    */
   gem(step: number): void {
+    const sampleIdx = (((step - 1) % 6) + 1) as 1 | 2 | 3 | 4 | 5 | 6;
+    const sampleName = `gem${sampleIdx}` as MinesSampleName;
+    const octave = Math.floor((step - 1) / 6);
+    const semitone = (step - 1) % 12;
+    const rate = Math.min(2.0, Math.pow(1.045, semitone) * (1 + octave * 0.12));
+
+    if (this.bank.play(sampleName, 0.95, rate)) return;
+
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -203,6 +269,7 @@ export class MinesAudio {
    * Mine explosion sound: thunderous sub-bass thump + sizzling fire blast
    */
   explosion(): void {
+    if (this.bank.play('explosion', 1.0)) return;
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
@@ -241,6 +308,10 @@ export class MinesAudio {
    * Cashout Victory: triumphant ascending chord fanfare + golden coin chimes
    */
   cashout(): void {
+    if (this.bank.play('cashout', 1.0)) {
+      this.bank.play('coinsShower', 0.7);
+      return;
+    }
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -281,8 +352,10 @@ export class MinesAudio {
   }
 
   close(): void {
-    this.ctx?.close().catch(() => {});
-    this.ctx = null;
+    this.bank.close();
+    this.master?.disconnect();
     this.master = null;
+    this.ctx = null;
   }
 }
+

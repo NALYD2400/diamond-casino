@@ -1,7 +1,10 @@
 Sons de la machine The Dog House — tous sous licence CC0 (domaine public).
 
+- Lancement des rouleaux (reel-spin) : Actuation mécanique feutrée douce (glissement des rouleaux sur paliers feutrés) + douce marimba joviale Do-Mi-Sol style Pragmatic Play (sans percussion agressive)
+- Arrêt & Chocs Wild (slam, reel-tick) : Kenney Impact Sounds (impactWood_heavy) & Interface Sounds
+- Interrupteur Ante Bet (switch) : Kenney UI Audio (switch1)
 - Jingles (win-*, bonus-*) : "Music Jingles" par Kenney — https://kenney.nl/assets/music-jingles
 - Pièces (coin-*, coins-shower) : "Casino Audio" par Kenney — https://kenney.nl/assets/casino-audio
 - Aboiements (bark-*) : "Dog barking mono" par HaelDB — https://opengameart.org/content/dog-barking-mono
 
-Fichiers découpés / convertis en MP3 avec ffmpeg.
+Fichiers traités et masterisés en MP3 avec ffmpeg.

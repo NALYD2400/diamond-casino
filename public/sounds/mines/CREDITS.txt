@@ -1,0 +1,7 @@
+Sons du jeu Mines (The Diamond Casino) — CC0 (domaine public).
+
+- Distribution (deal) & Jetons : "Casino Audio" par Kenney — https://kenney.nl/assets/casino-audio
+- Cristaux / Diamants : "Interface Sounds" (glass_*) par Kenney — https://kenney.nl/assets/interface-sounds
+- Explosion de Mine : "Sci-Fi Sounds" (explosionCrunch & lowFrequency) par Kenney — https://kenney.nl/assets/sci-fi-sounds
+- Encaissement & Pièces : "RPG Audio" & "Music Jingles" par Kenney
+Convertis en MP3 avec ffmpeg.

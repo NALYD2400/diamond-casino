@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Coins, Lock, RefreshCw, ShieldCheck, Unlock } from 'lucide-react';
+import { Activity, Coins, Download, History, Lock, RefreshCw, ShieldCheck, Unlock } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { useCasinoUser } from '../../context/CasinoUserContext';
-import { dbCheckHealth, type SupabaseHealthResult } from '../../lib/supabase';
+import { apiAdminExportHistory, dbCheckHealth, type HistoryExportKind, type SupabaseHealthResult } from '../../lib/supabase';
 import { Badge, Button, Card, Field, HelpBox, NumberInput, PageHeader, Toggle, fmt, inputClass } from './ui';
 
 const SECURITY_POINTS = [
@@ -13,6 +13,73 @@ const SECURITY_POINTS = [
   ['Journal', 'Écrit uniquement par le serveur, avec le nom réel de l’auteur. Personne ne peut le modifier ni le vider depuis le site.'],
   ['Mines', 'La grille reste secrète en base jusqu’à la fin de la manche. Fermer l’onglet ne rembourse plus la mise.'],
 ] as const;
+
+const EXPORTS: { kind: HistoryExportKind; label: string; file: string; columns: string[] }[] = [
+  {
+    kind: 'bets',
+    label: 'Manches de jeu',
+    file: 'manches',
+    columns: ['created_at', 'game_id', 'bet_amount', 'win_amount', 'multiplier', 'citizen_id', 'rp_first_name', 'rp_last_name', 'id'],
+  },
+  {
+    kind: 'transactions',
+    label: 'Transactions',
+    file: 'transactions',
+    columns: ['created_at', 'type', 'game', 'amount', 'chips', 'status', 'description', 'citizen_id', 'rp_first_name', 'rp_last_name', 'id'],
+  },
+];
+
+/** Cellule CSV ; neutralise les formules (=, +, -, @) qu'un nom de joueur pourrait contenir */
+const csvCell = (v: unknown) => {
+  let s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+};
+
+const HistoryExportCard: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
+  const [running, setRunning] = useState<HistoryExportKind | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  const run = async (exp: (typeof EXPORTS)[number]) => {
+    setRunning(exp.kind);
+    setProgress(0);
+    try {
+      const rows = await apiAdminExportHistory(exp.kind, setProgress);
+      const csv = [exp.columns.join(';'), ...rows.map((r) => exp.columns.map((c) => csvCell(r[c])).join(';'))].join('\n');
+      const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `historique_${exp.file}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`${fmt(rows.length)} lignes exportées.`);
+    } catch {
+      showToast("Échec de l'export, réessayez.");
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  return (
+    <Card title="Historique" icon={<History size={15} />}>
+      <div className="flex flex-col gap-4">
+        <p className="text-[12px] text-neutral-400">
+          Pour garder la base légère, les manches et transactions de jeu de plus de <b className="text-neutral-200">30 jours</b> sont
+          supprimées chaque nuit (VIP, ajustements et journal sont conservés). Téléchargez l'historique complet encore en base avant
+          qu'il ne parte si vous voulez l'archiver.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {EXPORTS.map((exp) => (
+            <Button key={exp.kind} loading={running === exp.kind} disabled={!!running && running !== exp.kind} onClick={() => void run(exp)}>
+              <Download size={13} /> {exp.label} (CSV)
+            </Button>
+          ))}
+        </div>
+        {running && <div className="text-[11px] text-neutral-500">{fmt(progress)} lignes récupérées…</div>}
+      </div>
+    </Card>
+  );
+};
 
 export const SystemPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
   const { economy, setMaintenance, adjustCitizenBalance, resetCitizenWheelCooldown, reloadConfig } = useCasinoAdmin();
@@ -139,6 +206,8 @@ export const SystemPanel: React.FC<{ showToast: (m: string) => void }> = ({ show
           </div>
         </Card>
       </div>
+
+      <HistoryExportCard showToast={showToast} />
 
       <Card title="Ce qui protège le casino" icon={<ShieldCheck size={15} />}>
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">

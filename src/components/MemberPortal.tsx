@@ -47,8 +47,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
     cancelPendingDiscord, 
     logout, 
     updateProfile, 
-    canSpinWheel, 
+    canSpinWheel,
+    watchHistory,
   } = useCasinoUser();
+
+  // L'historique n'est chargé que tant que l'espace membre est affiché
+  useEffect(() => watchHistory(), [watchHistory]);
 
   const [activeTab, setActiveTab] = useState<ConsoleTab>('overview');
   const [txFilter, setTxFilter] = useState<'ALL' | 'WHEEL' | 'VIP' | 'GAMES'>('ALL');

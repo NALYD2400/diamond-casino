@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
+import { useMachineClosed } from './MachineClosedBanner';
+import type { GamesConfig } from '../lib/gamesConfig';
 import { Wheel } from './wheel/Wheel';
 import { BombArt, GemArt } from './mines/MinesArt';
 import { DogSymbol } from './doghouse/DogSymbols';
@@ -226,7 +228,16 @@ const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'rewards', label: 'Récompenses', icon: <Disc size={15} /> },
 ];
 
-const Tile: React.FC<{ game: GameTile; index: number }> = ({ game, index }) => {
+const MACHINE_IDS = ['doghouse', 'wanted', 'mines', 'wheel'] as const;
+const isMachine = (id: string): id is keyof GamesConfig => (MACHINE_IDS as readonly string[]).includes(id);
+
+/** Carte d'une machine : suit en temps réel son ouverture / fermeture par la direction */
+const MachineTile: React.FC<{ game: GameTile & { id: keyof GamesConfig }; index: number }> = ({ game, index }) => {
+  const closed = useMachineClosed(game.id);
+  return <Tile game={game} index={index} closed={closed} />;
+};
+
+const Tile: React.FC<{ game: GameTile; index: number; closed?: ReturnType<typeof useMachineClosed> }> = ({ game, index, closed = null }) => {
   const available = !!game.link;
   const card = (
     <motion.div
@@ -241,12 +252,26 @@ const Tile: React.FC<{ game: GameTile; index: number }> = ({ game, index }) => {
         }`}
       >
         {game.cover}
-        {game.tag && (
-          <span className="absolute top-2 left-2 z-10 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-extrabold text-black">
-            {game.tag}
+        {closed ? (
+          <span className="absolute top-2 left-2 z-20 rounded-md bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+            {closed === 'maintenance' ? 'MAINTENANCE' : 'FERMÉE'}
           </span>
+        ) : (
+          game.tag && (
+            <span className="absolute top-2 left-2 z-10 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-extrabold text-black">
+              {game.tag}
+            </span>
+          )
         )}
-        {available ? (
+        {available && closed ? (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/65 backdrop-blur-[2px]">
+            <Lock size={20} className="text-rose-300" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-200">
+              {closed === 'maintenance' ? 'Maintenance' : 'Fermée'}
+            </span>
+            {game.id !== 'wheel' && <span className="text-[10px] text-white/60">Démo disponible</span>}
+          </div>
+        ) : available ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-all group-hover:opacity-100 backdrop-blur-[2px]">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-black shadow-[0_0_25px_rgba(255,255,255,0.6)]">
               <Play size={24} fill="currentColor" className="ml-1" />
@@ -395,7 +420,7 @@ export const GamesHub: React.FC = () => {
         {filtered.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6">
             {filtered.map((g, i) => (
-              <Tile key={g.id} game={g} index={i} />
+              isMachine(g.id) ? <MachineTile key={g.id} game={{ ...g, id: g.id }} index={i} /> : <Tile key={g.id} game={g} index={i} />
             ))}
           </div>
         ) : (

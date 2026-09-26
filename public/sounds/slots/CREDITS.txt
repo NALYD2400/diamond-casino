@@ -1,0 +1,9 @@
+Sons communs des machines à sous (The Diamond Casino) — CC0 (domaine public).
+
+- Lancement de rotation (reel-spin) : Actuation mécanique (Kenney RPG Audio metalClick & impactWood_heavy) + feutre acoustique doux
+- Arrêt de rouleaux mécaniques (reel-stop-*) : "Impact Sounds" (impactWood_heavy) par Kenney
+- Bouton / Microswitch (button-click, switch) : "RPG Audio" (metalClick) & "UI Audio" (switch1) par Kenney
+- Cloche Scatter (scatter-bell) : "Impact Sounds" (impactBell_heavy) par Kenney
+- Jingles & Pièces : "Music Jingles" & "Casino Audio" par Kenney
+
+Fichiers traités et masterisés en MP3 avec ffmpeg.

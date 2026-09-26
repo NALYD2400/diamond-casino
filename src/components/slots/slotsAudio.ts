@@ -1,23 +1,81 @@
+import { SampleBank, getSharedAudioContext } from './sampleBank';
+
+const BASE_URL = '/sounds/slots/';
+
+const SAMPLES = {
+  click: 'button-click.mp3',
+  reelSpin: 'reel-spin.mp3',
+  reelStop: 'reel-stop.mp3',
+  reelStop1: 'reel-stop-1.mp3',
+  reelStop2: 'reel-stop-2.mp3',
+  reelStop3: 'reel-stop-3.mp3',
+  reelStop4: 'reel-stop-4.mp3',
+  reelStop5: 'reel-stop-5.mp3',
+  scatterBell: 'scatter-bell.mp3',
+  anticipation: 'anticipation.mp3',
+  winSmall: 'win-small.mp3',
+  winMedium: 'win-medium.mp3',
+  winBig: 'win-big.mp3',
+  coin1: 'coin-1.mp3',
+  coin2: 'coin-2.mp3',
+  coin3: 'coin-3.mp3',
+  coinsShower: 'coins-shower.mp3',
+  bonusTrigger: 'bonus-trigger.mp3',
+  bonusEnd: 'bonus-end.mp3',
+  reelTick: 'reel-tick.mp3',
+  switch: 'switch.mp3',
+} as const;
+
+type SlotsSampleName = keyof typeof SAMPLES;
+
 /**
- * Web Audio API Sound Synthesizer for Diamond Slots Engine
- * 100% procedural sound synthesis: zero external audio assets, zero latency, offline-ready.
+ * Realistic Sound Design for Diamond Slots Engine
+ * - Real mechanical arcade/slot button microswitch clicks
+ * - Real mechanical slot reel spin motor hum & rotational friction
+ * - Real physical slot reel stops (heavy clack per reel)
+ * - Real golden scatter bell chime & anticipation roll
+ * - Real casino jingles & coin showers
+ * - Zero-dependency procedural synthesis fallback
  */
 export class SlotsAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
-  muted = false;
+  private _muted = false;
+  private _volume = 0.8;
+  private readonly bank = new SampleBank<SlotsSampleName>(BASE_URL, SAMPLES);
+
+  get muted() {
+    return this._muted;
+  }
+  set muted(v: boolean) {
+    this._muted = v;
+    this.bank.muted = v;
+    this.applyGain();
+  }
+
+  get volume() {
+    return this._volume;
+  }
+  set volume(v: number) {
+    this._volume = Math.max(0, Math.min(1, v));
+    this.bank.volume = this._volume;
+    this.applyGain();
+  }
+
+  private applyGain(): void {
+    if (this.master && this.ctx) {
+      const target = this._muted ? 0 : this._volume * 0.8;
+      this.master.gain.setValueAtTime(target, this.ctx.currentTime);
+    }
+  }
 
   unlock(): void {
+    this.bank.unlock();
     if (typeof window === 'undefined') return;
     try {
-      if (!this.ctx || this.ctx.state === 'closed') {
-        const Ctor =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (!Ctor) return;
-        this.ctx = new Ctor();
-
+      this.ctx = getSharedAudioContext();
+      if (this.ctx && (!this.master || this.master.context !== this.ctx)) {
         const compressor = this.ctx.createDynamicsCompressor();
         compressor.threshold.value = -14;
         compressor.knee.value = 10;
@@ -26,7 +84,7 @@ export class SlotsAudio {
         compressor.release.value = 0.2;
 
         this.master = this.ctx.createGain();
-        this.master.gain.value = 0.8;
+        this.master.gain.value = this._muted ? 0 : this._volume * 0.8;
         this.master.connect(compressor).connect(this.ctx.destination);
 
         const length = Math.floor(this.ctx.sampleRate * 1.0);
@@ -36,7 +94,7 @@ export class SlotsAudio {
           data[i] = Math.random() * 2 - 1;
         }
       }
-      if (this.ctx.state === 'suspended') {
+      if (this.ctx && this.ctx.state === 'suspended') {
         void this.ctx.resume();
       }
     } catch {
@@ -45,7 +103,7 @@ export class SlotsAudio {
   }
 
   private ready(): AudioContext | null {
-    if (this.muted || !this.ctx || !this.master) return null;
+    if (this._muted || !this.ctx || !this.master) return null;
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     return this.ctx;
   }
@@ -58,6 +116,7 @@ export class SlotsAudio {
 
   /** Crisp mechanical button click */
   click(): void {
+    if (this.bank.play('click', 0.95)) return;
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
@@ -78,63 +137,72 @@ export class SlotsAudio {
 
   /** Mechanical spin engagement whoosh + motor start */
   spinStart(): void {
+    if (this.bank.play('reelSpin', 0.75)) return;
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
 
-    // Servo rise
+    // Warm low-frequency motor undertone
     const osc = ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(110, t);
-    osc.frequency.exponentialRampToValueAtTime(340, t + 0.16);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(85, t);
+    osc.frequency.exponentialRampToValueAtTime(160, t + 0.18);
     const og = ctx.createGain();
     og.gain.setValueAtTime(0.0001, t);
-    og.gain.exponentialRampToValueAtTime(0.16, t + 0.04);
-    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    og.gain.exponentialRampToValueAtTime(0.08, t + 0.04);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
     osc.connect(og).connect(this.master!);
     osc.start(t);
-    osc.stop(t + 0.2);
+    osc.stop(t + 0.25);
 
-    // Air whoosh
+    // Warm reel rolling friction (bandpass pink noise at 380Hz)
     const src = this.noiseSource(ctx);
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(900, t);
-    filter.frequency.exponentialRampToValueAtTime(2200, t + 0.18);
-    filter.Q.value = 2.0;
+    filter.frequency.setValueAtTime(380, t);
+    filter.Q.value = 1.6;
 
     const ng = ctx.createGain();
     ng.gain.setValueAtTime(0.0001, t);
-    ng.gain.exponentialRampToValueAtTime(0.14, t + 0.03);
-    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    ng.gain.exponentialRampToValueAtTime(0.1, t + 0.03);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
 
     src.connect(filter).connect(ng).connect(this.master!);
-    src.start(t);
-    src.stop(t + 0.22);
+    src.start(t, Math.random() * 0.8);
+    src.stop(t + 0.28);
   }
 
   /** Soft mechanical tick during reel rotation */
   reelTick(): void {
+    if (this.bank.play('reelTick', 0.5)) return;
     const ctx = this.ready();
-    if (!ctx) return;
+    if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
+    const src = this.noiseSource(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(260, t);
+    filter.Q.value = 2.5;
     const g = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(950, t);
-    osc.frequency.exponentialRampToValueAtTime(420, t + 0.015);
     g.gain.setValueAtTime(0.035, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.018);
-    osc.connect(g).connect(this.master!);
-    osc.start(t);
-    osc.stop(t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+    src.connect(filter).connect(g).connect(this.master!);
+    src.start(t, Math.random() * 0.8);
+    src.stop(t + 0.03);
   }
 
   /**
    * Satisfying heavy mechanical lock when a reel stops.
-   * If `hasScatter` is true, adds a bright crystalline harmonic chime.
+   * If `hasScatter` is true, adds a bright golden harmonic bell chime.
    */
   reelStop(reelIndex: number, hasScatter = false): void {
+    const reelKey = `reelStop${Math.min(5, Math.max(1, reelIndex + 1))}` as SlotsSampleName;
+    const played = this.bank.play(reelKey, 0.95) || this.bank.play('reelStop', 0.95);
+    if (hasScatter) {
+      this.bank.play('scatterBell', 0.9);
+    }
+    if (played) return;
+
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const t = ctx.currentTime;
@@ -181,8 +249,9 @@ export class SlotsAudio {
     }
   }
 
-  /** Dramatic rising synth pulse when waiting for 3rd scatter */
+  /** Dramatic rising anticipation roll when waiting for 3rd scatter */
   anticipation(): void {
+    if (this.bank.play('anticipation', 0.85)) return;
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -209,6 +278,9 @@ export class SlotsAudio {
 
   /** Standard line win chime */
   winLine(tier: 'small' | 'medium' | 'big' = 'small'): void {
+    const sound = tier === 'big' ? 'winBig' : tier === 'medium' ? 'winMedium' : 'winSmall';
+    if (this.bank.play(sound, 0.9)) return;
+
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -256,6 +328,11 @@ export class SlotsAudio {
 
   /** Free Spins / Jackpot grand fanfare */
   jackpotFanfare(): void {
+    if (this.bank.play('winBig', 1.0)) {
+      this.bank.play('coinsShower', 0.8);
+      return;
+    }
+
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -320,8 +397,10 @@ export class SlotsAudio {
   }
 
   close(): void {
-    this.ctx?.close().catch(() => {});
-    this.ctx = null;
+    this.bank.close();
+    this.master?.disconnect();
     this.master = null;
+    this.ctx = null;
   }
 }
+

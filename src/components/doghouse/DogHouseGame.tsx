@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
+import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
 import { clampBetLevels } from '../../lib/gamesConfig';
 import { DogHouseAudio } from './dogHouseAudio';
+import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
 import { DogSymbol } from './DogSymbols';
@@ -79,6 +81,7 @@ export const DogHouseGame: React.FC = () => {
   const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
   const { gamesConfig } = useCasinoAdmin();
   const cfg = gamesConfig.doghouse;
+  const closed = useMachineClosed('doghouse');
   const buyPriceX = cfg.buyPrice;
 
   const betLevels = useMemo(() => clampBetLevels(BET_LEVELS, cfg.minBet, cfg.maxBet), [cfg.minBet, cfg.maxBet]);
@@ -120,6 +123,9 @@ export const DogHouseGame: React.FC = () => {
   /** Gain déjà crédité mais pas encore « révélé » à l'écran */
   const [hiddenWin, setHiddenWin] = useState(0);
   const displayCredit = Math.max(0, balance - hiddenWin);
+  // Machine fermée par la direction : plus de mise en jetons (le serveur refuse aussi)
+  const blockedRef = useRef(false);
+  blockedRef.current = !!closed && mode === 'real';
 
   // ---------------------------------------------------------------------------
   // État de jeu
@@ -167,9 +173,33 @@ export const DogHouseGame: React.FC = () => {
       return false;
     }
   });
+  const [volume, setVolume] = useState(() => {
+    try {
+      const v = localStorage.getItem('diamond_sound_volume');
+      if (v !== null) {
+        const parsed = parseFloat(v);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
+      }
+      return 0.8;
+    } catch {
+      return 0.8;
+    }
+  });
+
   const audio = useRef(new DogHouseAudio());
+  audio.current.volume = volume;
   audio.current.sfxMuted = muted;
   useEffect(() => () => audio.current.close(), []);
+
+  const handleVolumeChange = useCallback((newVol: number) => {
+    const clamped = Math.max(0, Math.min(1, Math.round(newVol * 100) / 100));
+    setVolume(clamped);
+    if (clamped > 0 && muted) {
+      setMuted(false);
+      try { localStorage.setItem('diamond_sound_muted', 'false'); } catch {}
+    }
+    try { localStorage.setItem('diamond_sound_volume', String(clamped)); } catch {}
+  }, [muted]);
 
   const toggleBoost = useCallback(() => {
     const next = !boost;
@@ -402,6 +432,11 @@ export const DogHouseGame: React.FC = () => {
   const playRound = useCallback(
     async (buyBonus: boolean) => {
       if (busyRef.current) return;
+      if (blockedRef.current) {
+        setMessage('MACHINE FERMÉE');
+        setAutoLeft(0);
+        return;
+      }
       const roundMode: DogRoundMode = buyBonus ? 'buy' : boost && cfg.boostEnabled ? 'boost' : 'spin';
       const cost = dogRoundCost(bet, roundMode, buyPriceX);
       if (displayCredit < cost) {
@@ -549,6 +584,7 @@ export const DogHouseGame: React.FC = () => {
 
   return (
     <div className="relative bg-[#0f1923] pt-[80px] sm:pt-[90px]">
+      <MachineClosedBanner state={closed} />
       <div
         className="relative w-full overflow-hidden select-none"
         style={{ height: 'max(640px, calc(100svh - 90px))' }}
@@ -664,6 +700,7 @@ export const DogHouseGame: React.FC = () => {
           autoLeft={autoLeft}
           turbo={turbo}
           muted={muted}
+          volume={volume}
           canDec={betIdx > 0}
           canInc={betIdx < betLevels.length - 1}
           onDec={() => setBetIdx((i) => Math.max(0, i - 1))}
@@ -673,6 +710,7 @@ export const DogHouseGame: React.FC = () => {
           onTurbo={() => setTurbo((t) => !t)}
           onToggleBoost={cfg.boostEnabled ? toggleBoost : undefined}
           onMute={toggleMute}
+          onVolumeChange={handleVolumeChange}
           onInfo={() => setInfoOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onBuy={cfg.buyEnabled ? () => setBuyOpen(true) : undefined}
@@ -743,7 +781,13 @@ export const DogHouseGame: React.FC = () => {
         {settingsOpen && (
           <Modal title="PARAMÈTRES" onClose={() => setSettingsOpen(false)}>
             <div className="space-y-3 text-white">
-              <SettingRow label="Son" value={!muted} onToggle={toggleMute} />
+              <GameVolumeModalRow
+                muted={muted}
+                volume={volume}
+                onMute={toggleMute}
+                onVolumeChange={handleVolumeChange}
+                accentClass="accent-[#ffcf3f]"
+              />
               <SettingRow label="Tours rapides (Turbo)" value={turbo} onToggle={() => setTurbo((t) => !t)} />
               <div className="flex items-center justify-between rounded-xl bg-black/30 px-4 py-3">
                 <span className="text-sm font-semibold">Solde démo</span>
@@ -1061,6 +1105,7 @@ interface ControlBarProps {
   autoLeft: number;
   turbo: boolean;
   muted: boolean;
+  volume: number;
   canDec: boolean;
   canInc: boolean;
   onDec: () => void;
@@ -1069,6 +1114,7 @@ interface ControlBarProps {
   onAuto: () => void;
   onTurbo: () => void;
   onMute: () => void;
+  onVolumeChange: (vol: number) => void;
   onInfo: () => void;
   onSettings: () => void;
   onBuy?: () => void;
@@ -1118,9 +1164,13 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
                 </div>
               </div>
             </div>
-            <button onClick={p.onMute} title={p.muted ? 'Activer le son' : 'Couper le son'} aria-label="Son" className="text-white/85 hover:text-white">
-              {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </button>
+            <GameVolumeButton
+              muted={p.muted}
+              volume={p.volume}
+              onMute={p.onMute}
+              onVolumeChange={p.onVolumeChange}
+              accentClass="accent-[#ffcf3f]"
+            />
           </div>
           <div className="leading-tight min-w-0">
             <div className="dh-font text-[13px] sm:text-base whitespace-nowrap">

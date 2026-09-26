@@ -149,7 +149,6 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
             <ArrowLeft size={14} />
             <span className="hidden sm:inline">Site</span>
           </Link>
-          <div className="w-7 h-7 rounded-lg bg-white text-black flex items-center justify-center font-serif font-bold shrink-0">D</div>
           <div className="min-w-0">
             <div className="text-sm font-bold leading-tight truncate">Console de gestion</div>
             <div className="text-[11px] text-neutral-500 leading-tight truncate hidden sm:block">Diamond Casino · {current.label}</div>
@@ -234,9 +233,6 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
               </div>
             </div>
           ))}
-          <div className="mt-auto rounded-xl border border-white/10 bg-white/[0.02] p-3 text-[11px] text-neutral-500 leading-relaxed">
-            Chaque page a un encadré <span className="text-sky-300">« Comment ça marche ? »</span> qui explique ses réglages.
-          </div>
         </aside>
 
         <main className="flex-1 min-w-0 overflow-y-auto">

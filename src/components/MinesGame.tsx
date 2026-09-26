@@ -520,29 +520,33 @@ export const MinesGame: React.FC = () => {
         <MinesBackdrop mood={mood} />
 
         {/* Haut */}
-        <div className="absolute top-8 sm:top-10 left-3 right-3 z-30 flex items-center justify-between gap-2">
+        <div className="absolute top-8 sm:top-10 left-3 sm:left-6 right-3 sm:right-6 z-30 flex items-center justify-between gap-2">
           <Link
             to="/jeux"
-            className="flex items-center gap-1.5 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+            className="flex items-center gap-2 rounded-full bg-black/80 hover:bg-black border border-white/20 hover:border-white/40 shadow-lg backdrop-blur-md px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-white transition-all hover:scale-105 active:scale-95"
           >
-            <ArrowLeft size={14} /> Lobby
+            <ArrowLeft size={16} /> Lobby
           </Link>
-          <div className="flex items-center rounded-full bg-black/50 backdrop-blur p-1 text-[11px] font-bold">
+          <div className="flex items-center rounded-full bg-black/80 border border-white/20 shadow-lg backdrop-blur-md p-1 sm:p-1.5 text-xs sm:text-sm font-extrabold tracking-wide">
             <button
               onClick={() => phase === 'idle' && isAuthenticated && setMode('real')}
               disabled={phase !== 'idle' || !isAuthenticated}
               title={isAuthenticated ? 'Jouer avec vos jetons' : 'Connectez-vous pour jouer avec vos jetons'}
-              className={`px-3 py-1 rounded-full transition-colors ${
-                mode === 'real' ? 'bg-white text-black font-bold' : 'text-white/70 hover:text-white'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full transition-all ${
+                mode === 'real'
+                  ? 'bg-[#3fd2f2] text-black font-black shadow-[0_0_12px_rgba(63,210,242,0.5)]'
+                  : 'text-white/80 hover:text-white hover:bg-white/10'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               JETONS
             </button>
             <button
               onClick={() => phase === 'idle' && setMode('demo')}
               disabled={phase !== 'idle'}
-              className={`px-3 py-1 rounded-full transition-colors ${
-                mode === 'demo' ? 'bg-white text-black font-bold' : 'text-white/70 hover:text-white'
+              className={`px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full transition-all ${
+                mode === 'demo'
+                  ? 'bg-white text-black font-black shadow-md'
+                  : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
             >
               DÉMO
@@ -556,7 +560,7 @@ export const MinesGame: React.FC = () => {
 
           <div className="relative flex-1 h-full min-w-0 max-w-[640px] flex items-center justify-center" style={{ containerType: 'size' }}>
             <div className="relative flex flex-col items-center" style={{ width: 'min(100cqw, calc(100cqh * 0.76))' }}>
-              <MinesLogo className="relative z-20 -mb-[2%]" />
+              <MinesLogo className="relative z-20 -mt-1 sm:-mt-2 mb-2 sm:mb-3" />
 
               {/* Échelle des multiplicateurs */}
               <div className="relative z-10 w-full flex justify-center gap-[1.2%] mb-[2.5%] mt-[1%]">
@@ -1071,7 +1075,7 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
           </div>
 
           {/* Droite */}
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={p.onDec}
@@ -1120,17 +1124,23 @@ const ControlBar: React.FC<ControlBarProps> = (p) => {
                 <Plus size={22} strokeWidth={3} />
               </button>
             </div>
-            <div className="flex items-center gap-2 pr-1">
+            <div className="flex items-center justify-center gap-2">
               <button
                 onClick={p.onRandom}
                 disabled={p.phase !== 'playing'}
                 title="Case au hasard (R)"
-                className="flex items-center gap-1 font-['Oswald'] font-bold tracking-wide text-[11px] px-2 py-0.5 rounded-full border text-white border-white/50 disabled:opacity-35"
+                className={`flex items-center gap-1.5 font-['Oswald'] font-bold tracking-wider text-xs sm:text-[13px] px-3.5 py-1 rounded-full border transition-all ${
+                  p.phase === 'playing'
+                    ? 'bg-white/15 border-white/40 text-white hover:bg-white/25 active:scale-95 shadow-md cursor-pointer'
+                    : 'bg-black/20 border-white/10 text-white/30 cursor-not-allowed'
+                }`}
               >
-                <Shuffle size={11} /> HASARD
+                <Shuffle size={13} strokeWidth={2.4} /> HASARD
               </button>
               {cash && (
-                <span className="font-['Oswald'] font-bold text-[11px] px-2 py-0.5 rounded-full bg-[#5ee8ff] text-[#07203a]">x{fmt(p.multiplier)}</span>
+                <span className="font-['Oswald'] font-bold text-xs sm:text-[13px] px-2.5 py-1 rounded-full bg-[#5ee8ff] text-[#07203a] shadow-sm">
+                  x{fmt(p.multiplier)}
+                </span>
               )}
             </div>
           </div>

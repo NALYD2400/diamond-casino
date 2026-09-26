@@ -592,29 +592,29 @@ export const DogHouseGame: React.FC = () => {
         <Scenery night={isNight} />
 
         {/* Barre supérieure : retour / mode */}
-        <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between gap-2">
+        <div className="absolute top-3 left-3 sm:left-6 right-3 sm:right-6 z-30 flex items-center justify-between gap-2">
           <Link
             to="/jeux"
-            className="flex items-center gap-1.5 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+            className="flex items-center gap-2 rounded-full bg-black/80 hover:bg-black border border-white/20 hover:border-white/40 shadow-lg backdrop-blur-md px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-white transition-all hover:scale-105 active:scale-95"
           >
-            <ArrowLeft size={14} /> Lobby
+            <ArrowLeft size={16} /> Lobby
           </Link>
-          <div className="flex items-center rounded-full bg-black/45 backdrop-blur p-1 text-[11px] font-bold">
+          <div className="flex items-center rounded-full bg-black/80 border border-white/20 shadow-lg backdrop-blur-md p-1 sm:p-1.5 text-xs sm:text-sm font-extrabold tracking-wide">
             <button
               onClick={() => !locked && isAuthenticated && setMode('real')}
               disabled={locked || !isAuthenticated}
               title={isAuthenticated ? 'Jouer avec vos jetons' : 'Connectez-vous pour jouer avec vos jetons'}
-              className={`px-3 py-1 rounded-full transition-colors ${
-                mode === 'real' ? 'bg-[#ffcf3f] text-[#3b1d0e]' : 'text-white/70 hover:text-white'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full transition-all ${
+                mode === 'real' ? 'bg-[#ffcf3f] text-[#3b1d0e] font-black shadow-[0_0_12px_rgba(255,207,63,0.5)]' : 'text-white/80 hover:text-white hover:bg-white/10'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               JETONS
             </button>
             <button
               onClick={() => !locked && setMode('demo')}
               disabled={locked}
-              className={`px-3 py-1 rounded-full transition-colors ${
-                mode === 'demo' ? 'bg-white text-[#3b1d0e]' : 'text-white/70 hover:text-white'
+              className={`px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full transition-all ${
+                mode === 'demo' ? 'bg-white text-[#3b1d0e] font-black shadow-md' : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
             >
               DÉMO

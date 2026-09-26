@@ -271,9 +271,9 @@ export const MinesBackdrop: React.FC<{ mood: MinesMood }> = ({ mood }) => {
       <Lantern className="left-[calc(8%+30px)] top-[18px] sm:top-[26px] hidden md:block" />
       <Lantern className="right-[calc(8%+30px)] top-[18px] sm:top-[26px] hidden md:block" />
       {/* cristaux lumineux */}
+      <CrystalCluster className="absolute left-[10%] bottom-[7%] w-[13vmin] max-w-[120px] opacity-85" color="#9a7aff" glow="rgba(154,122,255,0.6)" flip />
       <CrystalCluster className="absolute left-[-2%] bottom-[8%] w-[28vmin] max-w-[260px]" color="#3fd2f2" glow="rgba(63,210,242,0.7)" />
       <CrystalCluster className="absolute right-[-2%] bottom-[10%] w-[24vmin] max-w-[220px]" color="#ff5fc4" glow="rgba(255,95,196,0.65)" flip />
-      <CrystalCluster className="absolute left-[1%] bottom-[34%] w-[11vmin] max-w-[100px] opacity-75" color="#9a7aff" glow="rgba(154,122,255,0.6)" flip />
       {/* sol */}
       <svg viewBox="0 0 1200 200" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 w-full h-[16%]">
         <path d="M0 90 Q200 50 400 80 T800 70 T1200 85 V200 H0 Z" fill="#120b22" />

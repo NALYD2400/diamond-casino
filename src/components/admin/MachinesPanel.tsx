@@ -22,6 +22,8 @@ import { useCasinoAdmin, type WheelSegmentConfig } from '../../context/CasinoAdm
 import type { GamesConfig } from '../../lib/gamesConfig';
 import { apiAdminGameStats, type AdminGameStats, type StatsGameId } from '../../lib/supabase';
 import { calculateMultiplier } from '../mines/minesMath';
+import { MAX_WIN_X_BET, maxBuyBet } from '../doghouse/dogHouseEngine';
+import { MAX_WIN_X } from '../wanted/wantedEngine';
 import type { AdminTab } from '../AdminConsole';
 import {
   Badge,
@@ -739,6 +741,7 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
   );
 
   const betFields = (g: 'mines' | 'doghouse' | 'wanted') => (
+    <>
     <Card title="Mises et plafond">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Mise minimum" hint="Plus petite mise acceptée">
@@ -752,6 +755,8 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
         </Field>
       </div>
     </Card>
+    <CapCheck game={g} cfg={draft} />
+    </>
   );
 
   const retour = (value: number, price: number) => {
@@ -943,6 +948,58 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
 // ---------------------------------------------------------------------------
 // Petites briques
 // ---------------------------------------------------------------------------
+
+/** Ce que donnent réellement les mises et le plafond de gain réglés, avec les incohérences signalées */
+const CapCheck: React.FC<{ game: 'mines' | 'doghouse' | 'wanted'; cfg: GamesConfig }> = ({ game, cfg }) => {
+  const c = cfg[game];
+  const theoretical = game === 'doghouse' ? MAX_WIN_X_BET : game === 'wanted' ? MAX_WIN_X : null;
+  const capX = Math.floor(c.maxPayout / Math.max(1, c.maxBet));
+  const effective = theoretical === null ? capX : Math.min(theoretical, capX);
+  const cut = theoretical !== null && capX < theoretical;
+
+  const buys: { name: string; priceX: number }[] =
+    game === 'doghouse' && cfg.doghouse.buyEnabled
+      ? [{ name: 'Achat du bonus', priceX: cfg.doghouse.buyPrice }]
+      : game === 'wanted' && cfg.wanted.buyEnabled
+        ? [
+            { name: 'Great Train Robbery', priceX: cfg.wanted.buyPrices.gtr },
+            { name: 'Duel at Dawn', priceX: cfg.wanted.buyPrices.duel },
+            { name: "Dead Man's Hand", priceX: cfg.wanted.buyPrices.dmh },
+          ]
+        : [];
+
+  return (
+    <Card title="Cohérence des plafonds">
+      <div className="flex flex-col gap-2 text-[13px] text-neutral-300">
+        <div>
+          À la mise maximum ({fmt(c.maxBet)} ⛁), le gain maximum possible est de <b className="text-white">×{fmt(effective)}</b> la mise
+          {theoretical !== null && ` (le jeu permet jusqu'à ×${fmt(theoretical)} à petite mise)`}.
+          {cut && <span className="text-amber-300"> Le plafond de gain coupe les plus gros gains à cette mise.</span>}
+        </div>
+        {buys.map((b) => {
+          const limit = maxBuyBet(b.priceX, c.maxPayout);
+          const impossible = limit < c.minBet;
+          const limited = limit < c.maxBet;
+          return (
+            <div key={b.name} className="flex items-start gap-2">
+              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${impossible ? 'bg-rose-400' : limited ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+              <span>
+                <b className="text-white">{b.name}</b> (×{b.priceX}) :{' '}
+                {impossible ? (
+                  <span className="text-rose-300">achat impossible, même à la mise minimum. Augmentez le gain max. par manche.</span>
+                ) : limited ? (
+                  <span className="text-amber-300">achat limité aux mises jusqu'à {fmt(limit)} ⛁ (le gain max. doit rester au moins 5× le prix payé).</span>
+                ) : (
+                  <span className="text-emerald-300">autorisé à toutes les mises.</span>
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
 
 const Highlight: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode; hint?: React.ReactNode; valueClass?: string }> = ({ icon, label, value, hint, valueClass }) => (
   <div className="rounded-2xl bg-neutral-950 border border-white/10 p-4 flex flex-col gap-2 min-w-0">

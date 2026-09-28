@@ -123,6 +123,19 @@ export const GAME_LABELS: Record<string, string> = {
   'Wanted Dead or a Wild': 'Wanted Dead or a Wild',
 };
 
+/**
+ * RTP théorique des machines à sous : fixé par le moteur de tirage (calibré par
+ * simulation), la console admin ne peut pas le modifier. Mines est différent :
+ * son RTP se règle dans la console, on lit alors gamesConfig.mines.rtp.
+ * Toute l'interface passe par ces valeurs pour rester cohérente.
+ * Vérification : npm run check:rtp (simulation des moteurs, ~2 min).
+ */
+export const SLOT_RTP = { doghouse: 95, wanted: 96.4 } as const;
+
+/** 96.5 -> "96,5 %", 97 -> "97 %" */
+export const formatRtp = (rtp: number): string =>
+  `${(Math.round(rtp * 10) / 10).toString().replace('.', ',')} %`;
+
 /** Garde les paliers de mise compris entre min et max (au moins un) */
 export function clampBetLevels(levels: readonly number[], min: number, max: number): number[] {
   const list = levels.filter((b) => b >= min && b <= max);

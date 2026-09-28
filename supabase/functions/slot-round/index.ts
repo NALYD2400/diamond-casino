@@ -13,8 +13,8 @@
  * src/components/** — lancer `npm run sync:edge` après toute modification.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { playDogHouseRound, type DogRoundMode } from './dogHouseEngine.ts';
-import { playWantedRound, type WantedBonus } from './wantedEngine.ts';
+import { playDogHouseRound, maxBuyBet as dogMaxBuyBet, type DogRoundMode } from './dogHouseEngine.ts';
+import { playWantedRound, maxBuyBet as wantedMaxBuyBet, type WantedBonus } from './wantedEngine.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -101,12 +101,14 @@ Deno.serve(async (req) => {
   if (game === 'doghouse') {
     const mode = (['spin', 'boost', 'buy'].includes(body.mode ?? '') ? body.mode : 'spin') as DogRoundMode;
     if (mode === 'buy' && !cfg.buyEnabled) return json({ error: 'BUY_DISABLED' }, 403);
+    if (mode === 'buy' && bet > dogMaxBuyBet(cfg.buyPrice, cfg.maxPayout)) return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
     if (mode === 'boost' && !cfg.boostEnabled) return json({ error: 'BOOST_DISABLED' }, 403);
     round = playDogHouseRound({ bet, mode, buyPriceX: cfg.buyPrice, maxPayout: cfg.maxPayout, rng: secureRandom });
     detail = { mode, bonus: round.freeSpins ? 'free_spins' : null };
   } else {
     const buy = (['gtr', 'duel', 'dmh'].includes(body.buy ?? '') ? body.buy : null) as WantedBonus | null;
     if (buy && !cfg.buyEnabled) return json({ error: 'BUY_DISABLED' }, 403);
+    if (buy && bet > wantedMaxBuyBet(cfg.buyPrices[buy], cfg.maxPayout)) return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
     round = playWantedRound({ bet, buy, buyPrices: cfg.buyPrices, maxPayout: cfg.maxPayout, rng: secureRandom });
     detail = { mode: buy ? 'buy' : 'spin', bonus: round.bonus?.bonus ?? null };
   }

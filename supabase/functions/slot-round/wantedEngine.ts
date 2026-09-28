@@ -471,6 +471,17 @@ export interface WantedRound {
   totalWin: number;
 }
 
+/**
+ * Achat de bonus : le gain maximum d'une manche (maxPayout) doit rester au moins
+ * BUY_CAP_RATIO fois plus haut que le prix payé, sinon le joueur débourse plus
+ * qu'il ne peut gagner. Plus grosse mise autorisée pour acheter ce bonus.
+ * (Même fonction dans dogHouseEngine.ts et wantedEngine.ts : copiées côté serveur.)
+ */
+export const BUY_CAP_RATIO = 5;
+export function maxBuyBet(buyPriceX: number, maxPayout: number): number {
+  return Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
+}
+
 export function playWantedRound(params: {
   bet: number;
   buy?: WantedBonus | null;

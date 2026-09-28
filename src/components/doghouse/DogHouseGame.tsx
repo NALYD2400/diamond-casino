@@ -18,7 +18,7 @@ import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
-import { clampBetLevels } from '../../lib/gamesConfig';
+import { clampBetLevels, SLOT_RTP, formatRtp } from '../../lib/gamesConfig';
 import { DogHouseAudio } from './dogHouseAudio';
 import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
@@ -33,6 +33,7 @@ import {
   SCATTER_PAY_X_BET,
   dogRoundCost,
   getWinTier,
+  maxBuyBet,
   playDogHouseRound,
   randomStripSymbol,
   type DogFreeSpinsRound,
@@ -137,6 +138,11 @@ export const DogHouseGame: React.FC = () => {
     return idx >= 0 ? idx : 0;
   });
   const bet = betLevels[Math.min(betIdx, betLevels.length - 1)];
+  // Le gain d'une manche est plafonné : au-delà de cette mise, le bonus coûterait plus que le gain possible
+  const buyMaxBet = maxBuyBet(buyPriceX, cfg.maxPayout);
+  const buyBetTooHigh = bet > buyMaxBet;
+  // Gain maximum réellement possible à cette mise (plafond de la machine ou de la manche)
+  const maxWinX = Math.min(MAX_WIN_X_BET, Math.floor(cfg.maxPayout / bet));
 
   const [grid, setGrid] = useState<DogSymbolId[][]>(INITIAL_GRID);
   const [mults, setMults] = useState<number[][]>(() => INITIAL_GRID.map((c) => c.map((s) => (s === 'wild' ? 3 : 1))));
@@ -156,7 +162,7 @@ export const DogHouseGame: React.FC = () => {
   const [bigWin, setBigWin] = useState<{ amount: number; shown: number; bet: number } | null>(null);
   const [freeSpins, setFreeSpins] = useState<FreeSpinsState | null>(null);
   const [fsIntro, setFsIntro] = useState<{ values: number[]; revealed: number } | null>(null);
-  const [fsEnd, setFsEnd] = useState<{ win: number; spins: number } | null>(null);
+  const [fsEnd, setFsEnd] = useState<{ win: number; spins: number; planned: number; total: number } | null>(null);
 
   const [turbo, setTurbo] = useState(false);
   const [boostOn, setBoost] = useState(false);
@@ -414,7 +420,8 @@ export const DogHouseGame: React.FC = () => {
       audio.current.stopFreeSpinsMusic();
       await wait(600);
       setPhase('overlay');
-      setFsEnd({ win: fsWin, spins: total });
+      // Le serveur coupe le bonus dès que le gain maximum de la manche est atteint
+      setFsEnd({ win: fsWin, spins: fs.spins.length, planned: total, total: alreadyWon + fsWin });
       audio.current.bonusEnd();
       await waitClick();
       setFsEnd(null);
@@ -644,8 +651,14 @@ export const DogHouseGame: React.FC = () => {
               {cfg.buyEnabled && (
                 <BuyBonusButton
                   price={dogRoundCost(bet, 'buy', buyPriceX)}
-                  disabled={locked || freeSpins !== null || boost}
-                  disabledReason={boost ? 'Désactivez le Boost pour acheter' : undefined}
+                  disabled={locked || freeSpins !== null || boost || buyBetTooHigh}
+                  disabledReason={
+                    boost
+                      ? 'Désactivez le Boost pour acheter'
+                      : buyBetTooHigh
+                        ? `Achat possible jusqu'à ${fmt(buyMaxBet)} de mise`
+                        : undefined
+                  }
                   onClick={() => setBuyOpen(true)}
                 />
               )}
@@ -681,7 +694,7 @@ export const DogHouseGame: React.FC = () => {
             <div className="hidden lg:flex w-[150px] xl:w-[160px] flex-col gap-2 shrink-0">
               <div className="rounded-2xl bg-black/45 backdrop-blur p-3 text-center border border-white/10 shadow-lg">
                 <div className="dh-font text-[#ffcf3f] text-sm">GAIN MAX</div>
-                <div className="dh-font text-white text-2xl">{fmt(MAX_WIN_X_BET)}x</div>
+                <div className="dh-font text-white text-2xl">{fmt(maxWinX)}x</div>
               </div>
               <div className="rounded-2xl bg-black/45 backdrop-blur p-3 text-center border border-white/10 shadow-lg">
                 <div className="dh-font text-[#ffcf3f] text-sm">WILDS</div>
@@ -720,7 +733,7 @@ export const DogHouseGame: React.FC = () => {
           onInfo={() => setInfoOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onBuy={cfg.buyEnabled ? () => setBuyOpen(true) : undefined}
-          buyDisabled={locked || freeSpins !== null || boost}
+          buyDisabled={locked || freeSpins !== null || boost || buyBetTooHigh}
         />
 
         {/* Overlays */}
@@ -728,7 +741,7 @@ export const DogHouseGame: React.FC = () => {
         {fsIntro && (
           <FreeSpinsIntro values={fsIntro.values} revealed={fsIntro.revealed} onStart={resolveClick} />
         )}
-        {fsEnd && <FreeSpinsEnd win={fsEnd.win} spins={fsEnd.spins} onClose={resolveClick} />}
+        {fsEnd && <FreeSpinsEnd win={fsEnd.win} spins={fsEnd.spins} planned={fsEnd.planned} total={fsEnd.total} onClose={resolveClick} />}
         {autoOpen && (
           <Modal title="JEU AUTOMATIQUE" onClose={() => setAutoOpen(false)}>
             <p className="text-sm text-white/70 mb-4 text-center">
@@ -764,6 +777,11 @@ export const DogHouseGame: React.FC = () => {
             <p className="text-center text-white/50 text-xs mb-5">
               {buyPriceX}x la mise actuelle ({fmt(bet)}) · 9 à 27 tours avec wilds collants
             </p>
+            {buyBetTooHigh && (
+              <p className="text-center text-[#ff9a8a] text-xs mb-4">
+                Mise trop haute pour acheter : le gain maximum est plafonné à {fmt(cfg.maxPayout)}. Achat possible jusqu'à {fmt(buyMaxBet)} de mise.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setBuyOpen(false)}
@@ -772,7 +790,7 @@ export const DogHouseGame: React.FC = () => {
                 ANNULER
               </button>
               <button
-                disabled={displayCredit < dogRoundCost(bet, 'buy', buyPriceX)}
+                disabled={buyBetTooHigh || displayCredit < dogRoundCost(bet, 'buy', buyPriceX)}
                 onClick={() => {
                   setBuyOpen(false);
                   void playRound(true);
@@ -1151,7 +1169,7 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-white/60">RTP théorique</span>
-                  <span className="text-[#7dff5a] font-bold">96,5 %</span>
+                  <span className="text-[#7dff5a] font-bold">{formatRtp(SLOT_RTP.doghouse)}</span>
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-white/60">Volatilité</span>
@@ -1460,7 +1478,7 @@ const FreeSpinsIntro: React.FC<{ values: number[]; revealed: number; onStart: ()
   );
 };
 
-const FreeSpinsEnd: React.FC<{ win: number; spins: number; onClose: () => void }> = ({ win, spins, onClose }) => (
+const FreeSpinsEnd: React.FC<{ win: number; spins: number; planned: number; total: number; onClose: () => void }> = ({ win, spins, planned, total, onClose }) => (
   <div onClick={onClose} className="absolute inset-0 z-40 flex items-center justify-center overflow-hidden bg-black/75 p-4 cursor-pointer">
     <Rays />
     {win > 0 && <Coins count={24} />}
@@ -1468,7 +1486,14 @@ const FreeSpinsEnd: React.FC<{ win: number; spins: number; onClose: () => void }
       <div className="dh-font-xl text-3xl sm:text-4xl dh-bigwin-text">FÉLICITATIONS !</div>
       <p className="dh-font text-white mt-2">VOUS AVEZ GAGNÉ</p>
       <div className="dh-font text-6xl text-[#ffe14a] my-2 drop-shadow-[0_4px_0_#3b1d0e]">{fmt(win)}</div>
-      <p className="dh-font text-white">EN {spins} TOURS GRATUITS</p>
+      <p className="dh-font text-white">
+        EN {spins} TOURS GRATUITS{spins < planned ? ` SUR ${planned}` : ''}
+      </p>
+      {spins < planned && (
+        <p className="mt-2 text-xs text-white/80">
+          Gain maximum de la manche atteint : {fmt(total)} au total. Le bonus s'arrête à ce plafond.
+        </p>
+      )}
       <button className="mt-5 dh-font text-xl px-10 py-3 rounded-full bg-gradient-to-b from-[#7dff5a] to-[#1fa33a] border-[3px] border-[#0a4515] text-[#0a2d0a] shadow-[0_4px_0_#0a4515]">
         CONTINUER
       </button>
@@ -1572,7 +1597,7 @@ const PaytableModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, on
       </div>
       <p className="text-white/50 text-[11px] text-center mt-4">
         Gains de gauche à droite sur lignes adjacentes. Seul le gain le plus élevé par ligne est payé. Gain maximum :{' '}
-        {fmt(MAX_WIN_X_BET)}x la mise. RTP théorique ≈ 95 % (tirages effectués par le serveur).
+        {fmt(MAX_WIN_X_BET)}x la mise. RTP théorique {formatRtp(SLOT_RTP.doghouse)} (tirages effectués par le serveur).
       </p>
     </Modal>
   );
@@ -1586,7 +1611,7 @@ const GameInfoStrip: React.FC = () => (
         <div className="text-[#b1bad3] text-xs">Diamond Originals · Machine à sous</div>
       </div>
       {[
-        { l: 'RTP', v: '96,5 %' },
+        { l: 'RTP', v: formatRtp(SLOT_RTP.doghouse) },
         { l: 'Volatilité', v: 'Élevée' },
         { l: 'Gain max', v: `${fmt(MAX_WIN_X_BET)}x` },
         { l: 'Lignes', v: '20 fixes' },

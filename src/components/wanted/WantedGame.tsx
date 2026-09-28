@@ -6,7 +6,7 @@ import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
-import { clampBetLevels } from '../../lib/gamesConfig';
+import { clampBetLevels, SLOT_RTP, formatRtp } from '../../lib/gamesConfig';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
 import { WantedAudio } from './wantedAudio';
@@ -22,6 +22,7 @@ import {
   ROWS,
   getWantedTier,
   playWantedRound,
+  maxBuyBet,
   randomStripSymbol,
   type Cell,
   type DmhLanding,
@@ -646,9 +647,9 @@ export const WantedGame: React.FC = () => {
             </div>
           </div>
           <div className="hidden lg:flex w-[170px] shrink-0 flex-col gap-2">
-            <InfoCard title="GAIN MAX" value={`${fmt(MAX_WIN_X)}x`} />
+            <InfoCard title="GAIN MAX" value={`${fmt(Math.min(MAX_WIN_X, Math.floor(cfg.maxPayout / bet)))}x`} />
             <InfoCard title="VS" value="x2 → x100" sub="Multiplicateurs additionnés sur la ligne" />
-            <InfoCard title="RTP" value="96,4 %" />
+            <InfoCard title="RTP" value={formatRtp(SLOT_RTP.wanted)} />
           </div>
         </div>
 
@@ -688,10 +689,11 @@ export const WantedGame: React.FC = () => {
             <div className="grid sm:grid-cols-3 gap-3">
               {(Object.keys(BONUS_INFO) as WantedBonus[]).map((b) => {
                 const price = bet * buyPrices[b];
+                const tooHigh = bet > maxBuyBet(buyPrices[b], cfg.maxPayout);
                 return (
                   <button
                     key={b}
-                    disabled={displayCredit < price}
+                    disabled={tooHigh || displayCredit < price}
                     onClick={() => {
                       setBuyOpen(false);
                       void playRound(b);
@@ -705,6 +707,11 @@ export const WantedGame: React.FC = () => {
                     <div className="text-xs text-center mt-1 opacity-80">{BONUS_INFO[b].tagline}</div>
                     <div className="mt-3 text-center font-['Oswald'] font-bold text-2xl">{fmt(price)}</div>
                     <div className="text-center text-[11px] opacity-70">{buyPrices[b]}x la mise</div>
+                    {tooHigh && (
+                      <div className="mt-1 text-center text-[11px] font-bold text-[#8a1c10]">
+                        Mise max : {fmt(maxBuyBet(buyPrices[b], cfg.maxPayout))}
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -1456,7 +1463,7 @@ const RulesModal: React.FC<{ bet: number; prices: Record<WantedBonus, number>; o
       ))}
     </div>
     <p className="text-white/50 text-[11px] text-center mt-4">
-      Gain maximum : {fmt(MAX_WIN_X)}x la mise, le tour s'arrête dès qu'il est atteint. RTP théorique ≈ 96 % (tirages effectués par le serveur).
+      Gain maximum : {fmt(MAX_WIN_X)}x la mise, le tour s'arrête dès qu'il est atteint. RTP théorique {formatRtp(SLOT_RTP.wanted)} (tirages effectués par le serveur).
     </p>
   </Modal>
 );

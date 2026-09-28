@@ -203,7 +203,8 @@ export const MinesGame: React.FC = () => {
   const ladder = useMemo(() => getMultiplierLadder(mines, rtp), [mines, rtp]);
   const nextMult = calculateMultiplier(mines, (playing ? gems : 0) + 1, rtp);
   const nextProb = getNextStepProbability(mines, playing ? gems : 0);
-  const maxMult = ladder[ladder.length - 1]?.multiplier ?? 1;
+  // Le gain d'une manche est plafonné (maxPayout) : le vrai maximum dépend de la mise
+  const maxMult = Math.min(ladder[ladder.length - 1]?.multiplier ?? 1, cfg.maxPayout / bet);
 
   // ---------------------------------------------------------------------------
   // Déroulé d'une manche
@@ -645,7 +646,7 @@ export const MinesGame: React.FC = () => {
               tone={nextProb >= 70 ? 'good' : nextProb >= 40 ? 'mid' : 'bad'}
               sub="De tomber sur un diamant"
             />
-            <InfoCard title="GAIN MAX" value={`x${fmt(Math.round(maxMult))}`} sub={`Les ${GRID_SIZE - mines} diamants trouvés`} />
+            <InfoCard title="GAIN MAX" value={`x${fmt(Math.round(maxMult))}`} sub={maxMult < (ladder[ladder.length - 1]?.multiplier ?? 1) ? 'Plafond de gain de la manche' : `Les ${GRID_SIZE - mines} diamants trouvés`} />
           </div>
         </div>
 

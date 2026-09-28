@@ -92,6 +92,18 @@ export const DOG_PAYLINES: readonly (readonly number[])[] = [
 
 export const SCATTER_PAY_X_BET = 5;
 export const MAX_WIN_X_BET = 6750;
+
+/**
+ * Achat de bonus : le gain maximum d'une manche (maxPayout) doit rester au moins
+ * BUY_CAP_RATIO fois plus haut que le prix payé, sinon le joueur débourse plus
+ * qu'il ne peut gagner. Plus grosse mise autorisée pour acheter ce bonus.
+ * (Même fonction dans dogHouseEngine.ts et wantedEngine.ts : copiées côté serveur.)
+ */
+export const BUY_CAP_RATIO = 5;
+export function maxBuyBet(buyPriceX: number, maxPayout: number): number {
+  return Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
+}
+
 /**
  * Prix d'achat du bonus (valeur par défaut, réglable dans la console admin).
  * Le bonus acheté vaut ≈ 110x la mise en moyenne (simulation 150 000 manches) :

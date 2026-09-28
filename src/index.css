@@ -8,6 +8,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --background: 0 0% 0%;
   --foreground: 0 0% 100%;
 }
@@ -19,6 +20,16 @@ html, body {
   padding: 0;
   font-family: var(--font-sans);
   overflow-x: hidden;
+  color-scheme: dark;
+}
+
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #171717;
+  color: #ffffff;
 }
 
 /* Liquid glass luxury monochrome styling */
@@ -412,3 +423,105 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .wf-marquee { animation: none; }
 }
+
+/* ---- Boosters (cartes véhicules) ---- */
+.bst-card {
+  --mx: 50%;
+  --my: 50%;
+  --rx: 0deg;
+  --ry: 0deg;
+  --glare: 0;
+  transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bst-card.bst-tracking { transition: transform 0.08s linear; }
+.bst-holo {
+  background:
+    repeating-linear-gradient(115deg,
+      rgba(255, 0, 132, 0.55) 0%, rgba(255, 196, 0, 0.5) 7%, rgba(0, 255, 170, 0.5) 14%,
+      rgba(0, 160, 255, 0.55) 21%, rgba(170, 0, 255, 0.5) 28%, rgba(255, 0, 132, 0.55) 35%);
+  background-size: 300% 300%;
+  background-position: var(--mx) var(--my);
+  mix-blend-mode: color-dodge;
+  opacity: calc(0.18 + var(--glare) * 0.45);
+  filter: brightness(0.9) contrast(1.4);
+}
+.bst-sparkle {
+  background-image:
+    radial-gradient(circle at 20% 30%, #fff 0.6px, transparent 1.4px),
+    radial-gradient(circle at 70% 60%, #fff 0.6px, transparent 1.4px),
+    radial-gradient(circle at 40% 80%, #fff 0.5px, transparent 1.2px);
+  background-size: 38px 38px, 54px 54px, 29px 29px;
+  background-position: calc(var(--mx) * 0.3) calc(var(--my) * 0.3);
+  mix-blend-mode: overlay;
+  opacity: calc(0.25 + var(--glare) * 0.6);
+}
+.bst-glare {
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 45%);
+  mix-blend-mode: overlay;
+  opacity: var(--glare);
+}
+.bst-mythic-border {
+  background: conic-gradient(from var(--bst-angle, 0deg), #ff004c, #ffb800, #00ffa2, #00a2ff, #b400ff, #ff004c);
+  animation: bst-spin 4s linear infinite;
+}
+@property --bst-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes bst-spin { to { --bst-angle: 360deg; } }
+.bst-shimmer {
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: bst-shimmer 3.2s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes bst-shimmer { 0% { background-position: 150% 0; } 60%, 100% { background-position: -100% 0; } }
+.bst-back-pattern {
+  background-color: #07070a;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 14px),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), transparent 70%);
+}
+.bst-back-pulse { animation: bst-back-pulse 1.1s ease-in-out infinite; }
+@keyframes bst-back-pulse { 50% { box-shadow: 0 0 46px 6px var(--bst-hint, rgba(255, 255, 255, 0.4)); } }
+.bst-rays {
+  background: repeating-conic-gradient(from 0deg, var(--bst-ray, rgba(255, 215, 0, 0.35)) 0deg 7deg, transparent 7deg 20deg);
+  mask-image: radial-gradient(circle, #000 20%, transparent 68%);
+  -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 68%);
+  animation: bst-rays-spin 14s linear infinite;
+}
+@keyframes bst-rays-spin { to { transform: rotate(360deg); } }
+.bst-foil {
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0) 20%, rgba(255, 255, 255, 0.35) 38%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(160deg, var(--bst-accent-light), var(--bst-accent) 45%, var(--bst-accent-dark));
+  background-size: 250% 100%, 100% 100%;
+  animation: bst-foil 5s ease-in-out infinite;
+}
+@keyframes bst-foil { 0%, 100% { background-position: 120% 0, 0 0; } 50% { background-position: -40% 0, 0 0; } }
+.bst-crimp {
+  background-image: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0 2px, rgba(255, 255, 255, 0.18) 2px 4px);
+}
+.bst-shake { animation: bst-shake 0.45s linear infinite; }
+@keyframes bst-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-2px, 1px) rotate(-0.6deg); }
+  40% { transform: translate(2px, -1px) rotate(0.6deg); }
+  60% { transform: translate(-1px, -2px) rotate(-0.4deg); }
+  80% { transform: translate(1px, 2px) rotate(0.4deg); }
+}
+.bst-float { animation: bst-float 5s ease-in-out infinite; }
+@keyframes bst-float { 50% { transform: translateY(-10px); } }
+
+.bst-pack-sweep {
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.42) 48%, rgba(255, 255, 255, 0.12) 52%, transparent 62%);
+  background-size: 300% 100%;
+  mix-blend-mode: overlay;
+  animation: bst-pack-sweep 5.5s ease-in-out infinite;
+}
+@keyframes bst-pack-sweep { 0%, 55% { background-position: 150% 0; } 100% { background-position: -60% 0; } }
+
+/* Boosters : la mise en scène fait partie du jeu ; avec « réduire les animations »,
+   seuls le tremblement d'écran et le flash sont coupés (côté React). */
+
+.bst-paused { animation-play-state: paused !important; }

@@ -22,14 +22,14 @@ import {
 import { useCasinoUser, type CasinoTransaction } from '../context/CasinoUserContext';
 import { sanitizeText, isValidCitizenId, isValidRPName, isValidPhoneNumber } from '../lib/security';
 import { hasAdminPermissions } from '../lib/discord';
-import { MemberRewards } from './member/MemberRewards';
+import { MemberInventory } from './member/MemberInventory';
 
 interface MemberPortalProps {
   onBackToHome?: () => void;
   onNavigateToWheel?: () => void;
 }
 
-type ConsoleTab = 'overview' | 'lots' | 'vault' | 'profile' | 'vip';
+type ConsoleTab = 'overview' | 'inventory' | 'vault' | 'profile' | 'vip';
 
 const formatTxLabel = (label: string): string => {
   return label.replace(/\b(\d{4,})\b/g, (m) => Number(m).toLocaleString('fr-FR'));
@@ -54,7 +54,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // L'historique n'est chargé que tant que l'espace membre est affiché
   useEffect(() => watchHistory(), [watchHistory]);
 
-  const [activeTab, setActiveTab] = useState<ConsoleTab>('overview');
+  // #inventaire dans l'adresse ouvre directement l'inventaire (lien depuis les jeux)
+  const [activeTab, setActiveTab] = useState<ConsoleTab>(() =>
+    typeof window !== 'undefined' && window.location.hash === '#inventaire' ? 'inventory' : 'overview',
+  );
   const [txFilter, setTxFilter] = useState<'ALL' | 'WHEEL' | 'VIP' | 'GAMES'>('ALL');
   const [txSearchQuery, setTxSearchQuery] = useState<string>('');
   const [isEditingModalOpen, setIsEditingModalOpen] = useState<boolean>(false);
@@ -438,10 +441,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0">
             {[
               { id: 'overview', label: "Vue d'ensemble" },
-              { 
-                id: 'lots', 
-                label: 'Mes récompenses', 
-                count: user.rewards.filter((r) => r.status === 'IN_INVENTORY').length 
+              {
+                id: 'inventory',
+                label: 'Inventaire',
+                count: user.rewards.filter((r) => r.status === 'IN_INVENTORY').length,
               },
               { id: 'vault', label: 'Historique des jetons' },
               { id: 'profile', label: 'Mon profil' },
@@ -749,7 +752,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     </div>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('lots')}
+                      onClick={() => setActiveTab('inventory')}
                       className="text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer"
                     >
                       Inventaire ({user.rewards.length}) &rarr;
@@ -808,20 +811,17 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         {/* =================================================================== */}
         {/* TAB 2: MES RÉCOMPENSES (UTILISE MEMBER REWARDS)                     */}
         {/* =================================================================== */}
-        {activeTab === 'lots' && (
+        {activeTab === 'inventory' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-              <div>
-                <h1 className="text-lg font-semibold text-white tracking-tight">
-                  Mes Récompenses &amp; Lots
-                </h1>
-                <p className="text-xs text-neutral-400 mt-0.5">
-                  Consultez les véhicules et gains remportés à la Roue et demandez leur remise en ville.
-                </p>
-              </div>
+            <div className="pb-4 border-b border-neutral-800">
+              <h1 className="text-lg font-semibold text-white tracking-tight">Inventaire</h1>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Tout ce que vous avez gagné (roue, boosters, cadeaux) au même endroit : revendez un objet contre des jetons ou réclamez-le pour le recevoir
+                en ville.
+              </p>
             </div>
 
-            <MemberRewards showToast={showToast} />
+            <MemberInventory showToast={showToast} />
           </div>
         )}
 

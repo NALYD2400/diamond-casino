@@ -1,0 +1,5 @@
+Sons du jeu Boosters (The Diamond Casino) — CC0 (domaine public).
+
+- Ouverture du paquet (tear-*), sortie des cartes (take-out-*), retournement (flip-*),
+  glissement (slide-*) : "Casino Audio" par Kenney — https://kenney.nl/assets/casino-audio
+Convertis en MP3 avec ffmpeg (crête à -3 dB, sans compression).

@@ -9,6 +9,7 @@ const CATEGORY: Record<LogCategory, { label: string; tone: 'info' | 'gold' | 'vi
   ECONOMY: { label: 'Jetons & jeux', tone: 'gold' },
   WHEEL: { label: 'Roue', tone: 'info' },
   SYSTEM: { label: 'Système', tone: 'neutral' },
+  BOOSTER: { label: 'Boosters', tone: 'violet' },
 };
 
 export const LogsPanel: React.FC = () => {

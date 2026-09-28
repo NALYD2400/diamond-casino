@@ -9,7 +9,9 @@ import {
   isValidDiscordId,
 } from './src/lib/security';
 import { getDefaultDiscordAvatar, parseDiscordUserFromSession, hasAdminPermissions } from './src/lib/discord';
-import { supabase, dbCheckHealth, apiRecentWheelWins, apiSubscribeEvents, CasinoApiError } from './src/lib/supabase';
+import { supabase, dbCheckHealth, apiRecentWheelWins, apiSubscribeEvents, apiBoosterCatalog, apiOpenBooster, apiAdminSimulateBooster, CasinoApiError } from './src/lib/supabase';
+import type { BoosterCardData, BoosterRarity } from './src/lib/supabase';
+import { expectedRarityShares, packExpectedValue, packOdds, pickWeighted, resolveCard, rarityMap, suggestPrice, tiltRarityWeights } from './src/components/boosters/boosterUtils';
 import {
   calculateMultiplier,
   getNextStepProbability,
@@ -317,6 +319,79 @@ async function main() {
     })()],
   ]);
 
+  // Boosters : tirage pondéré (miroir du serveur) et résolution des cartes
+  const bRarities: BoosterRarity[] = [
+    { key: 'COMMUNE', label: 'Commune', color: '#a3a3a3', effect: 'none', sort: 0 },
+    { key: 'RARE', label: 'Rare', color: '#3b82f6', effect: 'glow', sort: 1 },
+    { key: 'MYTHIQUE', label: 'Mythique', color: '#ef4444', effect: 'mythic', sort: 2 },
+  ];
+  const bCard = (id: string, rarity: string, price: number | null, extra: Partial<BoosterCardData> = {}): BoosterCardData => ({
+    id, vehicle_model: `m_${id}`, rarity, title: null, subtitle: null, image_url: null, value_override: null, accent_color: null,
+    holo: false, active: true, value: price ?? 0,
+    vehicle: { model: `m_${id}`, manufacturer: 'PEGASSI', class: 'SUPER', type: 'CAR', seats: 2, price, photo_url: '/a.webp', photo_full_url: '/b.webp' },
+    ...extra,
+  });
+  const bCards = Object.fromEntries([bCard('a', 'COMMUNE', 1000), bCard('b', 'RARE', 5000), bCard('c', 'MYTHIQUE', 900000, { active: false })].map((c) => [c.id, c]));
+  await runGroup('BOOSTERS', [
+    ['weighted pick follows the weights', (() => {
+      const rng = seeded(77);
+      const hits = { x: 0, y: 0 };
+      for (let i = 0; i < 20000; i++) hits[pickWeighted(['x', 'y'] as const, (t) => (t === 'x' ? 3 : 1), rng())!]++;
+      const ratio = hits.x / 20000;
+      return ratio > 0.73 && ratio < 0.77;
+    })()],
+    ['zero weights are never picked', Array.from({ length: 500 }, (_, i) => pickWeighted([1, 2, 3], (n) => (n === 2 ? 0 : 1), i / 500)).every((n) => n !== 2)],
+    ['odds ignore rarities without an active card', (() => {
+      const odds = packOdds({ rarity_weights: { COMMUNE: 60, RARE: 20, MYTHIQUE: 20 }, cards: [{ card_id: 'a', weight: 1 }, { card_id: 'b', weight: 1 }, { card_id: 'c', weight: 1 }] }, bCards, bRarities);
+      return odds.length === 2 && Math.abs(odds[0].pct - 75) < 1e-9 && Math.abs(odds[1].pct - 25) < 1e-9;
+    })()],
+    ['a card shows the catalogue price unless overridden', (() => {
+      const m = rarityMap(bRarities);
+      return resolveCard(bCards.a, m).value === 1000 && resolveCard({ ...bCards.a, value_override: 42 }, m).value === 42;
+    })()],
+    ['a card uses the catalogue photo unless an image is set', (() => {
+      const m = rarityMap(bRarities);
+      return resolveCard(bCards.a, m).image === '/b.webp' && resolveCard({ ...bCards.a, image_url: 'https://x.y/z.png' }, m).image === 'https://x.y/z.png';
+    })()],
+    ['mythic cards are always holographic', resolveCard(bCard('d', 'MYTHIQUE', 1), rarityMap(bRarities)).holo],
+    ['auto-balancing the chances reaches the target value without exceeding it', (() => {
+      const cards = { ...bCards, c: { ...bCards.c, active: true } };
+      const pack = { rarity_weights: { COMMUNE: 60, RARE: 30, MYTHIQUE: 10 }, cards: [{ card_id: 'a', weight: 1 }, { card_id: 'b', weight: 1 }, { card_id: 'c', weight: 1 }], cards_per_pack: 3, guaranteed_rarity: null };
+      const target = 12000;
+      const w = tiltRarityWeights(pack, cards, bRarities, target);
+      if (!w) return false;
+      const ev = packExpectedValue({ ...pack, rarity_weights: w }, cards, bRarities);
+      return ev <= target && ev > target * 0.99 && w.MYTHIQUE < 10 && w.COMMUNE > 60;
+    })()],
+    ['auto-balancing refuses an impossible target', tiltRarityWeights(
+      { rarity_weights: { COMMUNE: 1, RARE: 1 }, cards: [{ card_id: 'a', weight: 1 }, { card_id: 'b', weight: 1 }], cards_per_pack: 5, guaranteed_rarity: null },
+      bCards, bRarities, 1000,
+    ) === null],
+    ['suggested price keeps the casino under the target return', [21243, 850020, 3261248].every((ev) => ev / suggestPrice(ev, 85) <= 0.85)],
+    ['expected shares without guarantee match the odds', (() => {
+      const pack = { rarity_weights: { COMMUNE: 60, RARE: 20 }, cards: [{ card_id: 'a', weight: 1 }, { card_id: 'b', weight: 1 }], cards_per_pack: 5, guaranteed_rarity: null };
+      const e = expectedRarityShares(pack, bCards, bRarities);
+      return Math.abs(e.COMMUNE - 0.75) < 1e-9 && Math.abs(e.RARE - 0.25) < 1e-9;
+    })()],
+    ['expected shares with a guarantee match a Monte Carlo of the server rule', (() => {
+      const pack = { rarity_weights: { COMMUNE: 80, RARE: 20 }, cards: [{ card_id: 'a', weight: 1 }, { card_id: 'b', weight: 1 }], cards_per_pack: 5, guaranteed_rarity: 'RARE' };
+      const e = expectedRarityShares(pack, bCards, bRarities);
+      const rng = seeded(99);
+      let rare = 0;
+      const packs = 40000;
+      for (let k = 0; k < packs; k++) {
+        let got = false;
+        for (let i = 1; i <= 5; i++) {
+          const force = i === 5 && !got;
+          const isRare = force || pickWeighted(['C', 'R'] as const, (t) => (t === 'C' ? 80 : 20), rng()) === 'R';
+          if (isRare) { rare++; got = true; }
+        }
+      }
+      const sum = Object.values(e).reduce((a, b) => a + b, 0);
+      return Math.abs(sum - 1) < 1e-9 && Math.abs(rare / (packs * 5) - e.RARE) < 0.004;
+    })()],
+  ]);
+
   const health = await dbCheckHealth();
   console.log(`\nSupabase: ${health.online ? 'ONLINE' : 'OFFLINE'} (${health.latencyMs}ms, ${health.version || health.error})`);
   if (!health.online) {
@@ -374,6 +449,50 @@ async function main() {
       ['can list recent wheel wins (names abbreviated)', (async () => {
         const wins = await apiRecentWheelWins(5);
         return Array.isArray(wins) && wins.every((w) => /^.+ .?\.$/.test(w.winner) && typeof w.prize === 'string');
+      })()],
+      ['can read the public booster catalogue', (async () => {
+        const c = await apiBoosterCatalog(false);
+        return Array.isArray(c.rarities) && c.rarities.length > 0 && Array.isArray(c.packs) && c.packs.every((p) => p.active);
+      })()],
+      ['cannot read the full booster catalogue (staff only)', (async () => {
+        try {
+          await apiBoosterCatalog(true);
+          return false;
+        } catch (err) {
+          return err instanceof CasinoApiError;
+        }
+      })()],
+      ['cannot open a booster without an account', (async () => {
+        try {
+          await apiOpenBooster('00000000-0000-0000-0000-000000000000');
+          return false;
+        } catch (err) {
+          return err instanceof CasinoApiError;
+        }
+      })()],
+      ['cannot run the booster rate simulator (staff only)', (async () => {
+        try {
+          await apiAdminSimulateBooster('00000000-0000-0000-0000-000000000000', 10);
+          return false;
+        } catch (err) {
+          return err instanceof CasinoApiError;
+        }
+      })()],
+      ['cannot read an inventory without an account', (async () => {
+        const { error } = await supabase.rpc('my_inventory');
+        return !!error;
+      })()],
+      ['cannot sell prizes without an account', (async () => {
+        const { error } = await supabase.rpc('sell_rewards', { p_ids: ['00000000-0000-0000-0000-000000000000'] });
+        return !!error;
+      })()],
+      ['cannot read a booster collection without an account', (async () => {
+        const { error } = await supabase.rpc('my_booster_collection');
+        return !!error;
+      })()],
+      ['cannot read booster tables directly', (async () => {
+        const { data } = await supabase.from('booster_cards').select('id');
+        return !data || data.length === 0;
       })()],
       ['event subscription rejects invalid e-mails', (async () => {
         try {

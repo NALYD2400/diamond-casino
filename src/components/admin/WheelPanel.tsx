@@ -47,6 +47,16 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [draft, totalWeight],
   );
+  // Véhicules comptés à leur valeur catalogue (1 jeton = 1 $), comme le fait le serveur
+  const expectedVehicles = useMemo(
+    () => draft.reduce((a, s) => a + (s.type === 'vehicle' ? (Number(s.vehicleValue) || 0) * (chance(s) / 100) : 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draft, totalWeight],
+  );
+  const maxRtp = gamesConfig.wheel.maxRtp;
+  const expectedTotal = expectedChips + expectedVehicles;
+  const segmentsRtp = spinPrice > 0 ? (expectedTotal / spinPrice) * 100 : 0;
+  const segmentsLosing = gamesConfig.wheel.enabled && segmentsRtp > maxRtp;
 
   const save = async () => {
     setSaving(true);
@@ -63,7 +73,8 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
     setDraft(next);
   };
 
-  const rtp = priceDraft > 0 ? (expectedChips / priceDraft) * 100 : 0;
+  const rtp = priceDraft > 0 ? (expectedTotal / priceDraft) * 100 : 0;
+  const priceLosing = gamesConfig.wheel.enabled && rtp > maxRtp;
 
   return (
     <div className="flex flex-col gap-6">
@@ -95,7 +106,7 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                 <NumberInput value={priceDraft} min={1} onChange={setPriceDraft} suffix="⛁" />
                 <Button
                   variant="primary"
-                  disabled={priceDraft === spinPrice || priceDraft < 1}
+                  disabled={priceDraft === spinPrice || priceDraft < 1 || priceLosing}
                   onClick={async () => {
                     if (await saveGamesConfig({ ...gamesConfig, wheel: { ...gamesConfig.wheel, spinPrice: priceDraft } })) {
                       showToast(`Prix du tour fixé à ${fmt(priceDraft)} jetons.`);
@@ -106,19 +117,33 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                 </Button>
               </div>
             </Field>
-            <div className="grid grid-cols-2 gap-2 text-center">
+            <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl bg-white/[0.03] border border-white/10 py-2">
-                <div className="text-[10px] text-neutral-500">Gain moyen en jetons</div>
+                <div className="text-[10px] text-neutral-500">Jetons / tour</div>
                 <div className="font-mono text-sm text-white">{fmt(expectedChips)}</div>
               </div>
               <div className="rounded-xl bg-white/[0.03] border border-white/10 py-2">
-                <div className="text-[10px] text-neutral-500">RTP jetons</div>
-                <div className={cx('font-mono text-sm', rtp > 100 ? 'text-rose-400' : 'text-white')}>{fmt(rtp, 1)} %</div>
+                <div className="text-[10px] text-neutral-500">Véhicules / tour</div>
+                <div className="font-mono text-sm text-white">{fmt(expectedVehicles)}</div>
+              </div>
+              <div className="rounded-xl bg-white/[0.03] border border-white/10 py-2">
+                <div className="text-[10px] text-neutral-500">Retour joueur</div>
+                <div className={cx('font-mono text-sm', priceLosing ? 'text-rose-400' : 'text-white')}>{fmt(rtp, 1)} %</div>
               </div>
             </div>
-            <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 text-[12px] text-neutral-400">
-              Le casino garde en moyenne <b className="text-white font-mono">{fmt(Math.max(0, priceDraft - expectedChips))} jetons</b> par
-              tour, avant les lots non monétaires (véhicules, objets). Au-dessus de 100 % de RTP, la roue fait perdre des jetons au casino.
+            <div className={cx('rounded-xl border p-3 text-[12px]', priceLosing ? 'bg-rose-500/10 border-rose-500/30 text-rose-200' : 'bg-white/[0.03] border-white/10 text-neutral-400')}>
+              {priceLosing ? (
+                <>
+                  Roue perdante : le retour joueur dépasse le maximum autorisé ({fmt(maxRtp)} %, réglable dans Machines → Roue). Le serveur
+                  refuse ce prix et bloque les tours tant que la roue reste perdante.
+                </>
+              ) : (
+                <>
+                  Le casino garde en moyenne <b className="text-white font-mono">{fmt(Math.max(0, priceDraft - expectedTotal))} jetons</b> par
+                  tour, véhicules comptés à leur valeur catalogue (les objets mystère / vêtements ne sont pas chiffrés). Maximum autorisé :{' '}
+                  {fmt(maxRtp)} %.
+                </>
+              )}
             </div>
           </div>
         </Card>
@@ -160,8 +185,14 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
         </Card>
       </div>
 
-      <div className="sticky top-0 z-20">
-        <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={() => setDraft(segments)} />
+      <div className="sticky top-0 z-20 flex flex-col gap-2">
+        <SaveBar dirty={dirty} saving={saving} onSave={save} blocked={segmentsLosing} onReset={() => setDraft(segments)} />
+        {dirty && segmentsLosing && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
+            Enregistrement bloqué : avec ces lots, la roue rend {fmt(segmentsRtp, 1)} % (max {fmt(maxRtp)} %). Baissez les chances des gros lots
+            ou montez le prix du tour.
+          </div>
+        )}
       </div>
 
       <Card
@@ -219,6 +250,11 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                     </td>
                     <td className="px-3 py-2.5 text-neutral-300 text-[13px]">
                       {seg.type === 'chips' ? <span className="font-mono text-white">{fmt(Number(seg.value))} jetons</span> : String(seg.value)}
+                      {seg.type === 'vehicle' && (
+                        <span className="block text-[11px] font-mono text-neutral-500">
+                          {seg.vehicleValue ? `valeur ${fmt(seg.vehicleValue)} $` : 'aucun véhicule du catalogue lié'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       <NumberInput
@@ -323,6 +359,7 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; onClose: () => void; on
                   type,
                   value: type === 'chips' ? Number(seg.value) || 0 : typeof seg.value === 'number' ? '' : seg.value,
                   vehicleModel: type === 'vehicle' ? seg.vehicleModel : undefined,
+                  vehicleValue: type === 'vehicle' ? seg.vehicleValue : undefined,
                 });
               }}
             >
@@ -356,6 +393,7 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; onClose: () => void; on
                   ...seg,
                   value: vehicleDisplayName(v.manufacturer, v.model),
                   vehicleModel: v.model,
+                  vehicleValue: v.price || 0,
                   imageUrl: v.photo_full_url || v.photo_url || undefined,
                 })
               }

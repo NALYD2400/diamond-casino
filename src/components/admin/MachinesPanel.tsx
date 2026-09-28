@@ -8,6 +8,7 @@ import {
   Dog,
   ExternalLink,
   Flame,
+  Layers,
   Power,
   RefreshCw,
   Settings2,
@@ -49,6 +50,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
   { id: 'wanted', statsId: 'wanted', name: 'Wanted Dead or a Wild', short: 'Wanted', icon: Skull, route: '/wanted' },
   { id: 'mines', statsId: 'mines', name: 'Mines', short: 'Mines', icon: Bomb, route: '/mines' },
   { id: 'wheel', statsId: 'lucky_wheel', name: 'Roue de la Fortune', short: 'Roue', icon: Disc, route: '/roue-de-la-fortune' },
+  { id: 'boosters', statsId: 'boosters', name: 'Boosters de cartes', short: 'Boosters', icon: Layers, route: '/boosters' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -59,14 +61,20 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 const DOG_BONUS_VALUE = 110;
 const WANTED_BONUS_VALUE = { gtr: 78, duel: 200, dmh: 395 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
-const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, wheel: 1.5 };
+const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, wheel: 1.5, boosters: 1 };
 const MIN_ROUNDS = 200;
 
+/** Valeur moyenne d'un tour de roue : jetons + véhicules à leur valeur catalogue (comme wheel_ev() côté serveur) */
 function wheelExpected(segments: WheelSegmentConfig[]) {
   const total = segments.reduce((a, s) => a + Math.max(0, Number(s.dropRate) || 0), 0);
   if (total <= 0) return 0;
-  return segments.reduce((a, s) => a + (s.type === 'chips' ? (Number(s.value) || 0) * (Math.max(0, s.dropRate) / total) : 0), 0);
+  const value = (s: WheelSegmentConfig) =>
+    s.type === 'chips' ? Number(s.value) || 0 : s.type === 'vehicle' ? Number(s.vehicleValue) || 0 : 0;
+  return segments.reduce((a, s) => a + value(s) * (Math.max(0, s.dropRate) / total), 0);
 }
+
+/** Planchers imposés par le serveur (normalize_games_config) : en dessous, l'achat de bonus fait perdre le casino */
+const MIN_BUY_PRICE = { doghouse: 115, gtr: 80, duel: 200, dmh: 400 } as const;
 
 /** RTP visé (%) pour une ligne de la répartition, ou null si non applicable */
 function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: WheelSegmentConfig[]): number | null {
@@ -86,11 +94,15 @@ function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: 
       return cfg.mines.rtp;
     case 'wheel':
       return key === '__all' && cfg.wheel.spinPrice > 0 ? (wheelExpected(segments) / cfg.wheel.spinPrice) * 100 : null;
+    case 'boosters':
+      // Les boosters rendent des véhicules, pas des jetons : pas de RTP en jetons
+      return null;
   }
 }
 
 /** RTP visé global, pondéré par ce qui a été misé dans chaque mode */
 function overallTarget(machine: MachineId, stats: AdminGameStats | undefined, cfg: GamesConfig, segments: WheelSegmentConfig[]): number | null {
+  if (machine === 'boosters') return null;
   if (machine === 'wheel' || machine === 'mines') return targetFor(machine, '__all', cfg, segments);
   const rows = (stats?.breakdown ?? []).filter((r) => Number(r.wagered) > 0);
   const total = rows.reduce((a, r) => a + Number(r.wagered), 0);
@@ -128,7 +140,7 @@ function verdict(machine: MachineId, rounds: number, rtp: number | null, target:
 
 function breakdownLabel(machine: MachineId, key: string) {
   if (machine === 'mines') return key === '?' || key === '0' ? 'Ancien format' : `${key} mine${key === '1' ? '' : 's'}`;
-  if (machine === 'wheel') return key;
+  if (machine === 'wheel' || machine === 'boosters') return key;
   return (
     {
       spin: 'Tour normal',
@@ -529,15 +541,15 @@ const MachineDetail: React.FC<{
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card title={m.id === 'mines' ? 'Par nombre de mines' : m.id === 'wheel' ? 'Par lot tiré' : 'Par mode de jeu'} icon={<Settings2 size={15} />} padded={false}>
+            <Card title={m.id === 'mines' ? 'Par nombre de mines' : m.id === 'wheel' ? 'Par lot tiré' : m.id === 'boosters' ? 'Par booster' : 'Par mode de jeu'} icon={<Settings2 size={15} />} padded={false}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[460px]">
                   <thead>
                     <tr className="text-[11px] text-neutral-500 text-left border-b border-white/10">
-                      <th className="px-5 py-2.5 font-medium">{m.id === 'wheel' ? 'Lot' : 'Mode'}</th>
+                      <th className="px-5 py-2.5 font-medium">{m.id === 'wheel' ? 'Lot' : m.id === 'boosters' ? 'Booster' : 'Mode'}</th>
                       <th className="px-3 py-2.5 font-medium text-right">Parties</th>
                       <th className="px-3 py-2.5 font-medium text-right">Bénéfice</th>
-                      <th className="px-5 py-2.5 font-medium text-right">{m.id === 'wheel' ? 'Part' : 'RTP réel / visé'}</th>
+                      <th className="px-5 py-2.5 font-medium text-right">{m.id === 'wheel' || m.id === 'boosters' ? 'Part' : 'RTP réel / visé'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -550,7 +562,7 @@ const MachineDetail: React.FC<{
                           <td className="px-3 py-2.5 text-right font-mono text-neutral-300">{fmt(b.rounds)}</td>
                           <td className={cx('px-3 py-2.5 text-right font-mono', profitClass(p))}>{signed(p)}</td>
                           <td className="px-5 py-2.5 text-right font-mono">
-                            {m.id === 'wheel' ? (
+                            {m.id === 'wheel' || m.id === 'boosters' ? (
                               <span className="text-neutral-300">{fmt((Number(b.rounds) / rounds) * 100, 1)} %</span>
                             ) : (
                               <>
@@ -793,11 +805,11 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
                   hint={
                     <>
                       Le bonus rapporte ≈ <b>{DOG_BONUS_VALUE}×</b> la mise en moyenne. Retour joueur : {retour(DOG_BONUS_VALUE, draft.doghouse.buyPrice)}
-                      {DOG_BONUS_VALUE / draft.doghouse.buyPrice > 1 && ' : le casino PERD de l’argent'}.
+                      {DOG_BONUS_VALUE / draft.doghouse.buyPrice > 1 && ' : le casino PERD de l’argent'}. Minimum ×{MIN_BUY_PRICE.doghouse}.
                     </>
                   }
                 >
-                  <NumberInput value={draft.doghouse.buyPrice} min={50} max={1000} onChange={(v) => set('doghouse', { buyPrice: v })} suffix="×" disabled={!draft.doghouse.buyEnabled} />
+                  <NumberInput value={draft.doghouse.buyPrice} min={MIN_BUY_PRICE.doghouse} max={1000} onChange={(v) => set('doghouse', { buyPrice: v })} suffix="×" disabled={!draft.doghouse.buyEnabled} />
                 </Field>
               </div>
               <div className="rounded-xl bg-white/[0.03] border border-white/10 p-4">
@@ -822,10 +834,10 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
                     ['dmh', "Dead Man's Hand"],
                   ] as const
                 ).map(([k, name]) => (
-                  <Field key={k} label={`${name} (× la mise)`} hint={<>Vaut ≈ {WANTED_BONUS_VALUE[k]}× · retour {retour(WANTED_BONUS_VALUE[k], draft.wanted.buyPrices[k])}</>}>
+                  <Field key={k} label={`${name} (× la mise)`} hint={<>Vaut ≈ {WANTED_BONUS_VALUE[k]}× · retour {retour(WANTED_BONUS_VALUE[k], draft.wanted.buyPrices[k])} · min ×{MIN_BUY_PRICE[k]}</>}>
                     <NumberInput
                       value={draft.wanted.buyPrices[k]}
-                      min={20}
+                      min={MIN_BUY_PRICE[k]}
                       onChange={(v) => set('wanted', { buyPrices: { ...draft.wanted.buyPrices, [k]: v } })}
                       suffix="×"
                       disabled={!draft.wanted.buyEnabled}
@@ -845,12 +857,26 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
               label="Prix d'un tour"
               hint={
                 <>
-                  La roue rend en moyenne {fmt(wheelExpected(segments))} jetons par tour, soit un retour de {retour(wheelExpected(segments), draft.wheel.spinPrice)} (hors véhicules et
-                  objets).
+                  La roue rend en moyenne {fmt(wheelExpected(segments))} jetons par tour (véhicules comptés à leur valeur catalogue), soit un retour de{' '}
+                  {retour(wheelExpected(segments), draft.wheel.spinPrice)}.
                 </>
               }
             >
               <NumberInput value={draft.wheel.spinPrice} min={1} onChange={(v) => set('wheel', { spinPrice: v })} suffix="⛁" />
+            </Field>
+            <Field
+              label="Retour joueur maximum"
+              hint={
+                <>
+                  Jetons + valeur des véhicules ≤ {fmt(draft.wheel.maxRtp)} % du prix du tour. Au-dessus, le serveur refuse le réglage et bloque les
+                  tours.
+                  {draft.wheel.spinPrice > 0 && (wheelExpected(segments) / draft.wheel.spinPrice) * 100 > draft.wheel.maxRtp && (
+                    <b className="text-rose-300"> Réglage actuel perdant : il sera refusé.</b>
+                  )}
+                </>
+              }
+            >
+              <NumberInput value={draft.wheel.maxRtp} min={10} max={100} onChange={(v) => set('wheel', { maxRtp: Math.min(100, Math.max(10, v)) })} suffix="%" />
             </Field>
             <div className="text-[13px] text-neutral-400">
               Les lots et leurs chances se règlent dans{' '}
@@ -859,6 +885,43 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
               </button>
               .
             </div>
+          </div>
+        </Card>
+      )}
+
+      {id === 'boosters' && (
+        <Card title="Rentabilité des boosters">
+          <div className="flex flex-col gap-4">
+            <Field
+              label="Retour joueur maximum"
+              hint={
+                <>
+                  Valeur moyenne des véhicules d'un booster ≤ {fmt(draft.boosters.maxRtp)} % de son prix (1 jeton = 1 $). Le casino garde au minimum{' '}
+                  {fmt(100 - draft.boosters.maxRtp)} % de chaque booster vendu. Un booster au-dessus est caché aux joueurs et ne peut pas être ouvert.
+                </>
+              }
+            >
+              <NumberInput value={draft.boosters.maxRtp} min={10} max={100} onChange={(v) => set('boosters', { maxRtp: Math.min(100, Math.max(10, v)) })} suffix="%" />
+            </Field>
+            <Field
+              label="Taux de reprise des lots"
+              hint={
+                <>
+                  Un joueur peut revendre un véhicule gagné (roue ou booster) contre {fmt(draft.boosters.sellRate)} % de sa valeur en jetons, au lieu de le
+                  réclamer en jeu. 0 % = revente désactivée. Sur un booster à {fmt(draft.boosters.maxRtp)} % de retour, tout revendre rend au maximum{' '}
+                  {fmt((draft.boosters.maxRtp * draft.boosters.sellRate) / 100, 1)} % des jetons dépensés.
+                </>
+              }
+            >
+              <NumberInput value={draft.boosters.sellRate} min={0} max={100} onChange={(v) => set('boosters', { sellRate: Math.min(100, Math.max(0, v)) })} suffix="%" />
+            </Field>
+          </div>
+          <div className="text-[13px] text-neutral-400 mt-4">
+            Les boosters, leurs prix, les cartes et les raretés se règlent dans{' '}
+            <button type="button" className="text-white underline cursor-pointer" onClick={() => goTo('boosters')}>
+              Boosters
+            </button>
+            . Chaque carte tirée est un véhicule ajouté à l'inventaire du joueur.
           </div>
         </Card>
       )}

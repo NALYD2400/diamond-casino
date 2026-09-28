@@ -7,6 +7,7 @@ import {
   Crown,
   Disc,
   Gamepad2,
+  Layers,
   LayoutDashboard,
   Lock,
   ScrollText,
@@ -20,15 +21,16 @@ import { DashboardPanel } from './admin/DashboardPanel';
 import { PlayersPanel } from './admin/PlayersPanel';
 import { MachinesPanel } from './admin/MachinesPanel';
 import { WheelPanel } from './admin/WheelPanel';
+import { BoostersPanel } from './admin/BoostersPanel';
 import { VipPanel } from './admin/VipPanel';
 import { RewardsPanel } from './admin/RewardsPanel';
 import { LogsPanel } from './admin/LogsPanel';
 import { SystemPanel } from './admin/SystemPanel';
 import { ROLE_LABEL, cx } from './admin/ui';
 
-export type AdminTab = 'dashboard' | 'players' | 'games' | 'wheel' | 'vip' | 'rewards' | 'logs' | 'system';
+export type AdminTab = 'dashboard' | 'players' | 'games' | 'wheel' | 'boosters' | 'vip' | 'rewards' | 'logs' | 'system';
 
-const TABS: AdminTab[] = ['dashboard', 'players', 'games', 'wheel', 'vip', 'rewards', 'logs', 'system'];
+const TABS: AdminTab[] = ['dashboard', 'players', 'games', 'wheel', 'boosters', 'vip', 'rewards', 'logs', 'system'];
 
 interface NavItem {
   id: AdminTab;
@@ -44,6 +46,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, description: 'Bénéfices, activité, alertes' },
       { id: 'games', label: 'Machines', icon: Gamepad2, description: 'Ouvrir, fermer, stats, calibrage' },
       { id: 'wheel', label: 'Lots de la roue', icon: Disc, description: 'Lots, chances, prix' },
+      { id: 'boosters', label: 'Boosters', icon: Layers, description: 'Cartes, raretés, paquets' },
     ],
   },
   {
@@ -241,6 +244,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
             {tab === 'players' && <PlayersPanel showToast={showToast} />}
             {tab === 'games' && <MachinesPanel showToast={showToast} goTo={goTo} />}
             {tab === 'wheel' && <WheelPanel showToast={showToast} />}
+            {tab === 'boosters' && <BoostersPanel showToast={showToast} />}
             {tab === 'vip' && <VipPanel showToast={showToast} />}
             {tab === 'rewards' && <RewardsPanel showToast={showToast} />}
             {tab === 'logs' && <LogsPanel />}

@@ -15,6 +15,7 @@ import { WheelOfFortune } from './components/WheelOfFortune';
 import { MinesGame } from './components/MinesGame';
 import { DogHouseGame } from './components/doghouse/DogHouseGame';
 import { WantedGame } from './components/wanted/WantedGame';
+import { BoostersGame } from './components/boosters/BoostersGame';
 import { GamesHub } from './components/GamesHub';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
@@ -149,6 +150,23 @@ function WantedPage() {
 }
 
 /**
+ * Boosters de cartes véhicules (/boosters)
+ */
+function BoostersPage() {
+  return (
+    <motion.div
+      key="boosters-page"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <BoostersGame />
+    </motion.div>
+  );
+}
+
+/**
  * Games Catalog / Hub Route Component (/jeux)
  */
 function GamesCatalogPage() {
@@ -159,6 +177,7 @@ function GamesCatalogPage() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
+      className="pb-16 lg:pb-0"
     >
       <GamesHub />
       <Footer />
@@ -273,6 +292,12 @@ const wantedRoute = createRoute({
   component: WantedPage,
 });
 
+const boostersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/boosters',
+  component: BoostersPage,
+});
+
 const gamesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/jeux',
@@ -312,6 +337,7 @@ const routeTree = rootRoute.addChildren([
   minesRoute,
   slotsRoute,
   wantedRoute,
+  boostersRoute,
   gamesRoute,
   subscriptionsRoute,
   adminRoute,

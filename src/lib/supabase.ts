@@ -19,7 +19,7 @@ export const SUPABASE_ANON_KEY: string =
 const BREAKER_WINDOW_MS = 60_000;
 const BREAKER_DEFAULT_MAX = 40;
 const BREAKER_GAME_MAX = 240;
-const GAME_ENDPOINTS = /\/(functions\/v1\/slot-round|rest\/v1\/rpc\/(mines_reveal|mines_start|mines_cashout|spin_wheel))$/;
+const GAME_ENDPOINTS = /\/(functions\/v1\/slot-round|rest\/v1\/rpc\/(mines_reveal|mines_start|mines_cashout|spin_wheel|open_booster))$/;
 const breakerHits = new Map<string, number[]>();
 const breakerWarned = new Set<string>();
 
@@ -135,7 +135,7 @@ export interface SupabaseProfile {
   updated_at: string | null;
 }
 
-export type LogCategory = 'WHEEL' | 'ECONOMY' | 'CITIZEN' | 'SYSTEM';
+export type LogCategory = 'WHEEL' | 'ECONOMY' | 'CITIZEN' | 'SYSTEM' | 'BOOSTER';
 
 export interface SupabaseAdminLog {
   id?: string;
@@ -155,7 +155,8 @@ export type TransactionType =
   | 'VIP_REWARD'
   | 'VIP_REQUEST'
   | 'VIP_SUBSCRIPTION'
-  | 'ADMIN_ADJUST';
+  | 'ADMIN_ADJUST'
+  | 'REWARD_SALE';
 
 export interface SupabaseTransaction {
   id: string;
@@ -237,6 +238,22 @@ const ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Vous n’avez pas les droits pour cette action (rôle insuffisant).',
   FORBIDDEN_ROLE_CHANGE: 'Vous n’avez pas les droits pour modifier ce rôle.',
   CANNOT_DELETE_SELF: 'Vous ne pouvez pas supprimer votre propre profil.',
+  PACK_NOT_FOUND: 'Ce booster n’est plus disponible.',
+  PACK_EMPTY: 'Ce booster ne contient encore aucune carte.',
+  REWARD_SOLD: 'Ce lot a été revendu par le joueur : il ne peut plus être modifié.',
+  SELL_DISABLED: 'La revente des lots est désactivée par la direction.',
+  NOTHING_TO_SELL: 'Aucun lot revendable dans la sélection.',
+  PACK_UNPROFITABLE: 'Booster perdant pour le casino : la valeur moyenne des véhicules dépasse le retour joueur autorisé. Montez le prix ou baissez les chances des cartes chères.',
+  WHEEL_UNPROFITABLE: 'Roue perdante pour le casino : jetons + valeur des véhicules dépassent le retour joueur autorisé. Montez le prix du tour ou baissez les chances des gros lots.',
+  FORBIDDEN_SELF: 'Vous ne pouvez pas créditer votre propre compte (solde, VIP ou lot). Demandez à un autre membre de la direction.',
+  VIP_HIGHER_ACTIVE: 'Une carte VIP supérieure est déjà active sur votre compte.',
+  VEHICLE_NOT_IN_DEALERSHIP: 'Ce véhicule n’est pas vendu en concession : il ne peut pas devenir une carte.',
+  CARD_NOT_FOUND: 'Carte introuvable.',
+  INVALID_RARITY: 'Rareté inconnue.',
+  INVALID_RARITIES: 'Liste de raretés invalide (1 à 12).',
+  RARITY_IN_USE: 'Impossible de supprimer une rareté encore utilisée par des cartes.',
+  INVALID_THRESHOLDS: 'Indiquez au moins un palier de rareté.',
+  EMPTY_FILTER: 'Choisissez au moins une classe, une marque ou un véhicule.',
 };
 
 export class CasinoApiError extends Error {
@@ -411,9 +428,11 @@ export interface VehicleCatalogEntry {
   photo_url: string | null;
   photo_full_url: string | null;
   screenshot_url: string | null;
+  /** Vendu en concession (seuls ces véhicules peuvent devenir des cartes de booster) */
+  in_dealership?: boolean | null;
 }
 
-export type RewardStatus = 'IN_INVENTORY' | 'CLAIMED' | 'DELIVERED' | 'REVOKED';
+export type RewardStatus = 'IN_INVENTORY' | 'CLAIMED' | 'DELIVERED' | 'REVOKED' | 'SOLD';
 
 export interface PlayerReward {
   id: string;
@@ -422,20 +441,26 @@ export interface PlayerReward {
   label: string;
   vehicle_model: string | null;
   image_url: string | null;
-  source: 'wheel' | 'admin';
+  source: 'wheel' | 'admin' | 'booster';
   status: RewardStatus;
   note: string | null;
   created_at: string;
   claimed_at: string | null;
   handled_at: string | null;
   handled_by: string | null;
+  /** Valeur du lot ($) et revente éventuelle */
+  value?: number | null;
+  booster_card_id?: string | null;
+  sold_at?: string | null;
+  sold_for?: number | null;
 }
 
-export async function dbSearchVehicles(query: string, opts: { vehicleClass?: string; limit?: number } = {}): Promise<VehicleCatalogEntry[]> {
+export async function dbSearchVehicles(query: string, opts: { vehicleClass?: string; limit?: number; dealershipOnly?: boolean } = {}): Promise<VehicleCatalogEntry[]> {
   let req = supabase.from('vehicle_catalog').select('*').order('price', { ascending: false }).limit(opts.limit ?? 40);
   const q = query.trim().replace(/[%,()]/g, ' ').trim();
   if (q) req = req.or(`model.ilike.%${q}%,manufacturer.ilike.%${q}%`);
   if (opts.vehicleClass) req = req.eq('class', opts.vehicleClass);
+  if (opts.dealershipOnly) req = req.eq('in_dealership', true);
   const { data, error } = await req;
   if (error) throw toApiError(error);
   return (data || []) as VehicleCatalogEntry[];
@@ -465,6 +490,174 @@ export async function dbFetchRewards(status?: RewardStatus, limit = 200): Promis
   if (error) throw toApiError(error);
   return (data || []) as PlayerReward[];
 }
+
+// -------------------------------------------------------------
+// Boosters (cartes véhicules)
+// -------------------------------------------------------------
+
+export type BoosterEffect = 'none' | 'glow' | 'holo' | 'rays' | 'mythic';
+
+export interface BoosterRarity {
+  key: string;
+  label: string;
+  color: string;
+  effect: BoosterEffect;
+  sort: number;
+}
+
+export interface BoosterCardVehicle {
+  model: string;
+  manufacturer: string | null;
+  class: string | null;
+  type: string | null;
+  seats: number | null;
+  price: number | null;
+  photo_url: string | null;
+  photo_full_url: string | null;
+}
+
+export interface BoosterCardData {
+  id: string;
+  vehicle_model: string;
+  rarity: string;
+  title: string | null;
+  subtitle: string | null;
+  image_url: string | null;
+  value_override: number | null;
+  accent_color: string | null;
+  holo: boolean;
+  active: boolean;
+  created_at?: string;
+  vehicle: BoosterCardVehicle | null;
+  /** Valeur affichée : surcharge ou prix du véhicule */
+  value: number;
+  /** Présent sur les cartes tirées (lot créé dans l'inventaire) */
+  reward_id?: string;
+}
+
+export interface BoosterPackCard {
+  card_id: string;
+  weight: number;
+}
+
+export interface BoosterPackData {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  cards_per_pack: number;
+  rarity_weights: Record<string, number>;
+  guaranteed_rarity: string | null;
+  cover_image_url: string | null;
+  accent_color: string;
+  active: boolean;
+  sort_order: number;
+  cards: BoosterPackCard[];
+  /** Calculés par le serveur : valeur moyenne des véhicules d'un booster ($) et retour joueur (%) */
+  ev?: number;
+  rtp?: number;
+}
+
+export interface BoosterCatalog {
+  rarities: BoosterRarity[];
+  packs: BoosterPackData[];
+  cards: BoosterCardData[];
+  /** Retour joueur maximum autorisé (%) */
+  max_rtp?: number;
+}
+
+export interface OpenBoosterResult {
+  pack_id: string;
+  price: number;
+  cards: BoosterCardData[];
+  total_value: number;
+  profile: ProfilePayload;
+}
+
+/** Catalogue public (boosters actifs) ou complet pour la console (all = true, staff) */
+export const apiBoosterCatalog = (all = false) => rpc<BoosterCatalog>('booster_catalog', { p_all: all });
+export const apiOpenBooster = (packId: string) => rpc<OpenBoosterResult>('open_booster', { p_pack_id: packId });
+
+export interface BoosterCollectionCard extends BoosterCardData {
+  count: number;
+  first_at: string;
+  last_at: string;
+}
+export interface BoosterCollection {
+  openings: number;
+  cards: BoosterCollectionCard[];
+}
+/** Espace Membre : cartes obtenues par le joueur connecté (exemplaires, dates) */
+export const apiMyBoosterCollection = () => rpc<BoosterCollection>('my_booster_collection');
+
+/** Console : mettre des véhicules en concession ou les en retirer (retirer désactive leurs cartes) */
+export const apiAdminSetVehicleDealership = (models: string[], value: boolean) =>
+  rpc<number>('admin_set_vehicle_dealership', { p_models: models, p_value: value });
+
+// -------------------------------------------------------------
+// Inventaire unique (lots de la roue + cartes des boosters) et revente
+// -------------------------------------------------------------
+
+export interface InventoryItem extends PlayerReward {
+  /** Valeur du véhicule ($) */
+  value: number;
+  /** Jetons obtenus en le revendant maintenant (0 = non revendable) */
+  sell_value: number;
+  card: BoosterCardData | null;
+  vehicle: BoosterCardVehicle | null;
+}
+export interface Inventory {
+  items: InventoryItem[];
+  /** Taux de reprise (%) */
+  sell_rate: number;
+}
+export const apiMyInventory = () => rpc<Inventory>('my_inventory');
+export const apiSellRewards = (ids: string[]) =>
+  rpc<{ sold: number; chips: number; profile: ProfilePayload }>('sell_rewards', { p_ids: ids });
+
+export type BoosterCardInput = Pick<
+  BoosterCardData,
+  'vehicle_model' | 'rarity' | 'title' | 'subtitle' | 'image_url' | 'value_override' | 'accent_color' | 'holo' | 'active'
+> & { id?: string };
+
+export const apiAdminSaveBoosterCard = (card: BoosterCardInput) =>
+  rpc<BoosterCardData>('admin_save_booster_card', { p_card: card });
+export const apiAdminDeleteBoosterCards = (ids: string[]) => rpc<number>('admin_delete_booster_cards', { p_ids: ids });
+
+export interface BoosterBulkOptions {
+  classes?: string[];
+  manufacturers?: string[];
+  models?: string[];
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  thresholds: { rarity: string; minPrice: number }[];
+  skipExisting?: boolean;
+  packId?: string | null;
+}
+export const apiAdminBulkCreateBoosterCards = (opts: BoosterBulkOptions) =>
+  rpc<number>('admin_bulk_create_booster_cards', { p_opts: opts });
+
+export type BoosterPackInput = Omit<BoosterPackData, 'id'> & { id?: string };
+export const apiAdminSaveBoosterPack = (pack: BoosterPackInput) => rpc<string>('admin_save_booster_pack', { p_pack: pack });
+export const apiAdminDeleteBoosterPack = (id: string) => rpc<null>('admin_delete_booster_pack', { p_id: id });
+export interface BoosterSimulation {
+  pack_id: string;
+  packs: number;
+  cards_drawn: number;
+  /** Nombre de fois où la rareté garantie a dû être forcée sur la dernière carte */
+  forced: number;
+  rarities: { rarity: string; count: number }[];
+  cards: { card_id: string; count: number }[];
+  value: { avg: number; min: number; max: number; p50: number; p90: number; p99: number };
+  price: number;
+  ms: number;
+}
+/** Console : N ouvertures « à blanc » avec le vrai tirage du serveur (10 000 max., sans jetons ni lots) */
+export const apiAdminSimulateBooster = (packId: string, count: number) =>
+  rpc<BoosterSimulation>('admin_simulate_booster', { p_pack_id: packId, p_count: count });
+
+export const apiAdminSaveBoosterRarities = (rows: BoosterRarity[]) =>
+  rpc<null>('admin_save_booster_rarities', { p_rows: rows });
 
 export const apiClaimReward = (rewardId: string) => rpc<PlayerReward>('claim_reward', { p_reward_id: rewardId });
 
@@ -627,6 +820,8 @@ export interface AdminDashboard {
     vip_sales: number;
     vip_bonuses: number;
     pending_vip: number;
+    /** Jetons versés aux joueurs pour la revente de leurs lots (absent avant la migration d'intégrité) */
+    reward_sales?: number;
     pending_rewards: number;
     mines_open_rounds: number;
     mines_open_stake: number;
@@ -637,7 +832,7 @@ export interface AdminDashboard {
 
 export const apiAdminDashboard = (days: number) => rpc<AdminDashboard>('admin_dashboard', { p_days: days });
 
-export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel';
+export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel' | 'boosters';
 
 interface GameStatsPlayer {
   id: string;

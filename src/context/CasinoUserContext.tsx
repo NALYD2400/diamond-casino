@@ -115,6 +115,7 @@ const TX_TYPE_MAP: Record<SupabaseTransaction['type'], Pick<CasinoTransaction, '
   WITHDRAW: { type: 'withdrawal', category: 'Caisse Casino' },
   BET: { type: 'bet', category: 'Jeux' },
   WIN: { type: 'bonus', category: 'Jeux' },
+  REWARD_SALE: { type: 'bonus', category: 'Caisse Casino' },
 };
 
 export function mapTransaction(tx: SupabaseTransaction): CasinoTransaction {

@@ -10,10 +10,12 @@ interface VehiclePickerProps {
   onSelect: (vehicle: VehicleCatalogEntry) => void;
   /** Max height of the results list */
   className?: string;
+  /** Only vehicles sold at the dealership (booster cards) */
+  dealershipOnly?: boolean;
 }
 
 /** Searchable picker over the vehicle catalogue (model / brand, class filter) */
-export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onSelect, className = 'max-h-72' }) => {
+export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onSelect, className = 'max-h-72', dealershipOnly = false }) => {
   const [query, setQuery] = useState('');
   const [vehicleClass, setVehicleClass] = useState('');
   const [results, setResults] = useState<VehicleCatalogEntry[]>([]);
@@ -24,7 +26,7 @@ export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onS
     let cancelled = false;
     setLoading(true);
     const t = window.setTimeout(() => {
-      dbSearchVehicles(query, { vehicleClass: vehicleClass || undefined, limit: 40 })
+      dbSearchVehicles(query, { vehicleClass: vehicleClass || undefined, limit: 40, dealershipOnly })
         .then((rows) => {
           if (!cancelled) {
             setResults(rows);
@@ -38,7 +40,7 @@ export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onS
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [query, vehicleClass]);
+  }, [query, vehicleClass, dealershipOnly]);
 
   return (
     <div className="flex flex-col gap-2">

@@ -314,6 +314,9 @@ export const VipSubscriptions: React.FC = () => {
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-20 items-stretch">
         {tiers.map((tier) => {
           const isCurrentTier = user?.vipTier === tier.id;
+          // Carte inférieure à celle déjà active : l'acheter ferait perdre la meilleure (refusé par le serveur)
+          const TIER_RANK = { SILVER: 1, GOLD: 2, DIAMOND: 3 } as const;
+          const isLowerTier = !!user?.vipTier && TIER_RANK[user.vipTier] > TIER_RANK[tier.id];
           const isPendingTier = pendingVipTier === tier.id;
           const isFeatured = tier.id === 'GOLD';
           const hasEnoughChips = !!user && user.chips >= tier.priceChips;
@@ -379,6 +382,13 @@ export const VipSubscriptions: React.FC = () => {
                   >
                     <Check size={14} className="text-emerald-400" />
                     Abonnement Actif
+                  </button>
+                ) : isLowerTier ? (
+                  <button
+                    disabled
+                    className="w-full py-3.5 px-6 rounded-2xl font-semibold text-xs uppercase tracking-wider bg-neutral-900 text-neutral-500 border border-white/10 flex items-center justify-center gap-2 cursor-default"
+                  >
+                    Inclus dans votre carte {user?.vipTier}
                   </button>
                 ) : isPendingTier ? (
                   <button

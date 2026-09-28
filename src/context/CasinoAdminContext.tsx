@@ -49,6 +49,8 @@ export interface WheelSegmentConfig {
   vehicleModel?: string;
   /** Image affichée quand le lot est gagné */
   imageUrl?: string;
+  /** Valeur catalogue du véhicule ($ = jetons), renseignée par le serveur : compte dans le RTP de la roue */
+  vehicleValue?: number;
 }
 
 export interface PodiumVehicleConfig {

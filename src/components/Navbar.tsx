@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isHome = currentPath === '/' || propCurrentView === 'landing';
   const isWheel = currentPath === '/roue-de-la-fortune' || propCurrentView === 'lucky-wheel';
   const isVip = currentPath === '/abonnements';
-  const isGames = currentPath === '/jeux' || currentPath === '/mines' || currentPath === '/slots' || currentPath === '/wanted';
+  const isGames = currentPath === '/jeux' || currentPath === '/mines' || currentPath === '/slots' || currentPath === '/wanted' || currentPath === '/boosters';
   const isMember = currentPath === '/espace-membre' || propCurrentView === 'member-portal';
 
   const handleSectionScroll = (sectionId: string) => {
@@ -178,7 +178,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile menu toggle */}
           <button
             onClick={() => setMenuOpen(!isMenuOpen)}
-            className="lg:hidden p-2 rounded-full border border-white/20 text-white bg-white/5 cursor-pointer"
+            className="liquid-glass lg:hidden w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors cursor-pointer"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? <X size={20} /> : (
@@ -195,59 +195,46 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       <AnimatePresence>
         {isMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
+          <motion.nav
+            initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-x-0 top-[80px] sm:top-[90px] bg-black/95 backdrop-blur-2xl border-b border-white/10 z-40 p-6 flex flex-col gap-4 lg:hidden"
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-x-0 top-[80px] sm:top-[90px] z-40 lg:hidden backdrop-blur-md bg-black/50 border-b border-white/10 px-6 sm:px-12 py-4 flex flex-col"
           >
-            <Link
-              to="/"
-              onClick={() => {
-                setMenuOpen(false);
-                setCurrentView?.('landing');
-              }}
-              className="text-left text-lg font-medium text-white/90 hover:text-white"
-            >
-              Accueil
-            </Link>
-            <Link
-              to="/jeux"
-              onClick={() => setMenuOpen(false)}
-              className="text-left text-lg font-medium text-white/90 hover:text-white"
-            >
-              Jeux
-            </Link>
-            <Link
-              to="/roue-de-la-fortune"
-              onClick={() => {
-                setMenuOpen(false);
-                setCurrentView?.('lucky-wheel');
-              }}
-              className="text-left text-lg font-medium text-white/90 hover:text-white"
-            >
-              Roue de la Fortune
-            </Link>
-            <Link
-              to="/abonnements"
-              onClick={() => {
-                setMenuOpen(false);
-              }}
-              className="text-left text-lg font-medium text-white/90 hover:text-white"
-            >
-              Abonnements VIP
-            </Link>
+            {[
+              { to: '/', label: 'Accueil', active: isHome && !isWheel && !isVip && !isMember && !isGames, view: 'landing' as AppView },
+              { to: '/jeux', label: 'Jeux', active: isGames },
+              { to: '/roue-de-la-fortune', label: 'Roue de la Fortune', active: isWheel, view: 'lucky-wheel' as AppView },
+              { to: '/abonnements', label: 'Abonnements VIP', active: isVip },
+            ].map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (item.view) setCurrentView?.(item.view);
+                }}
+                className={`py-2.5 text-[15px] tracking-tight transition-colors ${
+                  item.active ? 'text-white font-semibold' : 'text-white/70 font-medium hover:text-white'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
             <Link
               to="/espace-membre"
               onClick={() => {
                 setMenuOpen(false);
                 setCurrentView?.('member-portal');
               }}
-              className="text-left text-lg font-medium text-white/90 hover:text-white border-t border-white/10 pt-3 flex items-center gap-2"
+              className={`mt-2 pt-4 border-t border-white/10 flex items-center gap-2 text-[15px] tracking-tight transition-colors ${
+                isMember ? 'text-white font-semibold' : 'text-white/70 font-medium hover:text-white'
+              }`}
             >
-              <User size={18} /> {isAuthenticated && user ? `Espace Client (${user.rpFirstName})` : 'Espace Membre (Connexion Discord)'}
+              <User size={16} /> {isAuthenticated && user ? 'Espace Client' : 'Espace Membre'}
             </Link>
-          </motion.div>
+          </motion.nav>
         )}
       </AnimatePresence>
     </>

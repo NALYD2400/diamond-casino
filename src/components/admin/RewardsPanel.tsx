@@ -12,7 +12,7 @@ import {
   type RewardStatus,
   type VehicleCatalogEntry,
 } from '../../lib/supabase';
-import { REWARD_STATUS, formatRewardDate, vehicleDisplayName } from '../../lib/rewards';
+import { REWARD_SOURCE, REWARD_STATUS, formatRewardDate, vehicleDisplayName } from '../../lib/rewards';
 import { VehiclePicker } from './VehiclePicker';
 
 interface RewardsPanelProps {
@@ -185,7 +185,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
           <PackageCheck size={12} /> Remis en jeu
         </button>
       )}
-      {r.status !== 'REVOKED' && (
+      {r.status !== 'REVOKED' && r.status !== 'SOLD' && (
         <button
           type="button"
           onClick={() => setPending({ reward: r, status: 'REVOKED' })}
@@ -223,7 +223,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
           <p className="text-xs text-neutral-400 mt-0.5">{citizenLabel(c)}</p>
           <p className="text-[11px] font-mono text-neutral-500 mt-0.5">
             {r.vehicle_model ? `${r.vehicle_model} · ` : ''}
-            {r.source === 'wheel' ? 'Roue' : 'Don direction'} · {formatRewardDate(r.created_at)}
+            {REWARD_SOURCE[r.source]?.short ?? r.source} · {formatRewardDate(r.created_at)}
             {r.handled_by ? ` · traité par ${r.handled_by}` : ''}
           </p>
           {r.note && <p className="text-[11px] text-neutral-400 italic mt-0.5">« {r.note} »</p>}
@@ -424,6 +424,12 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
             {pending.status === 'DELIVERED' && (
               <p className="text-xs text-neutral-400">
                 Confirmez uniquement après avoir donné le véhicule / lot au joueur en jeu. Il sera ajouté à son garage sur le site.
+              </p>
+            )}
+            {pending.status === 'IN_INVENTORY' && pending.reward.status === 'DELIVERED' && (
+              <p className="text-xs text-amber-200">
+                Ce lot a déjà été remis en jeu : de retour dans l’inventaire, il ne pourra plus être revendu contre des jetons (sinon le
+                joueur garderait la voiture en ville ET toucherait les jetons). Pensez à récupérer le véhicule en jeu si besoin.
               </p>
             )}
             <input

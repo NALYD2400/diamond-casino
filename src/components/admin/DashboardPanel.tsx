@@ -10,7 +10,6 @@ const TARGET_RTP: Record<string, string> = {
   mines: 'réglable',
   doghouse: '≈ 95 %',
   wanted: '≈ 96 %',
-  lucky_wheel: 'gratuit',
 };
 
 export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ goTo }) => {
@@ -25,10 +24,15 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
 
   const t = dashboard?.totals;
   const games = dashboard?.games ?? {};
-  const paidGames = Object.entries(games).filter(([id]) => id !== 'lucky_wheel');
+  // Tous les jeux sont payants (roue comprise) : véhicules donnés comptés dans « payé » à leur valeur
+  const paidGames = Object.entries(games);
   const profit = paidGames.reduce((a, [, g]) => a + Number(g.profit), 0);
   const wagered = paidGames.reduce((a, [, g]) => a + Number(g.wagered), 0);
-  const wheel = games.lucky_wheel;
+  const targetRtp: Record<string, string> = {
+    ...TARGET_RTP,
+    lucky_wheel: `≤ ${fmt(gamesConfig.wheel.maxRtp)} %`,
+    boosters: `≤ ${fmt(gamesConfig.boosters.maxRtp)} %`,
+  };
   const period = dashboardDays === 0 ? 'depuis le début' : dashboardDays === 1 ? 'sur 24 h' : `sur ${dashboardDays} jours`;
   const maxDaily = Math.max(1, ...(dashboard?.daily ?? []).map((d) => Math.max(Number(d.wagered), Number(d.paid))));
 
@@ -36,7 +40,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   if (economy.maintenanceMode) alerts.push({ tone: 'bad', text: 'Le casino est en MAINTENANCE : aucun joueur ne peut jouer.', action: { label: 'Système', tab: 'system' } });
   if (t && t.pending_vip > 0) alerts.push({ tone: 'warn', text: `${t.pending_vip} demande(s) VIP à valider (paiement en € à vérifier).`, action: { label: 'Voir', tab: 'vip' } });
   if (t && t.pending_rewards > 0) alerts.push({ tone: 'warn', text: `${t.pending_rewards} lot(s) réclamé(s) à remettre en jeu.`, action: { label: 'Voir', tab: 'rewards' } });
-  const closed = (['mines', 'doghouse', 'wanted', 'wheel'] as const).filter((g) => !gamesConfig[g].enabled);
+  const closed = (['mines', 'doghouse', 'wanted', 'wheel', 'boosters'] as const).filter((g) => !gamesConfig[g].enabled);
   if (closed.length) alerts.push({ tone: 'info', text: `Jeu(x) fermé(s) : ${closed.map((g) => (g === 'wheel' ? 'Roue' : GAME_LABELS[g])).join(', ')}.`, action: { label: 'Jeux', tab: 'games' } });
   paidGames.forEach(([id, g]) => {
     if (g.rtp !== null && Number(g.wagered) > 200000 && Number(g.rtp) > 120) {
@@ -99,7 +103,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
           value={`${profit >= 0 ? '+' : ''}${fmtChips(profit)}`}
           tone={profit >= 0 ? 'good' : 'bad'}
           icon={profit >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-          hint={`Mises (${fmt(wagered)}) − gains payés, hors roue`}
+          hint={`Mises (${fmt(wagered)}) − gains payés (véhicules à leur valeur)`}
         />
         <Stat
           label="Jetons chez les joueurs"
@@ -116,9 +120,9 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
         />
         <Stat
           label={`Jetons créés ${period}`}
-          value={fmtChips((t?.admin_injected ?? 0) + Number(wheel?.paid ?? 0) + (t?.vip_bonuses ?? 0))}
+          value={fmtChips((t?.admin_injected ?? 0) + (t?.vip_bonuses ?? 0) + (t?.reward_sales ?? 0))}
           icon={<Crown size={16} />}
-          hint={`Roue ${fmt(wheel?.paid)} · staff ${fmt(t?.admin_injected)} · VIP ${fmt(t?.vip_bonuses)}`}
+          hint={`Staff ${fmt(t?.admin_injected)} · VIP ${fmt(t?.vip_bonuses)} · revente de lots ${fmt(t?.reward_sales ?? 0)}`}
         />
       </div>
 
@@ -150,16 +154,16 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
                       <td className="px-3 py-3 text-right font-mono text-neutral-300">{fmt(g.players)}</td>
                       <td className="px-3 py-3 text-right font-mono text-neutral-300">{fmt(g.wagered)}</td>
                       <td className="px-3 py-3 text-right font-mono text-neutral-300">{fmt(g.paid)}</td>
-                      <td className={cx('px-3 py-3 text-right font-mono font-semibold', id === 'lucky_wheel' ? 'text-neutral-500' : Number(g.profit) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                        {id === 'lucky_wheel' ? `−${fmt(g.paid)}` : `${Number(g.profit) >= 0 ? '+' : ''}${fmt(g.profit)}`}
+                      <td className={cx('px-3 py-3 text-right font-mono font-semibold', Number(g.profit) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                        {`${Number(g.profit) >= 0 ? '+' : ''}${fmt(g.profit)}`}
                       </td>
                       <td className="px-3 py-3 text-right">
-                        {id === 'lucky_wheel' || g.rtp === null ? (
-                          <span className="text-neutral-500 text-xs">{TARGET_RTP[id] ?? '—'}</span>
+                        {g.rtp === null ? (
+                          <span className="text-neutral-500 text-xs">{targetRtp[id] ?? '—'}</span>
                         ) : (
                           <span className="inline-flex flex-col items-end">
                             <span className={cx('font-mono font-semibold', Number(g.rtp) > 100 ? 'text-rose-300' : 'text-white')}>{g.rtp} %</span>
-                            <span className="text-[10px] text-neutral-500">visé {TARGET_RTP[id] ?? '—'}</span>
+                            <span className="text-[10px] text-neutral-500">visé {targetRtp[id] ?? '—'}</span>
                           </span>
                         )}
                       </td>
@@ -246,8 +250,9 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
           au-dessus de 100 %). Il se rapproche du RTP visé quand le nombre de parties augmente.
         </p>
         <p>
-          <b>Jetons créés</b> = jetons apparus sans mise : roue de la fortune (gratuite), crédits manuels du staff et dotations VIP.
-          C'est ce qui fait grossir la masse de jetons des joueurs.
+          <b>Jetons créés</b> = jetons apparus sans mise : crédits manuels du staff, dotations VIP et revente de lots (véhicules
+          échangés contre des jetons). C'est ce qui fait grossir la masse de jetons des joueurs. La roue et les boosters sont des jeux
+          payants : les véhicules qu'ils donnent sont comptés dans « Payé » à leur valeur catalogue.
         </p>
         <p className="text-neutral-400">
           Un joueur « le plus gagnant » affiché en <span className="text-rose-300">rouge</span> a gagné des jetons au casino, en{' '}

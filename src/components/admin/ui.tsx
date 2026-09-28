@@ -171,7 +171,7 @@ export const Field: React.FC<{ label: string; hint?: React.ReactNode; children: 
 );
 
 export const inputClass =
-  'w-full h-10 px-3 rounded-xl bg-white/[0.04] border border-white/10 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-white/40 transition-colors';
+  'w-full h-10 px-3 rounded-xl bg-white/[0.04] border border-white/10 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-white/40 transition-colors [color-scheme:dark]';
 
 export const NumberInput: React.FC<{
   value: number;
@@ -281,12 +281,13 @@ export const Modal: React.FC<{ title: string; onClose: () => void; children: Rea
 );
 
 /** Barre « modifications non enregistrées » */
-export const SaveBar: React.FC<{ dirty: boolean; saving: boolean; onSave: () => void; onReset: () => void; label?: string }> = ({
+export const SaveBar: React.FC<{ dirty: boolean; saving: boolean; onSave: () => void; onReset: () => void; label?: string; blocked?: boolean }> = ({
   dirty,
   saving,
   onSave,
   onReset,
   label = 'Modifications non enregistrées',
+  blocked = false,
 }) =>
   dirty ? (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/[0.04] px-4 py-2.5">
@@ -295,7 +296,7 @@ export const SaveBar: React.FC<{ dirty: boolean; saving: boolean; onSave: () => 
         <Button variant="subtle" size="sm" onClick={onReset} disabled={saving}>
           Annuler
         </Button>
-        <Button variant="primary" size="sm" onClick={onSave} loading={saving}>
+        <Button variant="primary" size="sm" onClick={onSave} loading={saving} disabled={blocked}>
           Enregistrer
         </Button>
       </div>

@@ -43,8 +43,19 @@ export interface GamesConfig {
   mines: MinesConfig;
   doghouse: DogHouseConfig;
   wanted: WantedConfig;
-  /** Roue payante : prix d'un tour en jetons (plus de délai entre deux tirages) */
-  wheel: { enabled: boolean; spinPrice: number };
+  /**
+   * Roue payante : prix d'un tour en jetons (plus de délai entre deux tirages).
+   * maxRtp : retour joueur maximum (%), véhicules comptés à leur valeur catalogue.
+   */
+  wheel: { enabled: boolean; spinPrice: number; maxRtp: number };
+  /** Boosters de cartes : prix et contenu réglés dans l'onglet Boosters de la console */
+  boosters: {
+    enabled: boolean;
+    /** Retour joueur maximum (%) : valeur moyenne des véhicules d'un booster ≤ prix × maxRtp */
+    maxRtp: number;
+    /** Taux de reprise des lots en jetons (% de leur valeur, 0 = revente désactivée) */
+    sellRate: number;
+  };
 }
 
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
@@ -58,7 +69,8 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
     buyPrices: { gtr: 80, duel: 200, dmh: 400 },
     maxPayout: 10000000,
   },
-  wheel: { enabled: true, spinPrice: 25000 },
+  wheel: { enabled: true, spinPrice: 25000, maxRtp: 95 },
+  boosters: { enabled: true, maxRtp: 90, sellRate: 90 },
 };
 
 export interface VipTierConfig {
@@ -86,6 +98,7 @@ export function mergeGamesConfig(raw: unknown): GamesConfig {
     doghouse: { ...DEFAULT_GAMES_CONFIG.doghouse, ...(r.doghouse || {}) },
     wanted,
     wheel: { ...DEFAULT_GAMES_CONFIG.wheel, ...(r.wheel || {}) },
+    boosters: { ...DEFAULT_GAMES_CONFIG.boosters, ...(r.boosters || {}) },
   };
 }
 
@@ -105,6 +118,7 @@ export const GAME_LABELS: Record<string, string> = {
   doghouse: 'The Dog House',
   wanted: 'Wanted Dead or a Wild',
   lucky_wheel: 'Roue de la Fortune',
+  boosters: 'Boosters',
   'The Dog House': 'The Dog House',
   'Wanted Dead or a Wild': 'Wanted Dead or a Wild',
 };

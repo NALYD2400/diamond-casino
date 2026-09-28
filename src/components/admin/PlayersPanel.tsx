@@ -119,14 +119,13 @@ export const PlayersPanel: React.FC<{ showToast: (m: string) => void }> = ({ sho
                 <th className="px-3 py-3 font-medium">Statut</th>
                 <th className="px-3 py-3 font-medium text-right">Solde</th>
                 <th className="px-3 py-3 font-medium text-right">Total misé</th>
-                <th className="px-3 py-3 font-medium">Roue</th>
                 <th className="px-5 py-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={6}>
                     <EmptyState icon={<Users size={30} />} title="Aucun joueur trouvé" hint="Modifiez la recherche ou le filtre." />
                   </td>
                 </tr>
@@ -184,11 +183,6 @@ export const PlayersPanel: React.FC<{ showToast: (m: string) => void }> = ({ sho
                     </td>
                     <td className="px-3 py-3 text-right font-mono text-white font-semibold">{fmt(c.chips)}</td>
                     <td className="px-3 py-3 text-right font-mono text-neutral-400">{fmt(c.totalWagered)}</td>
-                    <td className="px-3 py-3">
-                      <Badge tone={c.wheelCooldownRemaining === 'Disponible' ? 'good' : 'neutral'}>
-                        {c.wheelCooldownRemaining === 'Disponible' ? 'Disponible' : 'En attente'}
-                      </Badge>
-                    </td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" onClick={() => setMoney(c)} title="Ajouter / retirer des jetons">

@@ -15,6 +15,7 @@ import { BoosterCardFace } from '../boosters/BoosterCard';
 import { fmtChips, fmtMoney, modelName, rarityMap, resolveCard, type ResolvedCard } from '../boosters/boosterUtils';
 import { useIncremental } from '../boosters/useIncremental';
 import { MemberCollection } from './MemberCollection';
+import { DogHouseCover, WantedCover } from '../slots/GameCovers';
 
 type View = 'items' | 'album';
 type SourceFilter = 'all' | 'booster' | 'wheel' | 'admin';
@@ -84,32 +85,27 @@ function ItemCard({ item, width, dim }: { item: InventoryItem; width: number; di
   );
 }
 
-/** Carte d'un bon de bonus offert : couleurs de la machine, valeur en grand */
+/** Carte d'un bon de bonus offert : illustration de la machine, valeur en grand */
 function VoucherCard({ item, width, dim }: { item: InventoryItem; width: number; dim: boolean }) {
   const wanted = item.voucher?.game === 'wanted';
   const color = wanted ? '#e8c98a' : '#ffb300';
   const game = wanted ? 'Wanted Dead or a Wild' : 'The Dog House';
   return (
     <div
-      className={`relative overflow-hidden rounded-[14px] border flex flex-col items-center justify-between text-center p-4 ${dim ? 'opacity-60' : ''}`}
-      style={{
-        width,
-        height: width * 1.4,
-        borderColor: `${color}80`,
-        background: `radial-gradient(circle at 50% 30%, ${color}30, #0a0a0d 65%)`,
-      }}
+      className={`relative overflow-hidden rounded-[14px] border flex flex-col bg-[#0a0a0d] ${dim ? 'opacity-60' : ''}`}
+      style={{ width, height: width * 1.4, borderColor: `${color}80` }}
     >
-      <span className="text-[9px] uppercase tracking-[0.18em] font-bold px-2.5 py-1 rounded-full bg-emerald-400 text-black">Bonus offert</span>
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center border" style={{ borderColor: `${color}80`, background: `${color}18` }}>
-          <Sparkles size={30} style={{ color }} />
-        </div>
-        <span className="text-sm font-bold text-white leading-tight">{game}</span>
-        <span className="text-[11px] text-neutral-400">Tours bonus</span>
+      <div className="relative w-full" style={{ height: '58%' }}>
+        {wanted ? <WantedCover /> : <DogHouseCover />}
+        <span className="absolute top-2 left-1/2 -translate-x-1/2 z-10 text-[9px] uppercase tracking-[0.18em] font-bold px-2.5 py-1 rounded-full bg-emerald-400 text-black shadow">
+          Bonus offert
+        </span>
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0a0a0d] to-transparent" />
       </div>
-      <div className="flex flex-col items-center gap-0.5">
-        <span className="text-[10px] uppercase tracking-wider text-neutral-500">Valeur</span>
-        <span className="text-xl font-bold font-mono text-white">{fmtChips(item.value)}</span>
+      <div className="flex-1 flex flex-col items-center justify-center gap-0.5 px-2 text-center">
+        <span className="text-[13px] font-bold text-white leading-tight">{game}</span>
+        <span className="text-[10px] uppercase tracking-wider text-neutral-500">Tours bonus · valeur</span>
+        <span className="text-lg font-bold font-mono text-white">{fmtChips(item.value)}</span>
         <span className="text-[10px] text-emerald-300">Gratuit · sans mise</span>
       </div>
     </div>

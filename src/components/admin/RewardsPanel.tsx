@@ -3,6 +3,7 @@ import { Car, Check, Download, Gift, Loader2, PackageCheck, RefreshCw, Search, U
 import { useCasinoAdmin, type MockCitizen } from '../../context/CasinoAdminContext';
 import {
   apiAdminGrantReward,
+  apiAdminGrantVoucher,
   apiAdminImportVehicles,
   apiAdminUpdateReward,
   dbCountVehicles,
@@ -43,6 +44,10 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
   const [grantVehicle, setGrantVehicle] = useState<VehicleCatalogEntry | null>(null);
   const [grantLabel, setGrantLabel] = useState('');
   const [grantNote, setGrantNote] = useState('');
+  // Bon de bonus offert (bonus buy gratuit sur une machine)
+  const [voucherGame, setVoucherGame] = useState<'doghouse' | 'wanted'>('doghouse');
+  const [voucherBuy, setVoucherBuy] = useState<'gtr' | 'duel' | 'dmh'>('gtr');
+  const [voucherValue, setVoucherValue] = useState(20000);
 
   // Catalogue
   const [catalogCount, setCatalogCount] = useState<number | null>(null);
@@ -127,6 +132,33 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       showToast('Lot ajouté à l’inventaire du joueur.');
       setGrantVehicle(null);
       setGrantLabel('');
+      setGrantNote('');
+      await Promise.all([load(), refreshLogs()]);
+    } catch (err) {
+      showToast((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleGrantVoucher = async () => {
+    if (!grantCitizenId) {
+      showToast('Choisissez un citoyen.');
+      return;
+    }
+    if (!Number.isFinite(voucherValue) || voucherValue < 1) {
+      showToast('Saisissez une valeur valide.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiAdminGrantVoucher(grantCitizenId, {
+        game: voucherGame,
+        buy: voucherGame === 'wanted' ? voucherBuy : 'buy',
+        value: Math.floor(voucherValue),
+        note: grantNote.trim() || undefined,
+      });
+      showToast('Bon de bonus ajouté à l’inventaire du joueur.');
       setGrantNote('');
       await Promise.all([load(), refreshLogs()]);
     } catch (err) {
@@ -354,6 +386,54 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
           >
             Ajouter à l’inventaire du joueur
           </button>
+
+          <div className="mt-2 pt-4 border-t border-white/10 flex flex-col gap-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <Gift size={14} /> Offrir un bonus de machine (même citoyen)
+            </h3>
+            <p className="text-xs text-neutral-400">
+              Le joueur déclenche le bonus gratuitement depuis l’inventaire. La mise est déduite de la valeur choisie.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                value={voucherGame}
+                onChange={(e) => setVoucherGame(e.target.value as 'doghouse' | 'wanted')}
+                className="h-10 px-3 rounded-xl bg-neutral-900 border border-white/10 text-sm text-white focus:outline-none cursor-pointer"
+              >
+                <option value="doghouse">The Dog House</option>
+                <option value="wanted">Wanted Dead or a Wild</option>
+              </select>
+              {voucherGame === 'wanted' ? (
+                <select
+                  value={voucherBuy}
+                  onChange={(e) => setVoucherBuy(e.target.value as 'gtr' | 'duel' | 'dmh')}
+                  className="h-10 px-3 rounded-xl bg-neutral-900 border border-white/10 text-sm text-white focus:outline-none cursor-pointer"
+                >
+                  <option value="gtr">Tours gratuits (GTR)</option>
+                  <option value="duel">Duel at Dawn</option>
+                  <option value="dmh">Dead Man's Hand</option>
+                </select>
+              ) : (
+                <input disabled value="Tours gratuits" className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-neutral-400" />
+              )}
+            </div>
+            <input
+              type="number"
+              min={1}
+              value={voucherValue}
+              onChange={(e) => setVoucherValue(Number(e.target.value))}
+              placeholder="Valeur du bonus (jetons)"
+              className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
+            />
+            <button
+              type="button"
+              onClick={handleGrantVoucher}
+              disabled={busy}
+              className="h-11 rounded-xl border border-white/20 text-white text-xs font-bold uppercase tracking-wider hover:bg-white/10 disabled:opacity-50 cursor-pointer"
+            >
+              Offrir le bonus au joueur
+            </button>
+          </div>
         </section>
 
         {/* Catalogue */}

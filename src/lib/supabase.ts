@@ -696,6 +696,18 @@ export const apiAdminGrantReward = (profileId: string, p: { vehicleModel?: strin
     p_note: p.note || null,
   });
 
+export const apiAdminGrantVoucher = (
+  profileId: string,
+  p: { game: 'doghouse' | 'wanted'; buy: string; value: number; note?: string },
+) =>
+  rpc<PlayerReward>('admin_grant_voucher', {
+    p_profile_id: profileId,
+    p_game: p.game,
+    p_buy: p.buy,
+    p_value: p.value,
+    p_note: p.note || null,
+  });
+
 export const apiAdminUpdateReward = (rewardId: string, status: Exclude<RewardStatus, 'CLAIMED'>, note?: string) =>
   rpc<PlayerReward>('admin_update_reward', { p_reward_id: rewardId, p_status: status, p_note: note || null });
 

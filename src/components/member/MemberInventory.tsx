@@ -88,7 +88,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
     void load();
   }, [load]);
 
-  const items = inv?.items ?? [];
+  const items = useMemo(() => inv?.items ?? [], [inv]);
   const available = useMemo(() => items.filter((i) => i.status === 'IN_INVENTORY'), [items]);
   const sellable = useMemo(() => available.filter((i) => i.sell_value > 0), [available]);
   const stats = useMemo(
@@ -113,7 +113,10 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
 
   // La sélection ne garde que des objets encore revendables
   useEffect(() => {
-    setSelected((s) => new Set([...s].filter((id) => sellable.some((i) => i.id === id))));
+    setSelected((s) => {
+      const kept = [...s].filter((id) => sellable.some((i) => i.id === id));
+      return kept.length === s.size ? s : new Set(kept);
+    });
   }, [sellable]);
   const selectedChips = sellable.filter((i) => selected.has(i.id)).reduce((a, i) => a + i.sell_value, 0);
 

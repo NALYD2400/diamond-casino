@@ -28,7 +28,6 @@ import {
   AlertTriangle,
   UserCheck,
   Edit2,
-  Unlock,
   CheckCircle2,
 } from 'lucide-react';
 import type { MockCitizen, AdminLogEntry } from '../context/CasinoAdminContext';
@@ -246,14 +245,6 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
     } catch {
       return '—';
     }
-  };
-
-  // Reset Wheel Cooldown for this citizen (logged server-side)
-  const handleUnlockWheel = async () => {
-    const ok = await onResetCooldown(draft.citizenId);
-    if (ok === false) return;
-    setDraft((d) => ({ ...d, wheelCooldownRemaining: 'Disponible', lastSpinTimestamp: null }));
-    showToast(`Tirage débloqué pour ${displayName} !`);
   };
 
   // Manual balance operation (server-side, recorded as a transaction)
@@ -662,7 +653,10 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
           </div>
 
           {/* TAB BAR NAVIGATION */}
-          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto pt-2 border-t border-white/5 -mb-2">
+          <div
+            role="tablist"
+            className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 rounded-2xl bg-white/[0.03] border border-white/10"
+          >
             {[
               { id: 'profile', icon: UserCheck, label: 'Profil & Identité' },
               { id: 'transactions', icon: Wallet, label: 'Dépôts & Transactions', count: transactions.length },
@@ -674,21 +668,23 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => setActiveTab(tab.id as CitizenModalTab)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer min-w-0 ${
                     isActive
-                      ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.25)] font-bold'
-                      : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-white text-black shadow-[0_2px_12px_rgba(0,0,0,0.5)] font-bold'
+                      : 'text-neutral-400 hover:text-white hover:bg-white/[0.06]'
                   }`}
                 >
-                  <Icon size={14} className={isActive ? 'text-black' : 'text-neutral-400'} />
-                  <span>{tab.label}</span>
+                  <Icon size={14} className={`shrink-0 ${isActive ? 'text-black' : 'text-neutral-500'}`} />
+                  <span className="truncate">{tab.label}</span>
                   {tab.count !== undefined && (
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                        isActive ? 'bg-black/15 text-black font-bold' : 'bg-white/10 text-neutral-400'
-                      }`}
-                    >
+                      className={`shrink-0 min-w-[20px] text-center text-[10px] leading-none font-mono px-1.5 py-1 rounded-full ${
+                        isActive ? 'bg-black/10 text-black font-bold' : 'bg-white/10 text-neutral-400'
+                      }`
+                    }>
                       {tab.count}
                     </span>
                   )}
@@ -762,8 +758,8 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
           {activeTab === 'profile' && (
             <div className="flex flex-col gap-6 animate-in fade-in duration-200">
               
-              {/* Top Metric Cards: Solde Jetons + Roue */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Top Metric Cards: Solde Jetons */}
+              <div className="grid grid-cols-1 gap-4">
                 
                 {/* 1. Solde Jetons Card */}
                 <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col justify-between gap-4 shadow-inner">
@@ -784,53 +780,6 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                     <span className="text-[11px] text-neutral-500 mt-0.5 block">
                       Jetons disponibles pour la roulette, tables de jeux et tournois
                     </span>
-                  </div>
-                </div>
-
-                {/* 3. Wheel Cooldown & Status Card */}
-                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col justify-between gap-4 shadow-inner">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-wider text-neutral-400 font-mono flex items-center gap-1.5">
-                      <Disc size={14} className="text-white" />
-                      Roue de la Fortune
-                    </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-neutral-400 border border-white/5">
-                      COOLDOWN
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-2.5 h-2.5 rounded-full ${
-                          draft.wheelCooldownRemaining === 'Disponible' || !draft.lastSpinTimestamp
-                            ? 'bg-emerald-400 animate-pulse'
-                            : 'bg-neutral-500'
-                        }`}
-                      />
-                      <span className="text-lg font-bold text-white">
-                        {draft.wheelCooldownRemaining === 'Disponible' || !draft.lastSpinTimestamp
-                          ? 'Tirage Disponible'
-                          : 'Cooldown Actif'}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-neutral-500 mt-1 block font-mono">
-                      {draft.lastSpinTimestamp
-                        ? `Dernier tirage : ${formatDateTime(draft.lastSpinTimestamp)}`
-                        : 'Aucun tirage en cours'}
-                    </span>
-                  </div>
-
-                  {/* Reset Cooldown Action */}
-                  <div className="pt-3 border-t border-white/5">
-                    <button
-                      type="button"
-                      onClick={handleUnlockWheel}
-                      className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs text-white font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-                    >
-                      <Unlock size={14} className="text-white" />
-                      <span>Débloquer le Tirage Immédiatement</span>
-                    </button>
                   </div>
                 </div>
               </div>

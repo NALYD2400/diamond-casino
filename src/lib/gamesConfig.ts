@@ -70,7 +70,7 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
     maxPayout: 10000000,
   },
   wheel: { enabled: true, spinPrice: 25000, maxRtp: 95 },
-  boosters: { enabled: true, maxRtp: 90, sellRate: 90 },
+  boosters: { enabled: true, maxRtp: 90, sellRate: 70 },
 };
 
 export interface VipTierConfig {

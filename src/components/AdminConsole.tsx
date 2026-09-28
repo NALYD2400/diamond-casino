@@ -5,6 +5,7 @@ import {
   Car,
   CheckCircle2,
   Crown,
+  Dices,
   Disc,
   Gamepad2,
   Layers,
@@ -25,12 +26,13 @@ import { BoostersPanel } from './admin/BoostersPanel';
 import { VipPanel } from './admin/VipPanel';
 import { RewardsPanel } from './admin/RewardsPanel';
 import { LogsPanel } from './admin/LogsPanel';
+import { RoundsPanel } from './admin/RoundsPanel';
 import { SystemPanel } from './admin/SystemPanel';
 import { ROLE_LABEL, cx } from './admin/ui';
 
-export type AdminTab = 'dashboard' | 'players' | 'games' | 'wheel' | 'boosters' | 'vip' | 'rewards' | 'logs' | 'system';
+export type AdminTab = 'dashboard' | 'players' | 'games' | 'wheel' | 'boosters' | 'vip' | 'rewards' | 'rounds' | 'logs' | 'system';
 
-const TABS: AdminTab[] = ['dashboard', 'players', 'games', 'wheel', 'boosters', 'vip', 'rewards', 'logs', 'system'];
+const TABS: AdminTab[] = ['dashboard', 'players', 'games', 'wheel', 'boosters', 'vip', 'rewards', 'rounds', 'logs', 'system'];
 
 interface NavItem {
   id: AdminTab;
@@ -60,6 +62,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Administration',
     items: [
+      { id: 'rounds', label: 'Parties', icon: Dices, description: 'Tirages et gains par joueur' },
       { id: 'logs', label: 'Journal', icon: ScrollText, description: 'Qui a fait quoi' },
       { id: 'system', label: 'Système', icon: Server, description: 'Maintenance, export, tests' },
     ],
@@ -247,6 +250,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
             {tab === 'boosters' && <BoostersPanel showToast={showToast} />}
             {tab === 'vip' && <VipPanel showToast={showToast} />}
             {tab === 'rewards' && <RewardsPanel showToast={showToast} />}
+            {tab === 'rounds' && <RoundsPanel />}
             {tab === 'logs' && <LogsPanel />}
             {tab === 'system' && <SystemPanel showToast={showToast} />}
           </div>

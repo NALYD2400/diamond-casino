@@ -708,6 +708,35 @@ export const apiAdminGrantVoucher = (
     p_note: p.note || null,
   });
 
+export interface DbUsage {
+  db_bytes: number;
+  limit_bytes: number;
+  rounds: number;
+  transactions: number;
+  logs: number;
+  oldest_round: string | null;
+  rounds_24h: number;
+}
+export const apiAdminDbUsage = () => rpc<DbUsage>('admin_db_usage');
+
+/** Staff : parties de tous les joueurs, plus récentes d'abord (pagination par date) */
+export async function dbFetchAllBets(opts: {
+  game?: string;
+  profileId?: string;
+  minWin?: number;
+  before?: string;
+  limit?: number;
+}): Promise<SupabaseBetEntry[]> {
+  let req = supabase.from('bets_history').select('*').order('created_at', { ascending: false }).limit(opts.limit ?? 50);
+  if (opts.game) req = req.eq('game_id', opts.game);
+  if (opts.profileId) req = req.eq('profile_id', opts.profileId);
+  if (opts.minWin) req = req.gte('win_amount', opts.minWin);
+  if (opts.before) req = req.lt('created_at', opts.before);
+  const { data, error } = await req;
+  if (error) throw toApiError(error);
+  return (data || []) as SupabaseBetEntry[];
+}
+
 export const apiAdminUpdateReward = (rewardId: string, status: Exclude<RewardStatus, 'CLAIMED'>, note?: string) =>
   rpc<PlayerReward>('admin_update_reward', { p_reward_id: rewardId, p_status: status, p_note: note || null });
 

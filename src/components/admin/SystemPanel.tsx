@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity, Coins, Download, History, Lock, RefreshCw, ShieldCheck, Unlock } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { useCasinoUser } from '../../context/CasinoUserContext';
-import { apiAdminExportHistory, dbCheckHealth, type HistoryExportKind, type SupabaseHealthResult } from '../../lib/supabase';
+import { apiAdminDbUsage, apiAdminExportHistory, dbCheckHealth, type DbUsage, type HistoryExportKind, type SupabaseHealthResult } from '../../lib/supabase';
 import { Badge, Button, Card, Field, HelpBox, NumberInput, PageHeader, Toggle, fmt, inputClass } from './ui';
 
 const SECURITY_POINTS = [
@@ -87,6 +87,12 @@ export const SystemPanel: React.FC<{ showToast: (m: string) => void }> = ({ show
   const [message, setMessage] = useState(economy.maintenanceMessage);
   const [health, setHealth] = useState<SupabaseHealthResult | null>(null);
   const [pinging, setPinging] = useState(false);
+  const [usage, setUsage] = useState<DbUsage | null>(null);
+  useEffect(() => {
+    apiAdminDbUsage()
+      .then(setUsage)
+      .catch(() => setUsage(null));
+  }, []);
   const [devAmount, setDevAmount] = useState(50000);
   const [busy, setBusy] = useState(false);
 
@@ -134,6 +140,28 @@ export const SystemPanel: React.FC<{ showToast: (m: string) => void }> = ({ show
           </Field>
         </div>
       </Card>
+
+      {usage && (
+        <Card
+          title="Stockage de la base"
+          icon={<History size={15} />}
+          right={
+            <Badge tone={usage.db_bytes / usage.limit_bytes > 0.8 ? 'bad' : usage.db_bytes / usage.limit_bytes > 0.5 ? 'warn' : 'good'}>
+              {fmt((usage.db_bytes / usage.limit_bytes) * 100, 1)} % utilisé
+            </Badge>
+          }
+        >
+          <div className="flex flex-col gap-3 text-[13px]">
+            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full rounded-full bg-white" style={{ width: `${Math.min(100, (usage.db_bytes / usage.limit_bytes) * 100)}%` }} />
+            </div>
+            <p className="text-neutral-400">
+              <b className="text-white font-mono">{fmt(usage.db_bytes / 1048576, 1)} Mo</b> sur {fmt(usage.limit_bytes / 1048576)} Mo (plan gratuit) ·{' '}
+              {fmt(usage.rounds)} parties ({fmt(usage.rounds_24h)} sur 24 h) · {fmt(usage.transactions)} transactions · {fmt(usage.logs)} lignes de journal
+            </p>
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card

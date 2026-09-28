@@ -750,7 +750,7 @@ export const DogHouseGame: React.FC = () => {
         {vouchers.length > 0 && phase === 'idle' && freeSpins === null && (
           <button
             onClick={() => setVoucherOpen(true)}
-            className="dh-font fixed left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border-2 border-[#0a4515] bg-gradient-to-b from-[#7dff5a] to-[#1fa33a] px-4 py-2 text-sm text-[#0a2d0a] shadow-lg animate-pulse"
+            className="dh-font fixed left-1/2 top-[112px] z-40 -translate-x-1/2 rounded-full border-2 border-[#0a4515] bg-gradient-to-b from-[#7dff5a] to-[#1fa33a] px-4 py-2 text-sm text-[#0a2d0a] shadow-lg animate-pulse"
           >
             BONUS OFFERT ×{vouchers.length}
           </button>

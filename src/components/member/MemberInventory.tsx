@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Check, Coins, Gift, Layers, Loader2, Package, PackageCheck, Play, Search, Sparkles } from 'lucide-react';
+import { Check, Coins, Gift, Layers, Loader2, Package, PackageCheck, Play, Search, Shirt, Sparkles, Ticket, Watch, Wine, type LucideIcon } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { apiMyInventory, apiSellRewards, type BoosterRarity, type Inventory, type InventoryItem } from '../../lib/supabase';
 import { REWARD_STATUS, formatRewardDate } from '../../lib/rewards';
@@ -43,6 +43,77 @@ function toCard(item: InventoryItem, rarities: Record<string, BoosterRarity>): R
     holo: false,
     subtitle: item.label !== item.vehicle_model ? item.label : null,
   };
+}
+
+/** Icône du lot d'après son nom (bouteille, costume, pass, montre…) */
+function itemIcon(label: string): LucideIcon {
+  const l = label.toLowerCase();
+  if (/bouteille|champagne|vin|whisky/.test(l)) return Wine;
+  if (/costume|vêtement|vetement|tenue|veste/.test(l)) return Shirt;
+  if (/montre|bijou/.test(l)) return Watch;
+  if (/pass|accès|acces|salon|ticket|invitation/.test(l)) return Ticket;
+  return Gift;
+}
+
+/** Carte d'un objet (non véhicule) : icône, nom en grand, provenance */
+function ItemCard({ item, width, dim }: { item: InventoryItem; width: number; dim: boolean }) {
+  const Icon = itemIcon(item.label);
+  const wheel = item.source === 'wheel';
+  const color = wheel ? '#f5c542' : '#22d3ee';
+  return (
+    <div
+      className={`relative overflow-hidden rounded-[14px] border flex flex-col items-center justify-between text-center p-4 ${dim ? 'opacity-60' : ''}`}
+      style={{
+        width,
+        height: width * 1.4,
+        borderColor: `${color}66`,
+        background: `radial-gradient(circle at 50% 38%, ${color}26, #0a0a0d 62%)`,
+      }}
+    >
+      <span className="text-[9px] uppercase tracking-[0.18em] font-mono px-2 py-0.5 rounded-full border" style={{ color, borderColor: `${color}55` }}>
+        Objet · {wheel ? 'Roue' : 'Offert'}
+      </span>
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center border" style={{ borderColor: `${color}55`, background: `${color}14` }}>
+          <Icon size={30} style={{ color }} />
+        </div>
+        <span className="text-sm font-semibold text-white leading-tight px-1">{item.label}</span>
+      </div>
+      <span className="text-[10px] text-neutral-500">À utiliser en jeu</span>
+    </div>
+  );
+}
+
+/** Carte d'un bon de bonus offert : couleurs de la machine, valeur en grand */
+function VoucherCard({ item, width, dim }: { item: InventoryItem; width: number; dim: boolean }) {
+  const wanted = item.voucher?.game === 'wanted';
+  const color = wanted ? '#e8c98a' : '#ffb300';
+  const game = wanted ? 'Wanted Dead or a Wild' : 'The Dog House';
+  return (
+    <div
+      className={`relative overflow-hidden rounded-[14px] border flex flex-col items-center justify-between text-center p-4 ${dim ? 'opacity-60' : ''}`}
+      style={{
+        width,
+        height: width * 1.4,
+        borderColor: `${color}80`,
+        background: `radial-gradient(circle at 50% 30%, ${color}30, #0a0a0d 65%)`,
+      }}
+    >
+      <span className="text-[9px] uppercase tracking-[0.18em] font-bold px-2.5 py-1 rounded-full bg-emerald-400 text-black">Bonus offert</span>
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center border" style={{ borderColor: `${color}80`, background: `${color}18` }}>
+          <Sparkles size={30} style={{ color }} />
+        </div>
+        <span className="text-sm font-bold text-white leading-tight">{game}</span>
+        <span className="text-[11px] text-neutral-400">Tours bonus</span>
+      </div>
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-[10px] uppercase tracking-wider text-neutral-500">Valeur</span>
+        <span className="text-xl font-bold font-mono text-white">{fmtChips(item.value)}</span>
+        <span className="text-[10px] text-emerald-300">Gratuit · sans mise</span>
+      </div>
+    </div>
+  );
 }
 
 function useGrid() {
@@ -145,11 +216,11 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
     }
   };
 
-  const claim = async (id: string) => {
+  const claim = async (id: string, isVehicle = true) => {
     setBusy(id);
     try {
       await claimReward(id);
-      showToast('Réclamation envoyée : la direction vous remettra le véhicule en ville.');
+      showToast(isVehicle ? 'Réclamation envoyée : la direction vous remettra le véhicule en ville.' : 'Objet utilisé : la direction est prévenue et l’applique en jeu.');
       await load();
     } catch (e) {
       showToast((e as Error).message);
@@ -319,18 +390,9 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                       {item.kind === 'vehicle' || item.card ? (
                         <BoosterCardFace card={card} width={grid.cardW} lite />
                       ) : item.kind === 'voucher' ? (
-                        <div className="rounded-[14px] border border-emerald-400/40 bg-[#07100b] flex flex-col items-center justify-center gap-2 text-center p-4" style={{ width: grid.cardW, height: grid.cardW * 1.4 }}>
-                          <Sparkles size={36} className="text-emerald-300" />
-                          <span className="text-[11px] uppercase tracking-wider text-emerald-300/80 font-mono">Bonus offert</span>
-                          <span className="text-sm font-semibold text-white">{item.voucher?.game === 'wanted' ? 'Wanted Dead or a Wild' : 'The Dog House'}</span>
-                          <span className="text-lg font-bold text-white font-mono">{fmtChips(item.value)}</span>
-                          <span className="text-[10px] text-neutral-400">Bonus gratuit, sans mise</span>
-                        </div>
+                        <VoucherCard item={item} width={grid.cardW} dim={false} />
                       ) : (
-                        <div className="rounded-[14px] border border-cyan-400/40 bg-[#0a0a0d] flex flex-col items-center justify-center gap-3 text-center p-4" style={{ width: grid.cardW, height: grid.cardW * 1.4 }}>
-                          <Gift size={36} className="text-cyan-300" />
-                          <span className="text-sm font-semibold text-white">{item.label}</span>
-                        </div>
+                        <ItemCard item={item} width={grid.cardW} dim={false} />
                       )}
                       {canSell && (
                         <button
@@ -373,12 +435,12 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                         <button
                           type="button"
                           disabled={busy !== null}
-                          onClick={() => void claim(item.id)}
-                          title="Recevoir le véhicule en ville"
+                          onClick={() => void claim(item.id, item.kind === 'vehicle')}
+                          title={item.kind === 'vehicle' ? 'Recevoir le véhicule en ville' : 'Utiliser cet objet : la direction est prévenue'}
                           className={`${canSell ? 'w-9 shrink-0' : 'flex-1'} h-8 rounded-full border border-white/20 text-white text-[11px] font-semibold hover:bg-white/10 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5`}
                         >
                           {busy === item.id ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
-                          {!canSell && 'Réclamer'}
+                          {!canSell && (item.kind === 'vehicle' ? 'Réclamer' : 'Utiliser')}
                         </button>
                       </div>
                     ) : (
@@ -398,8 +460,8 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
           )}
           <p className="text-xs text-neutral-500">
             <b className="text-neutral-300">Revendre</b> crédite immédiatement {inv.sell_rate} % de la valeur du véhicule en jetons.{' '}
-            <b className="text-neutral-300">Réclamer</b> (<PackageCheck size={11} className="inline" />) prévient la direction qui vous remet le véhicule en ville.{' '}
-            <b className="text-neutral-300">Utiliser</b> lance un bonus offert directement dans la machine.
+            <b className="text-neutral-300">Réclamer</b> (<PackageCheck size={11} className="inline" />) prévient la direction qui vous remet le véhicule en ville. <b className="text-neutral-300">Utiliser</b> un objet prévient la direction qui l’applique en jeu.{' '}
+            Un <b className="text-neutral-300">bonus offert</b> se lance directement dans la machine.
           </p>
         </>
       )}

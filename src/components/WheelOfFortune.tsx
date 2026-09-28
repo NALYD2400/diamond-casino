@@ -42,8 +42,9 @@ const PRIZE_IMAGES: Record<WheelSegmentConfig['type'], string> = {
   chips: '/diamond_chips_jackpot.jpg',
   mystery: '/mystery_vault.jpg',
   clothing: '/diamond_vip_couture.jpg',
+  voucher: '/diamond_chips_jackpot.jpg',
 };
-const TYPE_EMOJI: Record<WheelSegmentConfig['type'], string> = { vehicle: '🏎️', chips: '🪙', mystery: '🎁', clothing: '👔' };
+const TYPE_EMOJI: Record<WheelSegmentConfig['type'], string> = { vehicle: '🏎️', chips: '🪙', mystery: '🎁', clothing: '👔', voucher: '🎰' };
 
 type Phase = 'idle' | 'requesting' | 'spinning';
 type Mood = 'idle' | 'spin' | 'win';
@@ -1005,7 +1006,7 @@ const BigWinOverlay: React.FC<{ amount: number; ratio: number; onClick: () => vo
 const PrizeOverlay: React.FC<{ result: SpinResult; podiumImage: string; onClose: () => void }> = ({ result, podiumImage, onClose }) => {
   const seg = result.segment;
   const fallback = PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg';
-  const title = seg.type === 'vehicle' ? 'JACKPOT !' : seg.type === 'clothing' ? 'LOT VIP !' : 'LOT MYSTÈRE !';
+  const title = seg.type === 'vehicle' ? 'JACKPOT !' : seg.type === 'clothing' ? 'LOT VIP !' : seg.type === 'voucher' ? 'BONUS OFFERT !' : 'LOT MYSTÈRE !';
   return (
     <div
       onClick={onClose}
@@ -1052,7 +1053,9 @@ const PrizeOverlay: React.FC<{ result: SpinResult; podiumImage: string; onClose:
           <p className="mt-3 text-xs text-white/60">
             {result.mode === 'demo'
               ? 'Tour de démonstration : ce lot n’est pas crédité.'
-              : 'Le lot rejoint votre inventaire. Réclamez-le depuis votre Espace Membre pour la remise en ville.'}
+              : result.segment.type === 'voucher'
+                ? 'Le bonus rejoint votre inventaire : utilisez-le depuis la machine, il est totalement gratuit.'
+                : 'Le lot rejoint votre inventaire. Réclamez-le depuis votre Espace Membre pour la remise en ville.'}
           </p>
           <div className="mt-4 flex gap-2">
             {result.mode === 'real' && (

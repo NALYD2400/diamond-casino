@@ -33,7 +33,7 @@ import {
 import { hasAdminPermissions } from '../lib/discord';
 import { useCasinoUser, type CasinoTransaction } from './CasinoUserContext';
 
-export type RewardType = 'vehicle' | 'chips' | 'mystery' | 'clothing';
+export type RewardType = 'vehicle' | 'chips' | 'mystery' | 'clothing' | 'voucher';
 
 export interface WheelSegmentConfig {
   id: number;
@@ -51,6 +51,10 @@ export interface WheelSegmentConfig {
   imageUrl?: string;
   /** Valeur catalogue du véhicule ($ = jetons), renseignée par le serveur : compte dans le RTP de la roue */
   vehicleValue?: number;
+  /** type 'voucher' : bonus offert sur une machine (jeu, type de bonus, valeur en jetons) */
+  voucherGame?: 'doghouse' | 'wanted';
+  voucherBuy?: 'buy' | 'gtr' | 'duel' | 'dmh';
+  voucherValue?: number;
 }
 
 export interface PodiumVehicleConfig {
@@ -194,7 +198,7 @@ export const DEFAULT_ECONOMY: CasinoEconomyConfig = {
 };
 
 const PUBLIC_SETTING_KEYS = ['wheel_segments', 'podium_vehicle', 'wheel_cooldown', 'economy_config', 'games_config', 'vip_config'];
-const REWARD_TYPES: string[] = ['vehicle', 'chips', 'cash', 'mystery', 'clothing'];
+const REWARD_TYPES: string[] = ['vehicle', 'chips', 'cash', 'mystery', 'clothing', 'voucher'];
 
 function isValidSegments(value: unknown): value is WheelSegmentConfig[] {
   return (

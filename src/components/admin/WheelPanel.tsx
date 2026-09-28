@@ -16,6 +16,7 @@ const TYPE_LABEL: Record<RewardType, string> = {
   vehicle: 'Véhicule',
   mystery: 'Objet mystère',
   clothing: 'Vêtement',
+  voucher: 'Bonus offert (machine)',
 };
 
 export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
@@ -49,7 +50,7 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
   );
   // Véhicules comptés à leur valeur catalogue (1 jeton = 1 $), comme le fait le serveur
   const expectedVehicles = useMemo(
-    () => draft.reduce((a, s) => a + (s.type === 'vehicle' ? (Number(s.vehicleValue) || 0) * (chance(s) / 100) : 0), 0),
+    () => draft.reduce((a, s) => a + (s.type === 'vehicle' ? (Number(s.vehicleValue) || 0) * (chance(s) / 100) : s.type === 'voucher' ? (Number(s.voucherValue) || 0) * (chance(s) / 100) : 0), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [draft, totalWeight],
   );
@@ -249,7 +250,9 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                       <Badge tone={seg.type === 'chips' ? 'gold' : seg.type === 'vehicle' ? 'info' : 'violet'}>{TYPE_LABEL[seg.type]}</Badge>
                     </td>
                     <td className="px-3 py-2.5 text-neutral-300 text-[13px]">
-                      {seg.type === 'chips' ? <span className="font-mono text-white">{fmt(Number(seg.value))} jetons</span> : String(seg.value)}
+                      {seg.type === 'chips' ? <span className="font-mono text-white">{fmt(Number(seg.value))} jetons</span> : seg.type === 'voucher' ? (
+                        <span className="font-mono text-white">{seg.voucherGame === 'wanted' ? 'Wanted' : 'Dog House'} · bonus de {fmt(Number(seg.voucherValue) || 0)}</span>
+                      ) : String(seg.value)}
                       {seg.type === 'vehicle' && (
                         <span className="block text-[11px] font-mono text-neutral-500">
                           {seg.vehicleValue ? `valeur ${fmt(seg.vehicleValue)} $` : 'aucun véhicule du catalogue lié'}
@@ -360,6 +363,9 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; onClose: () => void; on
                   value: type === 'chips' ? Number(seg.value) || 0 : typeof seg.value === 'number' ? '' : seg.value,
                   vehicleModel: type === 'vehicle' ? seg.vehicleModel : undefined,
                   vehicleValue: type === 'vehicle' ? seg.vehicleValue : undefined,
+                  voucherGame: type === 'voucher' ? seg.voucherGame ?? 'doghouse' : undefined,
+                  voucherBuy: type === 'voucher' ? seg.voucherBuy ?? 'buy' : undefined,
+                  voucherValue: type === 'voucher' ? seg.voucherValue ?? 20000 : undefined,
                 });
               }}
             >
@@ -378,6 +384,47 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; onClose: () => void; on
           <Field label="Nombre de jetons gagnés">
             <NumberInput value={Number(seg.value) || 0} min={0} onChange={(v) => setSeg({ ...seg, value: Math.max(0, v) })} suffix="⛁" />
           </Field>
+        ) : seg.type === 'voucher' ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Machine">
+                <select
+                  className={cx(inputClass, 'cursor-pointer')}
+                  value={seg.voucherGame ?? 'doghouse'}
+                  onChange={(e) => {
+                    const game = e.target.value as 'doghouse' | 'wanted';
+                    setSeg({ ...seg, voucherGame: game, voucherBuy: game === 'wanted' ? 'gtr' : 'buy' });
+                  }}
+                >
+                  <option value="doghouse" className="bg-black">The Dog House</option>
+                  <option value="wanted" className="bg-black">Wanted Dead or a Wild</option>
+                </select>
+              </Field>
+              {seg.voucherGame === 'wanted' ? (
+                <Field label="Bonus déclenché">
+                  <select
+                    className={cx(inputClass, 'cursor-pointer')}
+                    value={seg.voucherBuy ?? 'gtr'}
+                    onChange={(e) => setSeg({ ...seg, voucherBuy: e.target.value as 'gtr' | 'duel' | 'dmh' })}
+                  >
+                    <option value="gtr" className="bg-black">Tours gratuits (GTR)</option>
+                    <option value="duel" className="bg-black">Duel</option>
+                    <option value="dmh" className="bg-black">Dead Man's Hand</option>
+                  </select>
+                </Field>
+              ) : (
+                <Field label="Bonus déclenché">
+                  <input className={inputClass} disabled value="Tours gratuits" />
+                </Field>
+              )}
+            </div>
+            <Field
+              label="Valeur du bonus offert"
+              hint="Le joueur déclenche le bonus gratuitement. La mise est déduite de cette valeur (valeur ÷ prix du bonus). Compte dans le retour de la roue."
+            >
+              <NumberInput value={Number(seg.voucherValue) || 0} min={1} onChange={(v) => setSeg({ ...seg, voucherValue: Math.max(1, v) })} suffix="⛁" />
+            </Field>
+          </>
         ) : (
           <Field label="Nom du lot reçu par le joueur" hint="C'est ce qui apparaît dans son inventaire.">
             <input className={inputClass} maxLength={80} value={String(seg.value)} onChange={(e) => setSeg({ ...seg, value: e.target.value })} />

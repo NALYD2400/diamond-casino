@@ -360,6 +360,8 @@ export interface SlotRoundResponse<R> {
   cost: number;
   paid: number;
   profile: ProfilePayload;
+  /** Bonus offert : mise réellement utilisée par le serveur */
+  bet?: number;
 }
 
 /** Réveille la fonction Edge (aucun effet côté serveur) pour éviter le démarrage à froid */
@@ -372,6 +374,8 @@ export async function apiPlaySlotRound<R>(body: {
   bet: number;
   mode?: 'spin' | 'boost' | 'buy';
   buy?: string | null;
+  /** Bonus offert : le serveur relit le bon et joue le bonus gratuitement */
+  voucher_id?: string;
 }): Promise<SlotRoundResponse<R>> {
   const { data, error } = await supabase.functions.invoke('slot-round', { body });
   if (error) {
@@ -432,12 +436,12 @@ export interface VehicleCatalogEntry {
   in_dealership?: boolean | null;
 }
 
-export type RewardStatus = 'IN_INVENTORY' | 'CLAIMED' | 'DELIVERED' | 'REVOKED' | 'SOLD';
+export type RewardStatus = 'IN_INVENTORY' | 'CLAIMED' | 'DELIVERED' | 'REVOKED' | 'SOLD' | 'USED';
 
 export interface PlayerReward {
   id: string;
   profile_id: string;
-  kind: 'vehicle' | 'item';
+  kind: 'vehicle' | 'item' | 'voucher';
   label: string;
   vehicle_model: string | null;
   image_url: string | null;
@@ -453,6 +457,15 @@ export interface PlayerReward {
   booster_card_id?: string | null;
   sold_at?: string | null;
   sold_for?: number | null;
+  /** Bon de bonus offert : machine, type de bonus et mise déduite de sa valeur */
+  voucher?: VoucherSpec | null;
+}
+
+export interface VoucherSpec {
+  game: 'doghouse' | 'wanted';
+  buy: string;
+  bet: number;
+  cost: number;
 }
 
 export async function dbSearchVehicles(query: string, opts: { vehicleClass?: string; limit?: number; dealershipOnly?: boolean } = {}): Promise<VehicleCatalogEntry[]> {
@@ -469,6 +482,20 @@ export async function dbSearchVehicles(query: string, opts: { vehicleClass?: str
 export async function dbCountVehicles(): Promise<number> {
   const { count } = await supabase.from('vehicle_catalog').select('model', { count: 'exact', head: true });
   return count || 0;
+}
+
+/** Bons de bonus offerts non utilisés du joueur pour une machine */
+export async function dbFetchMyVouchers(profileId: string, game: 'doghouse' | 'wanted'): Promise<PlayerReward[]> {
+  const { data, error } = await supabase
+    .from('player_rewards')
+    .select('*')
+    .eq('profile_id', profileId)
+    .eq('kind', 'voucher')
+    .eq('status', 'IN_INVENTORY')
+    .order('created_at', { ascending: true })
+    .limit(50);
+  if (error) throw toApiError(error);
+  return ((data || []) as PlayerReward[]).filter((r) => r.voucher?.game === game);
 }
 
 export async function dbFetchMyRewards(profileId: string): Promise<PlayerReward[]> {

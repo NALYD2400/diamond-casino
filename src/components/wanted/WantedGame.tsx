@@ -5,10 +5,11 @@ import { ArrowLeft, Info, Menu, Minus, Play, Plus, RefreshCw, RotateCw, Volume2,
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
-import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
+import { apiPlaySlotRound, CasinoApiError, type PlayerReward } from '../../lib/supabase';
 import { clampBetLevels, SLOT_RTP, formatRtp } from '../../lib/gamesConfig';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
+import { useVouchers } from '../slots/useVouchers';
 import { WantedAudio } from './wantedAudio';
 import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
 import { WantedLogo, WantedSymbol } from './WantedSymbols';
@@ -202,14 +203,21 @@ export const WantedGame: React.FC = () => {
   const busyRef = useRef(false);
   const { wait, skipAll, waitClick, resolveClick, countUp } = useSlotTimeline();
   useSlotWarmup(mode === 'real');
+  // Bons de bonus offerts (roue, cadeaux) : bonus gratuit, mise déduite de leur valeur
+  const { vouchers, reload: reloadVouchers } = useVouchers('wanted', mode === 'real');
+  const [voucherOpen, setVoucherOpen] = useState(false);
+  const voucherBetRef = useRef(0);
 
   // Manche tirée par le SERVEUR en mode jetons (mise et gain réglés en base
   // avant l'animation), localement en mode démo.
   const obtainRound = useCallback(
-    async (buy: WantedBonus | null): Promise<WantedRound | null> => {
+    async (buy: WantedBonus | null, voucher?: PlayerReward): Promise<WantedRound | null> => {
       if (mode === 'real') {
         try {
-          const res = await apiPlaySlotRound<WantedRound>({ game: 'wanted', bet, buy });
+          const res = voucher
+            ? await apiPlaySlotRound<WantedRound>({ game: 'wanted', bet: voucher.voucher?.bet ?? bet, voucher_id: voucher.id })
+            : await apiPlaySlotRound<WantedRound>({ game: 'wanted', bet, buy });
+          if (voucher) voucherBetRef.current = res.bet ?? voucher.voucher?.bet ?? bet;
           setHiddenWin(res.paid);
           applyServerProfile(res.profile);
           return res.round;
@@ -425,7 +433,7 @@ export const WantedGame: React.FC = () => {
   );
 
   const playRound = useCallback(
-    async (buy: WantedBonus | null) => {
+    async (buy: WantedBonus | null, voucher?: PlayerReward) => {
       if (busyRef.current) return;
       if (blockedRef.current) {
         setMessage('MACHINE FERMÉE');
@@ -433,7 +441,7 @@ export const WantedGame: React.FC = () => {
         return;
       }
       const cost = buy ? bet * buyPrices[buy] : bet;
-      if (displayCredit < cost) {
+      if (!voucher && displayCredit < cost) {
         setMessage('SOLDE INSUFFISANT');
         setAutoLeft(0);
         return;
@@ -451,7 +459,7 @@ export const WantedGame: React.FC = () => {
       // Les rouleaux tournent pendant que le serveur tire la manche : le
       // résultat n'est connu qu'à la réponse, l'aléa reste entièrement serveur.
       const startedAt = startReels([]);
-      const round = await obtainRound(buy);
+      const round = await obtainRound(buy, voucher);
       if (!round) {
         setSpinning([false, false, false, false, false]);
         setAutoLeft(0);
@@ -460,25 +468,27 @@ export const WantedGame: React.FC = () => {
         return;
       }
       const res = round.base;
+      const roundBet = voucher ? voucherBetRef.current : bet;
 
-      await animateReels(res, { anticipation: !buy, keepVs: [], startedAt });
+      await animateReels(res, { anticipation: !buy && !voucher, keepVs: [], startedAt });
       if (res.bonus) {
         setScatterHit(true);
         setAutoLeft(0);
       }
-      await presentWins(res, bet, 0);
+      await presentWins(res, roundBet, 0);
       setHiddenWin((h) => Math.max(0, h - res.totalWin));
       setLastWin(res.totalWin);
 
       if (round.bonus) {
         await wait(1100);
-        await runBonus(round.bonus, bet, res.totalWin);
+        await runBonus(round.bonus, roundBet, res.totalWin);
       }
       setHiddenWin(0);
       setPhase('idle');
       busyRef.current = false;
+      if (voucher) void reloadVouchers();
     },
-    [animateReels, startReels, bet, buyPrices, displayCredit, obtainRound, presentWins, runBonus, wait],
+    [animateReels, startReels, bet, buyPrices, displayCredit, obtainRound, presentWins, runBonus, wait, reloadVouchers],
   );
 
   const onSpinPress = useCallback(() => {
@@ -680,9 +690,58 @@ export const WantedGame: React.FC = () => {
           buyDisabled={locked || !!bonusState}
         />
 
+        {vouchers.length > 0 && phase === 'idle' && !bonusState && (
+          <button
+            onClick={() => setVoucherOpen(true)}
+            className="fixed left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border-2 border-[#1c120c] bg-[linear-gradient(180deg,#efe4cc,#c9b48a)] px-4 py-2 font-['Oswald'] text-sm font-bold text-[#1c120c] shadow-lg animate-pulse"
+          >
+            BONUS OFFERT ×{vouchers.length}
+          </button>
+        )}
+
         {bigWin && <BigWinOverlay amount={bigWin.shown} bet={bigWin.bet} onClick={skipAll} />}
         {intro && <BonusIntro bonus={intro.bonus} onStart={resolveClick} />}
         {end && <BonusEnd bonus={end.bonus} win={end.win} onClose={resolveClick} />}
+
+        {voucherOpen && vouchers[0] && (
+          <Modal title="BONUS OFFERT" onClose={() => setVoucherOpen(false)}>
+            {(() => {
+              const v = vouchers[0];
+              const b = (v.voucher?.buy ?? 'gtr') as WantedBonus;
+              const info = BONUS_INFO[b] ?? BONUS_INFO.gtr;
+              return (
+                <>
+                  <div className="w-16 h-16 mx-auto mb-3">
+                    <WantedSymbol id={b === 'gtr' ? 'fs' : b === 'duel' ? 'duel' : 'dead'} />
+                  </div>
+                  <p className="text-center text-white/80 text-sm mb-1">{info.name} : le bonus est offert</p>
+                  <p className="text-center font-['Oswald'] font-bold text-4xl text-[#ffcf3f] mb-1">{fmt(v.value ?? 0)}</p>
+                  <p className="text-center text-white/50 text-xs mb-5">
+                    Valeur du bonus · mise {fmt(v.voucher?.bet ?? 0)}
+                    {vouchers.length > 1 ? ` · ${vouchers.length} bons disponibles` : ''}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setVoucherOpen(false)}
+                      className="font-['Oswald'] font-bold text-lg py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white"
+                    >
+                      PLUS TARD
+                    </button>
+                    <button
+                      onClick={() => {
+                        setVoucherOpen(false);
+                        void playRound(b, v);
+                      }}
+                      className="font-['Oswald'] font-bold text-lg py-3 rounded-lg border-2 border-[#1c120c] bg-[linear-gradient(180deg,#efe4cc,#c9b48a)] text-[#1c120c]"
+                    >
+                      UTILISER
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </Modal>
+        )}
 
         {buyOpen && (
           <Modal title="ACHETER UN BONUS" onClose={() => setBuyOpen(false)} wide>

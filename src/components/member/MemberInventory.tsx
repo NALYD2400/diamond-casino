@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Check, Coins, Gift, Layers, Loader2, Package, PackageCheck, Search } from 'lucide-react';
+import { Check, Coins, Gift, Layers, Loader2, Package, PackageCheck, Play, Search, Sparkles } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { apiMyInventory, apiSellRewards, type BoosterRarity, type Inventory, type InventoryItem } from '../../lib/supabase';
 import { REWARD_STATUS, formatRewardDate } from '../../lib/rewards';
@@ -94,7 +94,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
   const stats = useMemo(
     () => ({
       available: available.length,
-      value: available.reduce((a, i) => a + i.value, 0),
+      value: available.filter((i) => i.kind !== 'voucher').reduce((a, i) => a + i.value, 0),
       resale: sellable.reduce((a, i) => a + i.sell_value, 0),
       claimed: items.filter((i) => i.status === 'CLAIMED').length,
     }),
@@ -318,6 +318,14 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                     <div className={`relative ${item.status === 'IN_INVENTORY' ? '' : 'opacity-60'}`}>
                       {item.kind === 'vehicle' || item.card ? (
                         <BoosterCardFace card={card} width={grid.cardW} lite />
+                      ) : item.kind === 'voucher' ? (
+                        <div className="rounded-[14px] border border-emerald-400/40 bg-[#07100b] flex flex-col items-center justify-center gap-2 text-center p-4" style={{ width: grid.cardW, height: grid.cardW * 1.4 }}>
+                          <Sparkles size={36} className="text-emerald-300" />
+                          <span className="text-[11px] uppercase tracking-wider text-emerald-300/80 font-mono">Bonus offert</span>
+                          <span className="text-sm font-semibold text-white">{item.voucher?.game === 'wanted' ? 'Wanted Dead or a Wild' : 'The Dog House'}</span>
+                          <span className="text-lg font-bold text-white font-mono">{fmtChips(item.value)}</span>
+                          <span className="text-[10px] text-neutral-400">Bonus gratuit, sans mise</span>
+                        </div>
                       ) : (
                         <div className="rounded-[14px] border border-cyan-400/40 bg-[#0a0a0d] flex flex-col items-center justify-center gap-3 text-center p-4" style={{ width: grid.cardW, height: grid.cardW * 1.4 }}>
                           <Gift size={36} className="text-cyan-300" />
@@ -341,7 +349,15 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                         </span>
                       )}
                     </div>
-                    {item.status === 'IN_INVENTORY' ? (
+                    {item.status === 'IN_INVENTORY' && item.kind === 'voucher' ? (
+                      <Link
+                        to={item.voucher?.game === 'wanted' ? '/wanted' : '/slots'}
+                        title="Ouvrir la machine et utiliser le bonus"
+                        className="h-8 rounded-full bg-white text-black text-[11px] font-bold hover:bg-neutral-200 flex items-center justify-center gap-1.5"
+                      >
+                        <Play size={12} fill="currentColor" /> Utiliser
+                      </Link>
+                    ) : item.status === 'IN_INVENTORY' ? (
                       <div className="flex gap-1.5">
                         {canSell && (
                           <button
@@ -382,7 +398,8 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
           )}
           <p className="text-xs text-neutral-500">
             <b className="text-neutral-300">Revendre</b> crédite immédiatement {inv.sell_rate} % de la valeur du véhicule en jetons.{' '}
-            <b className="text-neutral-300">Réclamer</b> (<PackageCheck size={11} className="inline" />) prévient la direction qui vous remet le véhicule en ville.
+            <b className="text-neutral-300">Réclamer</b> (<PackageCheck size={11} className="inline" />) prévient la direction qui vous remet le véhicule en ville.{' '}
+            <b className="text-neutral-300">Utiliser</b> lance un bonus offert directement dans la machine.
           </p>
         </>
       )}

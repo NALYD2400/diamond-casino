@@ -55,6 +55,7 @@ const KNOWN_ERRORS = [
   'PROFILE_REQUIRED',
   'BUY_DISABLED',
   'BOOST_DISABLED',
+  'VOUCHER_NOT_FOUND',
 ];
 
 Deno.serve(async (req) => {
@@ -77,11 +78,61 @@ Deno.serve(async (req) => {
   const user = authRes.data?.user;
   if (authRes.error || !user) return json({ error: 'AUTH_REQUIRED' }, 401);
 
-  let body: { game?: string; bet?: number; mode?: string; buy?: string };
+  let body: { game?: string; bet?: number; mode?: string; buy?: string; voucher_id?: string };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'INVALID_BET' }, 400);
+  }
+
+  // Bon de bonus offert : le serveur relit le bon (jeu, type de bonus, mise), joue le
+  // bonus gratuitement puis consomme le bon et crédite le gain en une seule transaction.
+  if (body.voucher_id) {
+    const { data: prof } = await admin.from('profiles').select('id').eq('user_id', user.id).maybeSingle();
+    const { data: rw } = prof
+      ? await admin
+          .from('player_rewards')
+          .select('id, voucher')
+          .eq('id', body.voucher_id)
+          .eq('profile_id', prof.id)
+          .eq('kind', 'voucher')
+          .eq('status', 'IN_INVENTORY')
+          .maybeSingle()
+      : { data: null };
+    const v = rw?.voucher as { game?: string; buy?: string; bet?: number } | null | undefined;
+    if (!rw || !v || (v.game !== 'doghouse' && v.game !== 'wanted')) return json({ error: 'VOUCHER_NOT_FOUND' }, 400);
+
+    const vcfg = cfgRes.data?.[v.game];
+    if (!vcfg) return json({ error: 'GAME_DISABLED' }, 503);
+    if (!vcfg.enabled) return json({ error: 'GAME_DISABLED' }, 403);
+
+    let vround;
+    let vdetail: Record<string, unknown>;
+    let vbetUsed = 0;
+    if (v.game === 'doghouse') {
+      const vbet = Math.max(vcfg.minBet, Math.min(Number(v.bet), dogMaxBuyBet(vcfg.buyPrice, vcfg.maxPayout)));
+      vbetUsed = vbet;
+      vround = playDogHouseRound({ bet: vbet, mode: 'buy', buyPriceX: vcfg.buyPrice, maxPayout: vcfg.maxPayout, rng: secureRandom });
+      vdetail = { mode: 'voucher', bonus: vround.freeSpins ? 'free_spins' : null };
+    } else {
+      const vbuy = (['gtr', 'duel', 'dmh'].includes(v.buy ?? '') ? v.buy : 'gtr') as WantedBonus;
+      const vbet = Math.max(vcfg.minBet, Math.min(Number(v.bet), wantedMaxBuyBet(vcfg.buyPrices[vbuy], vcfg.maxPayout)));
+      vbetUsed = vbet;
+      vround = playWantedRound({ bet: vbet, buy: vbuy, buyPrices: vcfg.buyPrices, maxPayout: vcfg.maxPayout, rng: secureRandom });
+      vdetail = { mode: 'voucher', bonus: vround.bonus?.bonus ?? null };
+    }
+    const vpaid = Math.floor(vround.totalWin);
+    const { data: vprofile, error: verr } = await admin.rpc('settle_voucher_round', {
+      p_user_id: user.id,
+      p_reward_id: rw.id,
+      p_win: vpaid,
+      p_detail: vdetail,
+    });
+    if (verr) {
+      const code = KNOWN_ERRORS.find((c) => (verr.message ?? '').includes(c)) ?? 'SERVER_ERROR';
+      return json({ error: code }, code === 'SERVER_ERROR' ? 500 : 400);
+    }
+    return json({ round: vround, cost: 0, paid: vpaid, profile: vprofile, voucher: true, bet: vbetUsed });
   }
 
   const game = body.game;

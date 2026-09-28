@@ -12,6 +12,7 @@ export const REWARD_STATUS: Record<RewardStatus, { label: string; className: str
   DELIVERED: { label: 'Remis en jeu', className: 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10' },
   REVOKED: { label: 'Retiré', className: 'text-neutral-400 border-white/15 bg-white/5' },
   SOLD: { label: 'Revendu', className: 'text-amber-200 border-amber-400/30 bg-amber-500/10' },
+  USED: { label: 'Utilisé', className: 'text-neutral-400 border-white/15 bg-white/5' },
 };
 
 export function formatRewardDate(iso: string | null | undefined): string {

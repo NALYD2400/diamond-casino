@@ -32,6 +32,7 @@ const PALETTES: Record<RewardType | 'chipsA' | 'chipsB' | 'chipsC', { light: str
   vehicle: { light: '#ffe98a', dark: '#d48a0c', text: '#ffffff', sub: '#fff4c2' },
   mystery: { light: '#ff7fd4', dark: '#a0137a', text: '#ffffff', sub: '#ffd6f2' },
   clothing: { light: '#6ff0ff', dark: '#10789f', text: '#ffffff', sub: '#d2fbff' },
+  voucher: { light: '#7dff9a', dark: '#12803a', text: '#ffffff', sub: '#d3ffe0' },
 };
 
 function polar(radius: number, angleDeg: number): [number, number] {
@@ -49,6 +50,7 @@ function wedgeText(seg: WheelSegmentConfig): { primary: string; secondary: strin
   if (seg.type === 'chips' && typeof seg.value === 'number') return { primary: shortChips(seg.value), secondary: 'JETONS', emoji: '' };
   if (seg.type === 'vehicle') return { primary: 'VÉHICULE', secondary: 'JACKPOT', emoji: '🏎️' };
   if (seg.type === 'clothing') return { primary: 'VÊTEMENT', secondary: 'VIP', emoji: '👔' };
+  if (seg.type === 'voucher') return { primary: 'BONUS', secondary: seg.voucherGame === 'wanted' ? 'WANTED' : 'DOG HOUSE', emoji: '🎰' };
   const words = seg.label.trim().split(/\s+/);
   return {
     primary: (words[0] || 'MYSTÈRE').slice(0, 9).toUpperCase(),

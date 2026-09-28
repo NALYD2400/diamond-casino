@@ -845,7 +845,7 @@ export const GamesHub: React.FC = () => {
           </Link>
 
           {/* Cartes promo */}
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="mt-4 grid grid-cols-2 gap-3">
             <PromoCard
               to="/roue-de-la-fortune"
               title="Roue"
@@ -856,21 +856,12 @@ export const GamesHub: React.FC = () => {
               art={<WheelArt />}
             />
             <PromoCard
-              to="/abonnements"
-              title="Bonus VIP"
-              subtitle="Jetons offerts à l'activation de votre carte."
-              cta="Réclamer"
-              icon={<Gift size={15} />}
-              className="bg-[radial-gradient(ellipse_at_80%_80%,#4a4a4a,#1c1c1c_55%,#050505)]"
-              art={<div className="h-full w-full pr-6 pb-8"><Crown className="h-full w-full rotate-12 text-white drop-shadow-[0_0_24px_rgba(255,255,255,0.45)]" strokeWidth={1.4} /></div>}
-            />
-            <PromoCard
               to="/mines"
               title="Mines"
               subtitle="Évitez les bombes, encaissez quand vous voulez."
               cta="Jouer"
               icon={<Bomb size={15} />}
-              className="col-span-2 md:col-span-1 bg-[radial-gradient(ellipse_at_80%_80%,#2e2e2e,#141414_60%,#050505)]"
+              className="bg-[radial-gradient(ellipse_at_80%_80%,#2e2e2e,#141414_60%,#050505)]"
               art={<div className="h-full w-full pr-6 pb-8"><GemArt className="h-full w-full drop-shadow-[0_0_24px_rgba(94,232,255,0.6)]" /></div>}
             />
           </div>

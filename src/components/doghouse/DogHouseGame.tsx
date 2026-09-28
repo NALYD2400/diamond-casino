@@ -17,12 +17,13 @@ import {
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
-import { apiPlaySlotRound, CasinoApiError } from '../../lib/supabase';
+import { apiPlaySlotRound, CasinoApiError, type PlayerReward } from '../../lib/supabase';
 import { clampBetLevels, SLOT_RTP, formatRtp } from '../../lib/gamesConfig';
 import { DogHouseAudio } from './dogHouseAudio';
 import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
+import { useVouchers } from '../slots/useVouchers';
 import { DogSymbol } from './DogSymbols';
 import {
   BOOST_BET_MULTIPLIER,
@@ -221,16 +222,23 @@ export const DogHouseGame: React.FC = () => {
   const busyRef = useRef(false);
   const { wait, skipAll, waitClick, resolveClick, countUp } = useSlotTimeline();
   useSlotWarmup(mode === 'real');
+  // Bons de bonus offerts (roue, cadeaux) : bonus gratuit, mise déduite de leur valeur
+  const { vouchers, reload: reloadVouchers } = useVouchers('doghouse', mode === 'real');
+  const [voucherOpen, setVoucherOpen] = useState(false);
+  const voucherBetRef = useRef(0);
 
   // ---------------------------------------------------------------------------
   // Obtention de la manche : tirée par le SERVEUR en mode jetons (la mise et le
   // gain sont réglés en base avant l'animation), localement en mode démo.
   // ---------------------------------------------------------------------------
   const obtainRound = useCallback(
-    async (roundMode: DogRoundMode): Promise<DogHouseRound | null> => {
+    async (roundMode: DogRoundMode, voucher?: PlayerReward): Promise<DogHouseRound | null> => {
       if (mode === 'real') {
         try {
-          const res = await apiPlaySlotRound<DogHouseRound>({ game: 'doghouse', bet, mode: roundMode });
+          const res = voucher
+            ? await apiPlaySlotRound<DogHouseRound>({ game: 'doghouse', bet: voucher.voucher?.bet ?? bet, voucher_id: voucher.id })
+            : await apiPlaySlotRound<DogHouseRound>({ game: 'doghouse', bet, mode: roundMode });
+          if (voucher) voucherBetRef.current = res.bet ?? voucher.voucher?.bet ?? bet;
           // Le gain est déjà crédité : on le masque jusqu'à sa présentation
           setHiddenWin(res.paid);
           applyServerProfile(res.profile);
@@ -439,16 +447,16 @@ export const DogHouseGame: React.FC = () => {
   // Tour principal (normal ou achat de bonus)
   // ---------------------------------------------------------------------------
   const playRound = useCallback(
-    async (buyBonus: boolean) => {
+    async (buyBonus: boolean, voucher?: PlayerReward) => {
       if (busyRef.current) return;
       if (blockedRef.current) {
         setMessage('MACHINE FERMÉE');
         setAutoLeft(0);
         return;
       }
-      const roundMode: DogRoundMode = buyBonus ? 'buy' : boost && cfg.boostEnabled ? 'boost' : 'spin';
+      const roundMode: DogRoundMode = buyBonus || voucher ? 'buy' : boost && cfg.boostEnabled ? 'boost' : 'spin';
       const cost = dogRoundCost(bet, roundMode, buyPriceX);
-      if (displayCredit < cost) {
+      if (!voucher && displayCredit < cost) {
         setMessage('CRÉDIT INSUFFISANT');
         setAutoLeft(0);
         return;
@@ -465,7 +473,7 @@ export const DogHouseGame: React.FC = () => {
       // Les rouleaux tournent pendant que le serveur tire la manche : le
       // résultat n'est connu qu'à la réponse, l'aléa reste entièrement serveur.
       const startedAt = startReels();
-      const round = await obtainRound(roundMode);
+      const round = await obtainRound(roundMode, voucher);
       if (!round) {
         abortReels();
         setAutoLeft(0);
@@ -474,6 +482,7 @@ export const DogHouseGame: React.FC = () => {
         return;
       }
       const res = round.base;
+      const roundBet = voucher ? voucherBetRef.current : bet;
 
       await animateReels(res, !buyBonus, undefined, startedAt);
 
@@ -483,12 +492,12 @@ export const DogHouseGame: React.FC = () => {
         audio.current.bonusTrigger();
         setMessage('BONUS !');
       }
-      await presentWins(res, bet, 0);
+      await presentWins(res, roundBet, 0);
       setHiddenWin((h) => Math.max(0, h - res.totalWin));
 
       if (round.freeSpins) {
         await wait(1200);
-        await runFreeSpins(round.freeSpins, bet, res.totalWin);
+        await runFreeSpins(round.freeSpins, roundBet, res.totalWin);
       } else if (res.totalWin > 0) {
         setMessage(`GAIN ${fmt(res.totalWin)}`);
       } else {
@@ -498,8 +507,9 @@ export const DogHouseGame: React.FC = () => {
       setHiddenWin(0);
       setPhase('idle');
       busyRef.current = false;
+      if (voucher) void reloadVouchers();
     },
-    [animateReels, startReels, abortReels, bet, boost, cfg.boostEnabled, buyPriceX, displayCredit, obtainRound, presentWins, runFreeSpins, wait],
+    [animateReels, startReels, abortReels, bet, boost, cfg.boostEnabled, buyPriceX, displayCredit, obtainRound, presentWins, runFreeSpins, wait, reloadVouchers],
   );
 
   const onSpinPress = useCallback(() => {
@@ -736,6 +746,16 @@ export const DogHouseGame: React.FC = () => {
           buyDisabled={locked || freeSpins !== null || boost || buyBetTooHigh}
         />
 
+        {/* Bons de bonus offerts */}
+        {vouchers.length > 0 && phase === 'idle' && freeSpins === null && (
+          <button
+            onClick={() => setVoucherOpen(true)}
+            className="dh-font fixed left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border-2 border-[#0a4515] bg-gradient-to-b from-[#7dff5a] to-[#1fa33a] px-4 py-2 text-sm text-[#0a2d0a] shadow-lg animate-pulse"
+          >
+            BONUS OFFERT ×{vouchers.length}
+          </button>
+        )}
+
         {/* Overlays */}
         {bigWin && <BigWinOverlay amount={bigWin.shown} bet={bigWin.bet} onClick={skipAll} />}
         {fsIntro && (
@@ -760,6 +780,41 @@ export const DogHouseGame: React.FC = () => {
                   {n}
                 </button>
               ))}
+            </div>
+          </Modal>
+        )}
+        {voucherOpen && vouchers[0] && (
+          <Modal title="BONUS OFFERT" onClose={() => setVoucherOpen(false)}>
+            <div className="flex justify-center gap-2 mb-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="w-16 h-16">
+                  <DogSymbol id="scatter" />
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-white/80 text-sm mb-1">Déclenchez le bonus, il est offert</p>
+            <p className="text-center dh-font text-4xl text-[#ffcf3f] mb-1">{fmt(vouchers[0].value ?? 0)}</p>
+            <p className="text-center text-white/50 text-xs mb-5">
+              Valeur du bonus · mise {fmt(vouchers[0].voucher?.bet ?? 0)} · 9 à 27 tours avec wilds collants
+              {vouchers.length > 1 ? ` · ${vouchers.length} bons disponibles` : ''}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setVoucherOpen(false)}
+                className="dh-font text-lg py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white"
+              >
+                PLUS TARD
+              </button>
+              <button
+                onClick={() => {
+                  const v = vouchers[0];
+                  setVoucherOpen(false);
+                  void playRound(true, v);
+                }}
+                className="dh-font text-lg py-3 rounded-xl bg-gradient-to-b from-[#7dff5a] to-[#1fa33a] border-2 border-[#0a4515] text-[#0a2d0a]"
+              >
+                UTILISER
+              </button>
             </div>
           </Modal>
         )}

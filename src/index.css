@@ -525,3 +525,40 @@ select option {
    seuls le tremblement d'écran et le flash sont coupés (côté React). */
 
 .bst-paused { animation-play-state: paused !important; }
+
+/* Espace membre : fond ambiant violet/or, dans l'esprit du lobby */
+.member-ambient {
+  background-color: #000;
+  background-image:
+    radial-gradient(60% 40% at 50% -5%, rgba(255, 255, 255, 0.09), transparent 70%),
+    radial-gradient(50% 40% at 100% 100%, rgba(255, 255, 255, 0.04), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* Reflet diagonal sur la carte membre */
+.member-card-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 45%, transparent 60%);
+  transform: translateX(-100%);
+  animation: member-card-shine 7s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes member-card-shine {
+  0%, 60% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-card-shine::after { animation: none; }
+}
+
+/* Sélection discrète, et pas de sélection sur les éléments d'interface */
+::selection {
+  background: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+button, nav, header, aside, img, svg, [role="button"], [role="tab"] {
+  -webkit-user-select: none;
+  user-select: none;
+}

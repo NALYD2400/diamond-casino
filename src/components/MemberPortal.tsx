@@ -31,6 +31,34 @@ interface MemberPortalProps {
 
 type ConsoleTab = 'overview' | 'inventory' | 'vault' | 'profile' | 'vip';
 
+
+const CARD_THEMES = {
+  none: {
+    name: 'Membre',
+    card: 'border-white/15 bg-gradient-to-br from-neutral-800 via-neutral-950 to-black shadow-[0_20px_70px_rgba(255,255,255,0.05)]',
+    badge: 'bg-white/10 border border-white/20 text-white',
+    accent: 'text-neutral-400',
+  },
+  SILVER: {
+    name: 'Silver',
+    card: 'border-white/30 bg-gradient-to-br from-neutral-500 via-neutral-800 to-black shadow-[0_20px_70px_rgba(255,255,255,0.10)]',
+    badge: 'bg-white/15 border border-white/40 text-white',
+    accent: 'text-neutral-200',
+  },
+  GOLD: {
+    name: 'Gold',
+    card: 'border-white/40 bg-gradient-to-br from-neutral-300 via-neutral-700 to-black shadow-[0_20px_70px_rgba(255,255,255,0.15)]',
+    badge: 'bg-white/20 border border-white/50 text-white',
+    accent: 'text-white',
+  },
+  DIAMOND: {
+    name: 'Black Diamond',
+    card: 'border-white/50 bg-gradient-to-br from-white/25 via-neutral-950 to-black shadow-[0_20px_70px_rgba(255,255,255,0.20)]',
+    badge: 'bg-white text-black border border-white',
+    accent: 'text-white',
+  },
+} as const;
+
 const formatTxLabel = (label: string): string => {
   return label.replace(/\b(\d{4,})\b/g, (m) => Number(m).toLocaleString('fr-FR'));
 };
@@ -208,13 +236,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   }, [user?.transactions, txFilter, txSearchQuery]);
 
   const isOwnerOrAdmin = hasAdminPermissions(user);
+  const cardTheme = CARD_THEMES[user?.vipTier ?? 'none'];
 
   // =========================================================================
   // VIEW A : CHARGEMENT
   // =========================================================================
   if (isLoading) {
     return (
-      <div className="w-full min-h-screen bg-black flex items-center justify-center font-mono text-xs text-neutral-400">
+      <div className="w-full min-h-screen bg-black flex items-center justify-center font-mono text-[13px] text-neutral-400">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-white animate-ping" />
           <span>Chargement du compte...</span>
@@ -228,7 +257,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // =========================================================================
   if (!isAuthenticated || !user) {
     return (
-      <div className="w-full min-h-screen bg-black text-white flex flex-col justify-between selection:bg-neutral-800 selection:text-white">
+      <div className="member-ambient w-full min-h-screen text-white flex flex-col justify-between selection:bg-white/30 selection:text-white">
         {/* Toast */}
         <AnimatePresence>
           {toastMessage && (
@@ -236,7 +265,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="fixed top-6 right-6 z-50 px-4 py-2.5 rounded-lg bg-white text-black font-medium text-xs shadow-lg flex items-center gap-2"
+              className="fixed top-6 right-6 z-50 px-4 py-2.5 rounded-lg bg-white text-black font-medium text-[13px] shadow-lg flex items-center gap-2"
             >
               <CheckCircle2 size={16} className="text-black" />
               <span>{toastMessage}</span>
@@ -245,35 +274,35 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         </AnimatePresence>
 
         {/* Minimal Header */}
-        <header className="border-b border-neutral-900 px-6 py-4 flex items-center justify-between">
+        <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
           <Link
             to="/"
             onClick={() => onBackToHome?.()}
-            className="flex items-center gap-2 text-neutral-400 hover:text-white text-xs font-mono transition-colors"
+            className="flex items-center gap-2 text-neutral-400 hover:text-white text-[13px] font-mono transition-colors"
           >
             <ArrowLeft size={14} />
             <span>Retour au Casino</span>
           </Link>
-          <span className="text-[11px] font-mono text-neutral-500 uppercase">Diamond Resort &bull; Espace Membre</span>
+          <span className="text-xs font-mono text-neutral-500 uppercase">Diamond Resort &bull; Espace Membre</span>
         </header>
 
         {/* Center Auth Card */}
         <main className="flex-1 flex items-center justify-center p-6">
-          <div className="w-full max-w-sm border border-neutral-800 bg-[#0a0a0a] rounded-xl p-6 sm:p-8">
+          <div className="w-full max-w-md border border-white/15 bg-neutral-950/90 backdrop-blur-md rounded-2xl p-7 sm:p-10 shadow-[0_0_80px_rgba(255,255,255,0.06)]">
             {!pendingDiscordUser ? (
               <div className="flex flex-col text-center">
                 <div className="flex justify-center mb-6">
                   <img
                     src="/diamond_casino_logo.png"
                     alt="Diamond Casino"
-                    className="h-9 w-auto object-contain opacity-90"
+                    className="h-14 w-auto object-contain"
                   />
                 </div>
 
-                <h1 className="text-lg font-semibold tracking-tight text-white mb-1.5">
+                <h1 className="text-2xl font-semibold tracking-tight text-white mb-2">
                   Espace Membre
                 </h1>
-                <p className="text-xs text-neutral-400 leading-relaxed mb-6">
+                <p className="text-[13px] text-neutral-400 leading-relaxed mb-6">
                   Connectez votre compte Discord pour gérer vos jetons, vos lots de la Roue et vos accès VIP.
                 </p>
 
@@ -281,7 +310,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   type="button"
                   onClick={handleConnectDiscord}
                   disabled={isRedirecting}
-                  className="w-full h-10 rounded-lg bg-white text-black hover:bg-neutral-200 font-medium text-xs flex items-center justify-center gap-2.5 transition-colors cursor-pointer disabled:opacity-50"
+                  className="w-full h-12 rounded-xl bg-white text-black hover:brightness-110 font-semibold text-[13px] flex items-center justify-center gap-2.5 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                     <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
@@ -289,16 +318,16 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   <span>{isRedirecting ? 'Redirection...' : 'Continuer avec Discord'}</span>
                 </button>
 
-                <div className="mt-8 pt-6 border-t border-neutral-900 text-left space-y-2.5">
-                  <div className="flex items-center gap-2 text-xs text-neutral-400">
+                <div className="mt-8 pt-6 border-t border-white/5 text-left space-y-2.5">
+                  <div className="flex items-center gap-2 text-[13px] text-neutral-400">
                     <Check size={14} className="text-white shrink-0" />
                     <span>Sauvegarde en temps réel de votre solde</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-neutral-400">
+                  <div className="flex items-center gap-2 text-[13px] text-neutral-400">
                     <Check size={14} className="text-white shrink-0" />
-                    <span>1 tour gratuit à la Roue chaque jour</span>
+                    <span>Roue de la Fortune en tours illimités</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-neutral-400">
+                  <div className="flex items-center gap-2 text-[13px] text-neutral-400">
                     <Check size={14} className="text-white shrink-0" />
                     <span>Authentification sécurisée officielle</span>
                   </div>
@@ -307,18 +336,18 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             ) : (
               <div className="flex flex-col text-left">
                 {/* Pending user badge */}
-                <div className="p-3 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-between gap-3 mb-5">
+                <div className="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between gap-3 mb-5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <img
                       src={pendingDiscordUser.avatarUrl}
                       alt={pendingDiscordUser.username}
-                      className="w-8 h-8 rounded-full border border-neutral-700 object-cover shrink-0"
+                      className="w-8 h-8 rounded-full border border-white/20 object-cover shrink-0"
                     />
                     <div className="min-w-0">
-                      <span className="text-xs font-semibold text-white block truncate">
+                      <span className="text-[13px] font-semibold text-white block truncate">
                         {pendingDiscordUser.globalName || pendingDiscordUser.username}
                       </span>
-                      <span className="text-[10px] text-neutral-500 font-mono block truncate">
+                      <span className="text-xs text-neutral-500 font-mono block truncate">
                         {pendingDiscordUser.tag}
                       </span>
                     </div>
@@ -326,7 +355,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   <button
                     type="button"
                     onClick={cancelPendingDiscord}
-                    className="text-[11px] text-neutral-400 hover:text-white underline cursor-pointer shrink-0"
+                    className="text-xs text-neutral-400 hover:text-white underline cursor-pointer shrink-0"
                   >
                     Changer
                   </button>
@@ -335,12 +364,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 <h2 className="text-base font-semibold text-white mb-1">
                   Finaliser votre profil
                 </h2>
-                <p className="text-xs text-neutral-400 mb-5">
+                <p className="text-[13px] text-neutral-400 mb-5">
                   Renseignez vos coordonnées Roleplay in-game pour initialiser votre compte.
                 </p>
 
                 {onboardError && (
-                  <div className="p-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs flex items-center gap-2 mb-4">
+                  <div className="p-3 rounded-lg bg-white/5 border border-white/20 text-neutral-300 text-[13px] flex items-center gap-2 mb-4">
                     <AlertCircle size={14} className="text-white shrink-0" />
                     <span>{onboardError}</span>
                   </div>
@@ -349,47 +378,47 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 <form onSubmit={handleFinishOnboarding} className="space-y-3.5">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[11px] text-neutral-400">Prénom RP</label>
+                      <label className="text-xs text-neutral-400">Prénom RP</label>
                       <input
                         type="text"
                         required
                         placeholder="Prénom"
                         value={onboardFirst}
                         onChange={(e) => setOnboardFirst(e.target.value)}
-                        className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs text-white focus:outline-none focus:border-white transition-colors"
+                        className="w-full h-9 rounded-lg bg-black border border-white/10 px-3 text-[13px] text-white focus:outline-none focus:border-white transition-colors"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] text-neutral-400">Nom RP</label>
+                      <label className="text-xs text-neutral-400">Nom RP</label>
                       <input
                         type="text"
                         required
                         placeholder="Nom"
                         value={onboardLast}
                         onChange={(e) => setOnboardLast(e.target.value)}
-                        className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs text-white focus:outline-none focus:border-white transition-colors"
+                        className="w-full h-9 rounded-lg bg-black border border-white/10 px-3 text-[13px] text-white focus:outline-none focus:border-white transition-colors"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[11px] text-neutral-400">ID / Matricule Citoyen</label>
+                    <label className="text-xs text-neutral-400">ID / Matricule Citoyen</label>
                     <input
                       type="text"
                       required
                       placeholder="Votre ID"
                       value={onboardCitizenId}
                       onChange={(e) => setOnboardCitizenId(e.target.value)}
-                      className="w-full h-9 rounded-lg bg-black border border-neutral-800 px-3 text-xs font-mono text-white focus:outline-none focus:border-white transition-colors"
+                      className="w-full h-9 rounded-lg bg-black border border-white/10 px-3 text-[13px] font-mono text-white focus:outline-none focus:border-white transition-colors"
                     />
                   </div>
 
-                  <label className="flex items-center gap-2 pt-1 text-[11px] text-neutral-400 cursor-pointer">
+                  <label className="flex items-center gap-2 pt-1 text-xs text-neutral-400 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={rulesAccepted}
                       onChange={(e) => setRulesAccepted(e.target.checked)}
-                      className="rounded border-neutral-800 accent-white"
+                      className="rounded border-white/10 accent-white"
                     />
                     <span>J'accepte le règlement du Diamond Casino</span>
                   </label>
@@ -397,7 +426,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   <button
                     type="submit"
                     disabled={onboardSubmitting}
-                    className="w-full h-10 mt-2 rounded-lg bg-white text-black hover:bg-neutral-200 font-medium text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                    className="w-full h-10 mt-2 rounded-lg bg-white text-black hover:bg-neutral-200 font-medium text-[13px] flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <span>{onboardSubmitting ? 'Création en cours...' : 'Créer mon profil'}</span>
                   </button>
@@ -408,7 +437,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         </main>
 
         {/* Minimal Footer */}
-        <footer className="border-t border-neutral-900 px-6 py-4 text-center text-xs text-neutral-600 font-mono">
+        <footer className="border-t border-white/5 px-6 py-4 text-center text-[13px] text-neutral-600 font-mono">
           Diamond Casino &bull; FiveM Los Santos RP
         </footer>
       </div>
@@ -419,7 +448,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // VIEW C : ESPACE MEMBRE AUTHENTIFIÉ (DESIGN VERCEL PUR ET CLAIR)
   // =========================================================================
   return (
-    <div className="w-full min-h-screen bg-black text-white flex flex-col font-sans selection:bg-neutral-800 selection:text-white pt-[80px] sm:pt-[90px]">
+    <div className="member-ambient w-full min-h-screen text-white flex flex-col font-sans selection:bg-white/30 selection:text-white pt-[80px] sm:pt-[90px]">
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
@@ -427,7 +456,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="fixed top-24 sm:top-28 right-5 sm:right-8 z-50 px-4 py-2.5 rounded-lg bg-white text-black font-medium text-xs shadow-xl flex items-center gap-2"
+            className="fixed top-24 sm:top-28 right-5 sm:right-8 z-50 px-4 py-2.5 rounded-lg bg-white text-black font-medium text-[13px] shadow-xl flex items-center gap-2"
           >
             <CheckCircle2 size={16} className="text-black" />
             <span>{toastMessage}</span>
@@ -436,7 +465,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
       </AnimatePresence>
 
       {/* Subnav Tabs Bar (Directly below Global Navbar) */}
-      <nav className="border-b border-neutral-800 bg-neutral-950/95 backdrop-blur-md sticky top-[80px] sm:top-[90px] z-30">
+      <nav className="border-b border-white/10 bg-black/85 backdrop-blur-md sticky top-[80px] sm:top-[90px] z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0">
             {[
@@ -455,13 +484,13 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as ConsoleTab)}
-                  className={`relative py-3.5 px-3 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                  className={`relative py-3.5 px-3 text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2 ${
                     isActive ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
                   }`}
                 >
                   <span>{tab.label}</span>
                   {tab.count !== undefined && tab.count > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white text-black font-bold">
+                    <span className="px-1.5 py-0.2 rounded-full text-xs font-mono bg-white text-black font-bold">
                       {tab.count}
                     </span>
                   )}
@@ -482,7 +511,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             {isOwnerOrAdmin && (
               <Link
                 to="/admin"
-                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-neutral-700 hover:border-neutral-500 text-neutral-300 hover:text-white text-xs font-mono transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/20 hover:border-neutral-500 text-neutral-300 hover:text-white text-[13px] font-mono transition-colors"
               >
                 <ShieldCheck size={12} />
                 <span>Admin</span>
@@ -493,7 +522,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               type="button"
               onClick={() => setIsLogoutModalOpen(true)}
               title="Se déconnecter"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-neutral-400 hover:text-red-400 hover:bg-neutral-900 border border-neutral-800/80 hover:border-red-900/50 text-xs font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-neutral-400 hover:text-red-400 hover:bg-white/5 border border-white/10 hover:border-red-900/50 text-[13px] font-medium transition-colors cursor-pointer"
             >
               <LogOut size={13} />
               <span className="hidden sm:inline">Déconnexion</span>
@@ -511,158 +540,132 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         {activeTab === 'overview' && (
           <div className="space-y-6">
             
-            {/* User Greeting & Fast Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-800">
-              <div>
-                <h1 className="text-xl font-semibold text-white tracking-tight">
-                  Bonjour, {user.rpFirstName}
-                </h1>
-                <p className="text-xs text-neutral-400 mt-0.5">
-                  Matricule #{user.citizenId} &bull; Compte Discord {user.discordTag ? `@${user.discordTag.replace(/^@+/, '')}` : 'connecté'} &bull; Adhésion {user.vipTier ? `VIP ${user.vipTier}` : 'Standard'}
-                </p>
-              </div>
+            {/* Carte membre Diamond */}
+            <div
+              className={`member-card-shine relative overflow-hidden rounded-3xl border p-6 sm:p-8 ${cardTheme.card}`}
+            >
+              <div className="relative flex flex-col gap-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={user.avatarUrl}
+                      alt=""
+                      className="w-12 h-12 rounded-full border border-white/25 object-cover shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm text-white/60">Bonjour,</p>
+                      <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight truncate">
+                        {user.rpFirstName} {user.rpLastName}
+                      </h1>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase ${cardTheme.badge}`}>
+                    <Crown size={13} />
+                    {cardTheme.name}
+                  </span>
+                </div>
 
-              <div className="flex items-center gap-2.5">
-                <Link
-                  to="/roue-de-la-fortune"
-                  onClick={() => onNavigateToWheel?.()}
-                  className={`h-9 px-4 rounded-lg font-medium text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                    canSpinWheel
-                      ? 'bg-white text-black hover:bg-neutral-200'
-                      : 'bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:border-neutral-700'
-                  }`}
-                >
-                  <Disc size={14} className={canSpinWheel ? 'animate-spin' : ''} style={{ animationDuration: '6s' }} />
-                  <span>Tourner la Roue</span>
-                </Link>
+                <div>
+                  <span className="text-xs font-semibold tracking-wider uppercase text-white/60">Solde de jetons</span>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-4xl sm:text-6xl font-bold tracking-tight text-white tabular-nums">
+                      {user.chips.toLocaleString('fr-FR')}
+                    </span>
+                    <span className={`text-2xl sm:text-3xl ${cardTheme.accent}`}>⛁</span>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleOpenEditModal}
-                  className="h-9 px-3.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Edit3 size={13} />
-                  <span>Modifier</span>
-                </button>
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div className="text-sm text-white/70 space-y-0.5">
+                    <p>Matricule <span className="font-mono text-white">#{user.citizenId}</span></p>
+                    <p className="text-white/50">
+                      {user.discordTag ? `@${user.discordTag.replace(/^@+/, '')}` : 'Compte Discord connecté'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <Link
+                      to="/roue-de-la-fortune"
+                      onClick={() => onNavigateToWheel?.()}
+                      className="h-10 px-5 rounded-full font-semibold text-[13px] flex items-center gap-2 transition bg-white text-black hover:bg-neutral-200"
+                    >
+                      <Disc size={15} className={canSpinWheel ? 'animate-spin' : ''} style={{ animationDuration: '6s' }} />
+                      <span>Tourner la Roue</span>
+                    </Link>
+                    <Link
+                      to="/jeux"
+                      className="h-10 px-5 rounded-full border border-white/25 bg-white/10 hover:bg-white/20 text-white font-medium text-[13px] flex items-center gap-2 transition"
+                    >
+                      <span>Jouer</span>
+                      <ChevronRight size={14} />
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* 4 Stat Cards Grid (Clean Vercel Cards) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              
-              {/* Card 1: Solde Jetons */}
-              <div className="p-4 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
-                <div className="flex items-center justify-between text-neutral-400 text-xs">
-                  <span className="font-mono text-[11px] uppercase">Solde de jetons</span>
-                  <Coins size={14} className="text-neutral-500" />
-                </div>
-                <div className="my-2.5">
-                  <div className="text-2xl font-bold font-mono text-white tracking-tight">
-                    {user.chips.toLocaleString()} <span className="text-sm font-normal text-neutral-400">⛁</span>
-                  </div>
-                </div>
+            {/* Accès rapides */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                {
+                  key: 'inv',
+                  icon: <Car size={18} />,
+                  title: 'Inventaire',
+                  value: `${user.rewards.filter((r) => r.status === 'IN_INVENTORY').length} à réclamer`,
+                  sub: `${user.rewards.length} lot${user.rewards.length > 1 ? 's' : ''} au total`,
+                  onClick: () => setActiveTab('inventory'),
+                },
+                {
+                  key: 'vault',
+                  icon: <History size={18} />,
+                  title: 'Historique',
+                  value: `${(user.totalWon || 0).toLocaleString('fr-FR')} ⛁`,
+                  sub: `gagnés · ${user.totalSpins || 0} tirage${(user.totalSpins || 0) > 1 ? 's' : ''}`,
+                  onClick: () => setActiveTab('vault'),
+                },
+                {
+                  key: 'vip',
+                  icon: <Crown size={18} />,
+                  title: 'Avantages VIP',
+                  value: user.vipTier ? cardTheme.name : 'Aucune carte',
+                  sub: user.vipTier ? 'Avantages actifs' : 'Découvrir les cartes',
+                  onClick: () => setActiveTab('vip'),
+                },
+              ].map((tile) => (
                 <button
+                  key={tile.key}
                   type="button"
-                  onClick={() => setActiveTab('vault')}
-                  className="text-[11px] text-neutral-400 hover:text-white flex items-center justify-between pt-2 border-t border-neutral-900 transition-colors cursor-pointer"
+                  onClick={tile.onClick}
+                  className="group text-left p-5 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm hover:border-white/40 hover:bg-white/[0.06] transition cursor-pointer"
                 >
-                  <span>Voir l'historique</span>
-                  <ChevronRight size={12} />
-                </button>
-              </div>
-
-              {/* Card 2: Roue de la fortune */}
-              <div className="p-4 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
-                <div className="flex items-center justify-between text-neutral-400 text-xs">
-                  <span className="font-mono text-[11px] uppercase">Roue de la Fortune</span>
-                  <Disc size={14} className="text-neutral-500" />
-                </div>
-                <div className="my-2.5">
-                  <div className="text-sm font-semibold text-white">
-                    <span className="text-white flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-white" />
-                      Tours illimités
+                  <div className="flex items-center justify-between text-white">
+                    <span className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
+                      {tile.icon}
                     </span>
+                    <ChevronRight size={16} className="text-white/30 group-hover:text-white group-hover:translate-x-0.5 transition" />
                   </div>
-                  <span className="text-[11px] text-neutral-500 font-mono">
-                    {user.totalSpins || 0} tirage{(user.totalSpins || 0) > 1 ? 's' : ''} effectué{(user.totalSpins || 0) > 1 ? 's' : ''}
-                  </span>
-                </div>
-                <Link
-                  to="/roue-de-la-fortune"
-                  onClick={() => onNavigateToWheel?.()}
-                  className="text-[11px] text-neutral-400 hover:text-white flex items-center justify-between pt-2 border-t border-neutral-900 transition-colors"
-                >
-                  <span>Lancer maintenant</span>
-                  <ChevronRight size={12} />
-                </Link>
-              </div>
-
-              {/* Card 3: Adhésion VIP */}
-              <div className="p-4 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
-                <div className="flex items-center justify-between text-neutral-400 text-xs">
-                  <span className="font-mono text-[11px] uppercase">Niveau d'adhésion</span>
-                  <Crown size={14} className="text-neutral-500" />
-                </div>
-                <div className="my-2.5">
-                  <div className="text-sm font-semibold text-white">
-                    {user.vipTier ? `VIP ${user.vipTier}` : 'Membre Standard'}
-                  </div>
-                  <span className="text-[11px] text-neutral-500 font-mono">
-                    {user.vipTier ? 'Avantages VIP actifs' : 'Aucune carte VIP'}
-                  </span>
-                </div>
-                <Link
-                  to="/abonnements"
-                  className="text-[11px] text-neutral-400 hover:text-white flex items-center justify-between pt-2 border-t border-neutral-900 transition-colors"
-                >
-                  <span>Gérer l'abonnement</span>
-                  <ChevronRight size={12} />
-                </Link>
-              </div>
-
-              {/* Card 4: Fiche Citoyenne */}
-              <div className="p-4 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
-                <div className="flex items-center justify-between text-neutral-400 text-xs">
-                  <span className="font-mono text-[11px] uppercase">Fiche citoyenne</span>
-                  <User size={14} className="text-neutral-500" />
-                </div>
-                <div className="my-2.5">
-                  <div className="text-sm font-medium text-white truncate">
-                    {user.rpFirstName} {user.rpLastName}
-                  </div>
-                  <span className="text-[11px] text-neutral-500 font-mono">
-                    ID #{user.citizenId}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenEditModal}
-                  className="text-[11px] text-neutral-400 hover:text-white flex items-center justify-between pt-2 border-t border-neutral-900 transition-colors cursor-pointer"
-                >
-                  <span>Modifier les infos</span>
-                  <ChevronRight size={12} />
+                  <p className="mt-4 text-xs font-semibold tracking-wider uppercase text-white/50">{tile.title}</p>
+                  <p className="mt-1 text-lg font-semibold text-white">{tile.value}</p>
+                  <p className="text-[13px] text-white/50">{tile.sub}</p>
                 </button>
-              </div>
-
+              ))}
             </div>
 
             {/* Split Section: Recent Transactions + Recent Rewards */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
               
               {/* Left Column (7 cols): Dernières transactions */}
-              <div className="lg:col-span-7 border border-neutral-800 bg-[#0a0a0a] rounded-xl p-5">
-                <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-800">
+              <div className="lg:col-span-7 border border-white/10 bg-white/[0.03] backdrop-blur-sm rounded-xl p-5">
+                <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <History size={14} className="text-neutral-400" />
-                    <h2 className="text-xs font-semibold uppercase tracking-wider text-white">
+                    <h2 className="text-[13px] font-semibold uppercase tracking-wider text-white">
                       Dernières transactions
                     </h2>
                   </div>
                   <button
                     type="button"
                     onClick={() => setActiveTab('vault')}
-                    className="text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                    className="text-[13px] text-neutral-400 hover:text-white transition-colors cursor-pointer"
                   >
                     Voir tout &rarr;
                   </button>
@@ -676,7 +679,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       return (
                         <div
                           key={tx.id}
-                          className="py-2.5 px-3 rounded-lg bg-black border border-neutral-900 flex items-center justify-between gap-3 text-xs hover:border-neutral-800 transition-colors"
+                          className="py-2.5 px-3 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between gap-3 text-[13px] hover:border-white/10 transition-colors"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div
@@ -685,7 +688,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                                   ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
                                   : isNegative
                                   ? 'bg-red-500/10 border-red-500/25 text-red-400'
-                                  : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                                  : 'bg-white/5 border-white/10 text-neutral-400'
                               }`}
                             >
                               {tx.type === 'spin_reward' ? (
@@ -700,7 +703,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                               <span className="font-medium text-white block truncate">
                                 {formatTxLabel(tx.label)}
                               </span>
-                              <span className="text-[10px] text-neutral-500 font-mono">
+                              <span className="text-xs text-neutral-500 font-mono">
                                 {new Date(tx.date).toLocaleDateString('fr-FR', {
                                   day: '2-digit',
                                   month: 'short',
@@ -724,7 +727,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                                 {isPositive ? `+${tx.amountChips.toLocaleString('fr-FR')}` : tx.amountChips.toLocaleString('fr-FR')} ⛁
                               </span>
                             ) : (
-                              <span className="text-[10px] font-mono text-neutral-400">
+                              <span className="text-xs font-mono text-neutral-400">
                                 {tx.status}
                               </span>
                             )}
@@ -733,7 +736,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       );
                     })
                   ) : (
-                    <div className="py-8 text-center text-xs text-neutral-500 font-mono">
+                    <div className="py-8 text-center text-[13px] text-neutral-500 font-mono">
                       Aucune transaction récente
                     </div>
                   )}
@@ -741,19 +744,19 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               </div>
 
               {/* Right Column (5 cols): Mes Récompenses & Podium */}
-              <div className="lg:col-span-5 border border-neutral-800 bg-[#0a0a0a] rounded-xl p-5 flex flex-col justify-between">
+              <div className="lg:col-span-5 border border-white/10 bg-white/[0.03] backdrop-blur-sm rounded-xl p-5 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-800">
+                  <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-white/10">
                     <div className="flex items-center gap-2">
                       <Car size={14} className="text-neutral-400" />
-                      <h2 className="text-xs font-semibold uppercase tracking-wider text-white">
+                      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-white">
                         Mes lots & récompenses
                       </h2>
                     </div>
                     <button
                       type="button"
                       onClick={() => setActiveTab('inventory')}
-                      className="text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                      className="text-[13px] text-neutral-400 hover:text-white transition-colors cursor-pointer"
                     >
                       Inventaire ({user.rewards.length}) &rarr;
                     </button>
@@ -764,38 +767,38 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                       user.rewards.slice(0, 3).map((reward) => (
                         <div
                           key={reward.id}
-                          className="p-3 rounded-lg bg-black border border-neutral-900 flex items-center justify-between gap-3 text-xs"
+                          className="p-3 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between gap-3 text-[13px]"
                         >
                           <div className="min-w-0">
                             <span className="font-medium text-white block truncate">
                               {reward.label}
                             </span>
-                            <span className="text-[10px] text-neutral-500 font-mono uppercase">
+                            <span className="text-xs text-neutral-500 font-mono uppercase">
                               {reward.kind === 'vehicle' ? 'Véhicule' : 'Objet'}
                             </span>
                           </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase border ${
+                          <span className={`px-2 py-0.5 rounded text-xs font-mono uppercase border ${
                             reward.status === 'IN_INVENTORY'
                               ? 'bg-white text-black font-semibold border-white'
-                              : 'bg-neutral-900 text-neutral-400 border-neutral-800'
+                              : 'bg-white/5 text-neutral-400 border-white/10'
                           }`}>
                             {reward.status === 'IN_INVENTORY' ? 'À réclamer' : 'Remis'}
                           </span>
                         </div>
                       ))
                     ) : (
-                      <div className="py-8 text-center text-xs text-neutral-500 font-mono">
+                      <div className="py-8 text-center text-[13px] text-neutral-500 font-mono">
                         Aucun lot dans votre inventaire pour l'instant.
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="pt-4 mt-4 border-t border-neutral-900">
+                <div className="pt-4 mt-4 border-t border-white/5">
                   <Link
                     to="/roue-de-la-fortune"
                     onClick={() => onNavigateToWheel?.()}
-                    className="w-full h-9 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+                    className="w-full h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-200 text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
                   >
                     <Disc size={13} />
                     <span>Voir le véhicule sur le podium</span>
@@ -813,9 +816,9 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         {/* =================================================================== */}
         {activeTab === 'inventory' && (
           <div className="space-y-4">
-            <div className="pb-4 border-b border-neutral-800">
+            <div className="pb-4 border-b border-white/10">
               <h1 className="text-lg font-semibold text-white tracking-tight">Inventaire</h1>
-              <p className="text-xs text-neutral-400 mt-0.5">
+              <p className="text-[13px] text-neutral-400 mt-0.5">
                 Tout ce que vous avez gagné (roue, boosters, cadeaux) au même endroit : revendez un objet contre des jetons ou réclamez-le pour le recevoir
                 en ville.
               </p>
@@ -832,15 +835,15 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
           <div className="space-y-6">
             
             {/* Header & Balance Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-neutral-800 bg-[#0a0a0a]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
               <div>
-                <span className="text-[11px] font-mono uppercase text-neutral-400 block mb-1">
+                <span className="text-[11px] font-semibold tracking-wider uppercase text-neutral-400 block mb-1">
                   Solde disponible
                 </span>
                 <div className="text-3xl font-bold font-mono text-white">
                   {user.chips.toLocaleString()} <span className="text-sm font-normal text-neutral-400">⛁</span>
                 </div>
-                <p className="text-xs text-neutral-500 mt-1">
+                <p className="text-[13px] text-neutral-500 mt-1">
                   Gains cumulés : <span className="font-mono text-neutral-300">{(user.totalWon || 0).toLocaleString()} ⛁</span> &bull; Tirages : <span className="font-mono text-neutral-300">{user.totalSpins || 0}</span>
                 </p>
               </div>
@@ -849,14 +852,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 <Link
                   to="/roue-de-la-fortune"
                   onClick={() => onNavigateToWheel?.()}
-                  className="h-9 px-4 rounded-lg bg-white text-black hover:bg-neutral-200 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  className="h-9 px-4 rounded-lg bg-white text-black hover:bg-neutral-200 text-[13px] font-medium flex items-center gap-1.5 transition-colors"
                 >
                   <Disc size={13} />
                   <span>Jouer à la Roue</span>
                 </Link>
                 <Link
                   to="/abonnements"
-                  className="h-9 px-4 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  className="h-9 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-200 text-[13px] font-medium flex items-center gap-1.5 transition-colors"
                 >
                   <Crown size={13} />
                   <span>Pass VIP</span>
@@ -866,7 +869,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
             {/* Filter & Search Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-1 p-0.5 rounded-lg border border-neutral-800 bg-neutral-950 text-xs">
+              <div className="flex items-center gap-1 p-0.5 rounded-lg border border-white/10 bg-white/5 text-[13px]">
                 {(['ALL', 'WHEEL', 'VIP', 'GAMES'] as const).map((key) => (
                   <button
                     key={key}
@@ -890,21 +893,21 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   value={txSearchQuery}
                   onChange={(e) => setTxSearchQuery(e.target.value)}
                   placeholder="Rechercher une opération..."
-                  className="w-full h-8 pl-8 pr-3 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors font-mono"
+                  className="w-full h-8 pl-8 pr-3 rounded-lg bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors font-mono"
                 />
               </div>
             </div>
 
             {/* Transactions Table */}
-            <div className="border border-neutral-800 rounded-xl overflow-hidden bg-[#0a0a0a]">
+            <div className="border border-white/10 rounded-xl overflow-hidden bg-white/[0.03] backdrop-blur-sm">
               {filteredTransactions.length === 0 ? (
                 <div className="py-12 px-4 text-center">
-                  <p className="text-xs text-neutral-500 font-mono">
+                  <p className="text-[13px] text-neutral-500 font-mono">
                     Aucune transaction trouvée.
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-neutral-900">
+                <div className="divide-y divide-white/5">
                   {filteredTransactions.map((tx) => {
                     const isPositive = tx.amountChips > 0;
                     const isNegative = tx.amountChips < 0;
@@ -912,7 +915,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     return (
                       <div
                         key={tx.id}
-                        className="p-3.5 sm:px-4 flex items-center justify-between gap-4 hover:bg-neutral-900/40 transition-colors text-xs"
+                        className="p-3.5 sm:px-4 flex items-center justify-between gap-4 hover:bg-white/5 transition-colors text-[13px]"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div
@@ -921,7 +924,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                                 ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
                                 : isNegative
                                 ? 'bg-red-500/10 border-red-500/25 text-red-400'
-                                : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                                : 'bg-white/5 border-white/10 text-neutral-400'
                             }`}
                           >
                             {tx.type === 'spin_reward' ? (
@@ -936,7 +939,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                             <span className="font-medium text-white block truncate">
                               {formatTxLabel(tx.label)}
                             </span>
-                            <span className="text-[11px] text-neutral-500 font-mono">
+                            <span className="text-xs text-neutral-500 font-mono">
                               {new Date(tx.date).toLocaleDateString('fr-FR', {
                                 day: '2-digit',
                                 month: 'short',
@@ -962,11 +965,11 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                               {isPositive ? `+${tx.amountChips.toLocaleString('fr-FR')}` : tx.amountChips.toLocaleString('fr-FR')} ⛁
                             </div>
                           ) : (
-                            <div className="text-[11px] font-mono text-neutral-400 uppercase">
+                            <div className="text-xs font-mono text-neutral-400 uppercase">
                               {tx.type === 'vip_request' ? 'Demande VIP' : 'Lot'}
                             </div>
                           )}
-                          <span className="text-[10px] font-mono text-neutral-500 uppercase block mt-0.5">
+                          <span className="text-xs font-mono text-neutral-500 uppercase block mt-0.5">
                             {tx.status}
                           </span>
                         </div>
@@ -986,12 +989,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         {activeTab === 'profile' && (
           <div className="space-y-6 max-w-3xl">
             
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div>
                 <h1 className="text-lg font-semibold text-white tracking-tight">
                   Informations du Compte
                 </h1>
-                <p className="text-xs text-neutral-400 mt-0.5">
+                <p className="text-[13px] text-neutral-400 mt-0.5">
                   Coordonnées in-game enregistrées et liaison avec votre compte Discord.
                 </p>
               </div>
@@ -999,7 +1002,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               <button
                 type="button"
                 onClick={handleOpenEditModal}
-                className="h-8 px-3 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-200 text-[13px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Edit3 size={13} />
                 <span>Modifier</span>
@@ -1007,18 +1010,18 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             </div>
 
             {/* Profile Identity Card */}
-            <div className="border border-neutral-800 rounded-xl bg-[#0a0a0a] divide-y divide-neutral-900">
+            <div className="border border-white/10 rounded-xl bg-white/[0.03] backdrop-blur-sm divide-y divide-white/5">
               <div className="p-4 sm:p-5 flex items-center gap-4">
                 <img
                   src={user.avatarUrl}
                   alt={user.rpFirstName}
-                  className="w-14 h-14 rounded-full border border-neutral-700 object-cover"
+                  className="w-14 h-14 rounded-full border border-white/20 object-cover"
                 />
                 <div>
                   <h2 className="text-base font-semibold text-white">
                     {user.rpFirstName} {user.rpLastName}
                   </h2>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-neutral-400 font-mono">
+                  <div className="flex items-center gap-2 mt-0.5 text-[13px] text-neutral-400 font-mono">
                     <span>Matricule #{user.citizenId}</span>
                     <span>&bull;</span>
                     <span>{user.vipTier ? `VIP ${user.vipTier}` : user.role}</span>
@@ -1026,9 +1029,9 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 </div>
               </div>
 
-              <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-[13px]">
                 <div>
-                  <span className="text-[11px] font-mono text-neutral-500 uppercase block mb-1">
+                  <span className="text-xs font-mono text-neutral-500 uppercase block mb-1">
                     Prénom &amp; Nom Roleplay
                   </span>
                   <span className="font-medium text-white text-sm">
@@ -1037,7 +1040,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 </div>
 
                 <div>
-                  <span className="text-[11px] font-mono text-neutral-500 uppercase block mb-1">
+                  <span className="text-xs font-mono text-neutral-500 uppercase block mb-1">
                     Numéro de Citoyen
                   </span>
                   <span className="font-mono font-medium text-white text-sm">
@@ -1046,7 +1049,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 </div>
 
                 <div>
-                  <span className="text-[11px] font-mono text-neutral-500 uppercase block mb-1">
+                  <span className="text-xs font-mono text-neutral-500 uppercase block mb-1">
                     Date d'inscription
                   </span>
                   <span className="font-mono text-neutral-300 text-sm">
@@ -1062,21 +1065,21 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               {/* Linked Discord */}
               <div className="p-4 sm:p-5 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white">
+                  <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                       <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
                     </svg>
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-white block">
+                    <span className="text-[13px] font-semibold text-white block">
                       Compte Discord relié
                     </span>
-                    <span className="text-[11px] font-mono text-neutral-500">
+                    <span className="text-xs font-mono text-neutral-500">
                       {user.discordTag || user.discordId ? `@${(user.discordTag || user.discordId).replace(/^@+/, '')}` : 'Non renseigné'}
                     </span>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-neutral-900 border border-neutral-800 text-neutral-400">
+                <span className="px-2 py-0.5 rounded text-xs font-mono uppercase bg-white/5 border border-white/10 text-neutral-400">
                   Vérifié
                 </span>
               </div>
@@ -1084,14 +1087,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
 
             {/* Session Management Actions */}
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="text-xs text-neutral-500 font-mono">
+              <div className="text-[13px] text-neutral-500 font-mono">
                 Session active &bull; Diamond Casino Resort
               </div>
               <div className="flex items-center gap-2.5 w-full sm:w-auto">
                 {isOwnerOrAdmin && (
                   <Link
                     to="/admin"
-                    className="flex-1 sm:flex-none h-9 px-4 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-xs font-mono text-neutral-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                    className="flex-1 sm:flex-none h-9 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[13px] font-mono text-neutral-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <ShieldCheck size={14} />
                     <span>Console Admin</span>
@@ -1100,7 +1103,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 <button
                   type="button"
                   onClick={() => setIsLogoutModalOpen(true)}
-                  className="flex-1 sm:flex-none h-9 px-4 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-red-950/40 hover:border-red-800/60 text-xs font-medium text-neutral-300 hover:text-red-400 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-none h-9 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-red-950/40 hover:border-red-800/60 text-[13px] font-medium text-neutral-300 hover:text-red-400 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <LogOut size={14} />
                   <span>Se déconnecter</span>
@@ -1117,19 +1120,19 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         {activeTab === 'vip' && (
           <div className="space-y-6">
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
               <div>
                 <h1 className="text-lg font-semibold text-white tracking-tight">
                   Paliers &amp; Avantages VIP
                 </h1>
-                <p className="text-xs text-neutral-400 mt-0.5">
-                  Augmentez votre fréquence de tirages à la Roue de la Fortune et accédez aux salons privés.
+                <p className="text-[13px] text-neutral-400 mt-0.5">
+                  Recevez des jetons offerts à l'adhésion et accédez aux salons privés.
                 </p>
               </div>
 
               <Link
                 to="/abonnements"
-                className="h-9 px-4 rounded-lg bg-white text-black hover:bg-neutral-200 text-xs font-medium flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+                className="h-9 px-4 rounded-lg bg-white text-black hover:bg-neutral-200 text-[13px] font-medium flex items-center gap-1.5 transition-colors self-start sm:self-auto"
               >
                 <span>Souscrire un abonnement</span>
                 <ChevronRight size={14} />
@@ -1140,14 +1143,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* Tier 1: Standard */}
-              <div className="p-5 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
+              <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between text-xs text-neutral-400 mb-2">
-                    <span className="font-mono uppercase text-[11px]">Membre Standard</span>
+                  <div className="flex items-center justify-between text-[13px] text-neutral-400 mb-2">
+                    <span className="font-mono uppercase text-xs">Membre Standard</span>
                     <span>Gratuit</span>
                   </div>
                   <h3 className="text-base font-semibold text-white mb-4">Citoyen Los Santos</h3>
-                  <ul className="space-y-2.5 text-xs text-neutral-400">
+                  <ul className="space-y-2.5 text-[13px] text-neutral-400">
                     <li className="flex items-center gap-2">
                       <Check size={14} className="text-white shrink-0" />
                       <span>Roue de la Fortune en tours illimités</span>
@@ -1162,22 +1165,22 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     </li>
                   </ul>
                 </div>
-                <div className="pt-4 mt-6 border-t border-neutral-900">
-                  <span className="text-[11px] font-mono text-neutral-500 uppercase">
+                <div className="pt-4 mt-6 border-t border-white/5">
+                  <span className="text-xs font-mono text-neutral-500 uppercase">
                     Statut de base
                   </span>
                 </div>
               </div>
 
               {/* Tier 2: VIP Gold */}
-              <div className="p-5 rounded-xl border border-neutral-700 bg-neutral-950 flex flex-col justify-between">
+              <div className="p-5 rounded-2xl border border-white/40 bg-gradient-to-b from-white/10 to-white/[0.03] shadow-[0_0_40px_rgba(255,255,255,0.08)] flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between text-xs text-neutral-400 mb-2">
-                    <span className="font-mono uppercase text-[11px] text-white">VIP Gold</span>
-                    <span className="text-[10px] font-mono bg-white text-black px-1.5 py-0.2 rounded font-bold">Populaire</span>
+                  <div className="flex items-center justify-between text-[13px] text-neutral-400 mb-2">
+                    <span className="font-mono uppercase text-xs text-white">VIP Gold</span>
+                    <span className="text-xs font-mono bg-white text-black px-1.5 py-0.2 rounded font-bold">Populaire</span>
                   </div>
                   <h3 className="text-base font-semibold text-white mb-4">High Roller</h3>
-                  <ul className="space-y-2.5 text-xs text-neutral-300">
+                  <ul className="space-y-2.5 text-[13px] text-neutral-300">
                     <li className="flex items-center gap-2">
                       <Check size={14} className="text-white shrink-0" />
                       <span>+60 000 jetons offerts à l'adhésion</span>
@@ -1188,10 +1191,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     </li>
                   </ul>
                 </div>
-                <div className="pt-4 mt-6 border-t border-neutral-800">
+                <div className="pt-4 mt-6 border-t border-white/10">
                   <Link
                     to="/abonnements"
-                    className="text-xs text-white hover:underline flex items-center justify-between font-medium"
+                    className="text-[13px] text-white hover:underline flex items-center justify-between font-medium"
                   >
                     <span>Voir l'offre VIP Gold</span>
                     <ChevronRight size={12} />
@@ -1200,14 +1203,14 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               </div>
 
               {/* Tier 3: VIP Diamond */}
-              <div className="p-5 rounded-xl border border-neutral-800 bg-[#0a0a0a] flex flex-col justify-between">
+              <div className="p-5 rounded-2xl border border-white/25 bg-gradient-to-b from-white/[0.07] to-black/60 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between text-xs text-neutral-400 mb-2">
-                    <span className="font-mono uppercase text-[11px]">Black Diamond</span>
+                  <div className="flex items-center justify-between text-[13px] text-neutral-400 mb-2">
+                    <span className="font-mono uppercase text-xs">Black Diamond</span>
                     <span>Élite</span>
                   </div>
                   <h3 className="text-base font-semibold text-white mb-4">Maître du Resort</h3>
-                  <ul className="space-y-2.5 text-xs text-neutral-400">
+                  <ul className="space-y-2.5 text-[13px] text-neutral-400">
                     <li className="flex items-center gap-2">
                       <Check size={14} className="text-white shrink-0" />
                       <span>+150 000 jetons offerts à l'adhésion</span>
@@ -1218,10 +1221,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     </li>
                   </ul>
                 </div>
-                <div className="pt-4 mt-6 border-t border-neutral-900">
+                <div className="pt-4 mt-6 border-t border-white/5">
                   <Link
                     to="/abonnements"
-                    className="text-xs text-white hover:underline flex items-center justify-between font-medium"
+                    className="text-[13px] text-white hover:underline flex items-center justify-between font-medium"
                   >
                     <span>Voir l'offre Black Diamond</span>
                     <ChevronRight size={12} />
@@ -1246,7 +1249,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="w-full max-w-sm rounded-xl bg-[#0a0a0a] border border-neutral-800 p-6 shadow-2xl relative"
+              className="w-full max-w-sm rounded-xl bg-white/[0.03] backdrop-blur-sm border border-white/10 p-6 shadow-2xl relative"
             >
               <button
                 type="button"
@@ -1259,12 +1262,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               <h2 className="text-sm font-semibold text-white mb-1">
                 Modifier mes informations
               </h2>
-              <p className="text-xs text-neutral-400 mb-4">
+              <p className="text-[13px] text-neutral-400 mb-4">
                 Mise à jour de vos coordonnées enregistrées.
               </p>
 
               {editError && (
-                <div className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs flex items-center gap-2 mb-3">
+                <div className="p-2.5 rounded-lg bg-white/5 border border-white/20 text-neutral-300 text-[13px] flex items-center gap-2 mb-3">
                   <AlertCircle size={14} className="text-white shrink-0" />
                   <span>{editError}</span>
                 </div>
@@ -1273,32 +1276,32 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               <form onSubmit={handleSaveProfile} className="space-y-3">
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="text-[11px] text-neutral-400">Prénom RP</label>
+                    <label className="text-xs text-neutral-400">Prénom RP</label>
                     <input
                       type="text"
                       disabled
                       value={editFirstName}
-                      className="w-full h-8 rounded-lg bg-neutral-900 border border-neutral-800 px-2.5 text-xs text-neutral-500 cursor-not-allowed"
+                      className="w-full h-8 rounded-lg bg-white/5 border border-white/10 px-2.5 text-[13px] text-neutral-500 cursor-not-allowed"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] text-neutral-400">Nom RP</label>
+                    <label className="text-xs text-neutral-400">Nom RP</label>
                     <input
                       type="text"
                       disabled
                       value={editLastName}
-                      className="w-full h-8 rounded-lg bg-neutral-900 border border-neutral-800 px-2.5 text-xs text-neutral-500 cursor-not-allowed"
+                      className="w-full h-8 rounded-lg bg-white/5 border border-white/10 px-2.5 text-[13px] text-neutral-500 cursor-not-allowed"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] text-neutral-400">ID Citoyen</label>
+                  <label className="text-xs text-neutral-400">ID Citoyen</label>
                   <input
                     type="text"
                     disabled
                     value={editCitizenId}
-                    className="w-full h-8 rounded-lg bg-neutral-900 border border-neutral-800 px-2.5 text-xs font-mono text-neutral-500 cursor-not-allowed"
+                    className="w-full h-8 rounded-lg bg-white/5 border border-white/10 px-2.5 text-[13px] font-mono text-neutral-500 cursor-not-allowed"
                   />
                 </div>
 
@@ -1306,13 +1309,13 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                   <button
                     type="button"
                     onClick={() => setIsEditingModalOpen(false)}
-                    className="flex-1 h-9 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-xs font-medium text-neutral-300 transition-colors cursor-pointer"
+                    className="flex-1 h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[13px] font-medium text-neutral-300 transition-colors cursor-pointer"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 h-9 rounded-lg bg-white text-black hover:bg-neutral-200 text-xs font-medium transition-colors cursor-pointer"
+                    className="flex-1 h-9 rounded-lg bg-white text-black hover:bg-neutral-200 text-[13px] font-medium transition-colors cursor-pointer"
                   >
                     Enregistrer
                   </button>
@@ -1333,12 +1336,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="w-full max-w-sm rounded-xl bg-[#0a0a0a] border border-neutral-800 p-6 shadow-2xl relative text-left"
+              className="w-full max-w-sm rounded-xl bg-white/[0.03] backdrop-blur-sm border border-white/10 p-6 shadow-2xl relative text-left"
             >
               <h2 className="text-sm font-semibold text-white mb-1.5">
                 Se déconnecter
               </h2>
-              <p className="text-xs text-neutral-400 leading-relaxed mb-5">
+              <p className="text-[13px] text-neutral-400 leading-relaxed mb-5">
                 Êtes-vous sûr de vouloir fermer votre session ? Votre solde ({user.chips.toLocaleString()} ⛁) et vos récompenses restent sauvegardés sur le serveur.
               </p>
 
@@ -1346,7 +1349,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 <button
                   type="button"
                   onClick={() => setIsLogoutModalOpen(false)}
-                  className="flex-1 h-9 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-xs font-medium text-neutral-300 transition-colors cursor-pointer"
+                  className="flex-1 h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[13px] font-medium text-neutral-300 transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
@@ -1356,7 +1359,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                     setIsLogoutModalOpen(false);
                     void logout();
                   }}
-                  className="flex-1 h-9 rounded-lg bg-white text-black hover:bg-neutral-200 text-xs font-medium transition-colors cursor-pointer"
+                  className="flex-1 h-9 rounded-lg bg-white text-black hover:bg-neutral-200 text-[13px] font-medium transition-colors cursor-pointer"
                 >
                   Déconnexion
                 </button>

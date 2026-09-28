@@ -48,8 +48,8 @@ const TIERS: TierData[] = [
     priceChips: 25000,
     priceReal: '10 € / mois',
     description: "L'accès privilégié aux commodités et tables du Diamond Casino.",
-    accentColor: 'text-neutral-300',
-    borderStyle: 'border-white/10 bg-neutral-950/40 hover:bg-neutral-900/60',
+    accentColor: 'text-slate-200',
+    borderStyle: 'border-slate-300/30 bg-gradient-to-b from-slate-400/15 to-neutral-950 hover:from-slate-400/25',
     chipsBonus: 15000,
     dailySpins: 1,
     cashback: 'Aucun',
@@ -68,8 +68,8 @@ const TIERS: TierData[] = [
     priceChips: 75000,
     priceReal: '20 € / mois',
     description: "Pour les joueurs d'envergure souhaitant des privilèges VIP exclusifs.",
-    accentColor: 'text-white',
-    borderStyle: 'border-white/30 bg-neutral-950 shadow-[0_0_40px_rgba(255,255,255,0.05)]',
+    accentColor: 'text-amber-300',
+    borderStyle: 'border-amber-300/50 bg-gradient-to-b from-amber-400/20 to-neutral-950 shadow-[0_0_50px_rgba(245,158,11,0.18)]',
     chipsBonus: 60000,
     dailySpins: 2,
     cashback: '5 % remboursés / semaine',
@@ -88,8 +88,8 @@ const TIERS: TierData[] = [
     priceChips: 180000,
     priceReal: '35 € / mois',
     description: "Le statut d'élite absolu. Tous les accès déverrouillés.",
-    accentColor: 'text-white',
-    borderStyle: 'border-white/20 bg-black shadow-[0_0_50px_rgba(255,255,255,0.08)]',
+    accentColor: 'text-cyan-200',
+    borderStyle: 'border-cyan-200/40 bg-gradient-to-b from-cyan-300/15 to-black shadow-[0_0_50px_rgba(103,232,249,0.18)]',
     chipsBonus: 150000,
     dailySpins: 3,
     cashback: '10 % remboursés / semaine',
@@ -275,7 +275,7 @@ export const VipSubscriptions: React.FC = () => {
         </h1>
 
         <p className="text-neutral-400 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-          Rejoignez l'élite du Diamond Casino. Choisissez votre gamme d'adhésion mensuelle pour débloquer des tirages supplémentaires à la Roue, des allocations régulières de jetons et l'accès aux salons privés.
+          Rejoignez l'élite du Diamond Casino. Choisissez votre gamme d'adhésion mensuelle pour recevoir des jetons offerts à l'activation et accéder aux salons privés.
         </p>
 
         {/* Current Active Status Banner if user has a tier */}

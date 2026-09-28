@@ -39,7 +39,7 @@ function RootComponent() {
   }, [location.pathname]);
 
   return (
-    <div className="relative min-h-screen bg-black text-white selection:bg-white selection:text-black font-sans">
+    <div className="relative min-h-screen bg-black text-white selection:bg-white/30 selection:text-white font-sans">
       {!hideNavbar && <Navbar />}
       <Outlet />
     </div>

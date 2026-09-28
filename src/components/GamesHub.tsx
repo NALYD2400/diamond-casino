@@ -31,7 +31,7 @@ import {
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
 import { useMachineClosed } from './MachineClosedBanner';
-import { GAME_LABELS, type GamesConfig } from '../lib/gamesConfig';
+import { GAME_LABELS, SLOT_RTP, formatRtp, type GamesConfig } from '../lib/gamesConfig';
 import { apiRecentWheelWins, dbFetchBetsHistory, type SupabaseBetEntry, type WheelWin } from '../lib/supabase';
 import { Wheel } from './wheel/Wheel';
 import { BombArt, GemArt } from './mines/MinesArt';
@@ -306,7 +306,7 @@ const GAMES: GameTile[] = [
     category: 'slots',
     link: '/slots',
     tag: 'NOUVEAU',
-    rtp: '96,5 %',
+    rtp: formatRtp(SLOT_RTP.doghouse),
     cover: <DogHouseCover />,
   },
   {
@@ -316,7 +316,7 @@ const GAMES: GameTile[] = [
     category: 'slots',
     link: '/wanted',
     tag: 'NOUVEAU',
-    rtp: '96,4 %',
+    rtp: formatRtp(SLOT_RTP.wanted),
     cover: <WantedCover />,
   },
   {
@@ -326,7 +326,6 @@ const GAMES: GameTile[] = [
     category: 'originals',
     link: '/mines',
     tag: 'POPULAIRE',
-    rtp: '98,5 %',
     cover: <MinesCover />,
   },
   {
@@ -383,7 +382,10 @@ const isMachine = (id: string): id is keyof GamesConfig => (MACHINE_IDS as reado
 /** Carte d'une machine : suit en temps réel son ouverture / fermeture par la direction */
 const MachineTile: React.FC<{ game: GameTile & { id: keyof GamesConfig }; index: number }> = ({ game, index }) => {
   const closed = useMachineClosed(game.id);
-  return <Tile game={game} index={index} closed={closed} />;
+  const { gamesConfig } = useCasinoAdmin();
+  // Le RTP de Mines se règle dans la console : on affiche la valeur en vigueur
+  const shown = game.id === 'mines' ? { ...game, rtp: formatRtp(gamesConfig.mines.rtp) } : game;
+  return <Tile game={shown} index={index} closed={closed} />;
 };
 
 const Tile: React.FC<{ game: GameTile; index: number; closed?: ReturnType<typeof useMachineClosed> }> = ({ game, index, closed = null }) => {
@@ -465,7 +467,7 @@ const GameRow: React.FC<{
     <section className="mt-8">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-base sm:text-lg font-bold text-white">
-          <span className="text-violet-300">{icon}</span>
+          <span className="text-neutral-200">{icon}</span>
           {title}
         </h3>
         <div className="flex items-center gap-1.5">
@@ -585,7 +587,7 @@ const WinsFeed: React.FC = () => {
         ) : (
           wins.map((w, i) => (
             <li key={i} className="flex items-start gap-3 px-4 py-2.5">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-300">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-neutral-200">
                 <Trophy size={13} />
               </span>
               <div className="min-w-0 flex-1">
@@ -594,7 +596,7 @@ const WinsFeed: React.FC = () => {
                   <span className="shrink-0 text-[10px] text-neutral-500">{formatTime(w.won_at)}</span>
                 </div>
                 <div className="truncate text-[11px] text-neutral-400">
-                  a gagné <span className="font-semibold text-violet-200">{w.prize}</span>
+                  a gagné <span className="font-semibold text-neutral-200">{w.prize}</span>
                 </div>
               </div>
             </li>
@@ -621,7 +623,7 @@ const MyBets: React.FC<{ profileId: string }> = ({ profileId }) => {
   return (
     <section className="mt-10">
       <h3 className="mb-3 flex items-center gap-2 text-base sm:text-lg font-bold text-white">
-        <History size={17} className="text-violet-300" />
+        <History size={17} className="text-neutral-200" />
         Mes dernières parties
       </h3>
       <div className="overflow-x-auto rounded-2xl border border-white/10 bg-neutral-950/80">
@@ -710,13 +712,13 @@ const SideMenu: React.FC<{ category: Category; onCategory: (c: Category) => void
     </div>
     <Link
       to="/abonnements"
-      className="group relative overflow-hidden rounded-2xl border border-violet-400/30 bg-[radial-gradient(ellipse_at_80%_20%,#7c3aed_0%,#3b1a78_45%,#12071f_100%)] p-4"
+      className="group relative overflow-hidden rounded-2xl border border-white/20 bg-[radial-gradient(ellipse_at_80%_20%,#3a3a3a_0%,#161616_50%,#050505_100%)] p-4"
     >
-      <Crown size={54} className="absolute -right-2 -top-1 rotate-12 text-amber-300/80 drop-shadow-[0_0_14px_rgba(252,211,77,0.5)] transition-transform group-hover:rotate-6" />
+      <Crown size={40} strokeWidth={1.6} className="absolute right-4 bottom-4 rotate-12 text-white/80 drop-shadow-[0_0_12px_rgba(255,255,255,0.35)] transition-transform group-hover:rotate-6" />
       <div className="relative text-sm font-extrabold leading-tight text-white">
         Passez VIP,
         <br />
-        tournez plus souvent.
+        recevez des jetons offerts.
       </div>
       <span className="relative mt-3 inline-block rounded-md bg-white px-2.5 py-1 text-[11px] font-extrabold uppercase text-black">
         Découvrir
@@ -758,9 +760,9 @@ export const GamesHub: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black pt-[80px] sm:pt-[90px] text-white selection:bg-white selection:text-black">
-      {/* Halo violet d'ambiance */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_at_50%_0%,rgba(124,58,237,0.22),transparent_70%)]" />
+    <div className="min-h-screen bg-black pt-[80px] sm:pt-[90px] text-white selection:bg-white/30 selection:text-white">
+      {/* Halo d'ambiance */}
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,255,255,0.10),transparent_70%)]" />
 
       <div className="relative mx-auto flex max-w-[1600px] gap-6 px-4 sm:px-6 lg:px-6 py-6">
         {/* Sidebar */}
@@ -787,7 +789,7 @@ export const GamesHub: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 rounded-lg bg-neutral-900 border border-white/10 px-3 py-2">
-                    <Coins size={16} className="text-amber-300" />
+                    <Coins size={16} className="text-white" />
                     <span className="font-['Geist_Mono'] text-sm font-bold text-white">{user.chips.toLocaleString('fr-FR')}</span>
                   </div>
                   <Link
@@ -850,17 +852,17 @@ export const GamesHub: React.FC = () => {
               subtitle="Tentez votre chance, lots et véhicules à gagner."
               cta="Tourner"
               icon={<Disc size={15} />}
-              className="bg-[radial-gradient(ellipse_at_80%_80%,#5a2a8a,#24104a_60%,#0b0518)]"
+              className="bg-[radial-gradient(ellipse_at_80%_80%,#3a3a3a,#181818_60%,#050505)]"
               art={<WheelArt />}
             />
             <PromoCard
               to="/abonnements"
               title="Bonus VIP"
-              subtitle="Jetons offerts et roue plus fréquente."
+              subtitle="Jetons offerts à l'activation de votre carte."
               cta="Réclamer"
               icon={<Gift size={15} />}
-              className="bg-[radial-gradient(ellipse_at_80%_80%,#7c3aed,#3b1a78_55%,#12071f)]"
-              art={<Crown className="h-full w-full rotate-12 text-amber-300 drop-shadow-[0_0_24px_rgba(252,211,77,0.55)]" strokeWidth={1.4} />}
+              className="bg-[radial-gradient(ellipse_at_80%_80%,#4a4a4a,#1c1c1c_55%,#050505)]"
+              art={<div className="h-full w-full pr-6 pb-8"><Crown className="h-full w-full rotate-12 text-white drop-shadow-[0_0_24px_rgba(255,255,255,0.45)]" strokeWidth={1.4} /></div>}
             />
             <PromoCard
               to="/mines"
@@ -868,8 +870,8 @@ export const GamesHub: React.FC = () => {
               subtitle="Évitez les bombes, encaissez quand vous voulez."
               cta="Jouer"
               icon={<Bomb size={15} />}
-              className="col-span-2 md:col-span-1 bg-[radial-gradient(ellipse_at_80%_80%,#1c5a7a,#1a1238_60%,#07050f)]"
-              art={<GemArt className="h-full w-full drop-shadow-[0_0_24px_rgba(94,232,255,0.6)]" />}
+              className="col-span-2 md:col-span-1 bg-[radial-gradient(ellipse_at_80%_80%,#2e2e2e,#141414_60%,#050505)]"
+              art={<div className="h-full w-full pr-6 pb-8"><GemArt className="h-full w-full drop-shadow-[0_0_24px_rgba(94,232,255,0.6)]" /></div>}
             />
           </div>
 
@@ -949,7 +951,6 @@ export const GamesHub: React.FC = () => {
           {/* Studios */}
           <section className="mt-10">
             <h3 className="mb-3 flex items-center gap-2 text-base sm:text-lg font-bold text-white">
-              <Sparkles size={17} className="text-violet-300" />
               Studios
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -957,9 +958,9 @@ export const GamesHub: React.FC = () => {
                 <button
                   key={p.name}
                   onClick={() => pickCategory(p.category)}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-neutral-950/80 px-4 py-4 text-sm font-extrabold uppercase tracking-widest text-neutral-300 hover:border-violet-400/40 hover:text-white transition-colors"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-neutral-950/80 px-4 py-4 text-sm font-extrabold uppercase tracking-widest text-neutral-300 hover:border-white/40 hover:text-white transition-colors"
                 >
-                  <span className="text-violet-300">{p.icon}</span>
+                  <span className="text-neutral-200">{p.icon}</span>
                   {p.name}
                 </button>
               ))}

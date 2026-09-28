@@ -103,7 +103,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
           value={`${profit >= 0 ? '+' : ''}${fmtChips(profit)}`}
           tone={profit >= 0 ? 'good' : 'bad'}
           icon={profit >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-          hint={`Mises (${fmt(wagered)}) − gains payés (véhicules à leur valeur)`}
+          hint={`Mises (${fmt(wagered)}) − gains payés (véhicules à leur valeur, moins la part non versée des revendus ou retirés)`}
         />
         <Stat
           label="Jetons chez les joueurs"
@@ -252,7 +252,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
         <p>
           <b>Jetons créés</b> = jetons apparus sans mise : crédits manuels du staff, dotations VIP et revente de lots (véhicules
           échangés contre des jetons). C'est ce qui fait grossir la masse de jetons des joueurs. La roue et les boosters sont des jeux
-          payants : les véhicules qu'ils donnent sont comptés dans « Payé » à leur valeur catalogue.
+          payants : les véhicules qu'ils donnent sont comptés dans « Payé » à leur valeur catalogue. Si le joueur le revend, seule la somme réellement versée en jetons reste comptée ; un véhicule retiré par le staff n'est plus compté.
         </p>
         <p className="text-neutral-400">
           Un joueur « le plus gagnant » affiché en <span className="text-rose-300">rouge</span> a gagné des jetons au casino, en{' '}

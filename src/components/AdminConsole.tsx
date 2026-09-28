@@ -56,7 +56,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { id: 'players', label: 'Joueurs', icon: Users, description: 'Comptes, soldes, fiches' },
       { id: 'vip', label: 'VIP', icon: Crown, description: 'Demandes et offres' },
-      { id: 'rewards', label: 'Lots & véhicules', icon: Car, description: 'Livraisons en jeu' },
+      { id: 'rewards', label: 'Lots & véhicules', icon: Car, description: 'Livraisons aux joueurs' },
     ],
   },
   {

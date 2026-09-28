@@ -39,7 +39,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   const alerts: { tone: 'warn' | 'bad' | 'info'; text: string; action?: { label: string; tab: AdminTab } }[] = [];
   if (economy.maintenanceMode) alerts.push({ tone: 'bad', text: 'Le casino est en MAINTENANCE : aucun joueur ne peut jouer.', action: { label: 'Système', tab: 'system' } });
   if (t && t.pending_vip > 0) alerts.push({ tone: 'warn', text: `${t.pending_vip} demande(s) VIP à valider (paiement en € à vérifier).`, action: { label: 'Voir', tab: 'vip' } });
-  if (t && t.pending_rewards > 0) alerts.push({ tone: 'warn', text: `${t.pending_rewards} lot(s) réclamé(s) à remettre en jeu.`, action: { label: 'Voir', tab: 'rewards' } });
+  if (t && t.pending_rewards > 0) alerts.push({ tone: 'warn', text: `${t.pending_rewards} lot(s) réclamé(s) à livrer au joueur.`, action: { label: 'Voir', tab: 'rewards' } });
   const closed = (['mines', 'doghouse', 'wanted', 'wheel', 'boosters'] as const).filter((g) => !gamesConfig[g].enabled);
   if (closed.length) alerts.push({ tone: 'info', text: `Jeu(x) fermé(s) : ${closed.map((g) => (g === 'wheel' ? 'Roue' : GAME_LABELS[g])).join(', ')}.`, action: { label: 'Jeux', tab: 'games' } });
   paidGames.forEach(([id, g]) => {
@@ -230,7 +230,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
           <Stat label="Ventes VIP (jetons)" value={fmtChips(t?.vip_sales)} icon={<Crown size={16} />} hint={`${fmt(t?.pending_vip)} demande(s) en attente`} />
         </button>
         <button type="button" onClick={() => goTo('rewards')} className="text-left cursor-pointer">
-          <Stat label="Lots à livrer" value={fmt(t?.pending_rewards)} icon={<Car size={16} />} hint="Réclamés par les joueurs, à remettre en jeu" tone={t && t.pending_rewards > 0 ? 'gold' : 'default'} />
+          <Stat label="Lots à livrer" value={fmt(t?.pending_rewards)} icon={<Car size={16} />} hint="Réclamés par les joueurs, à livrer en ville" tone={t && t.pending_rewards > 0 ? 'gold' : 'default'} />
         </button>
         <Stat
           label="Mines : manches en cours"

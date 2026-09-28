@@ -9,7 +9,7 @@ export const REWARD_SOURCE: Record<PlayerReward['source'], { long: string; short
 export const REWARD_STATUS: Record<RewardStatus, { label: string; className: string }> = {
   IN_INVENTORY: { label: 'Dans l’inventaire', className: 'text-white border-white/20 bg-white/10' },
   CLAIMED: { label: 'Réclamé · en attente', className: 'text-sky-300 border-sky-400/30 bg-sky-500/10' },
-  DELIVERED: { label: 'Remis en jeu', className: 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10' },
+  DELIVERED: { label: 'Livré', className: 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10' },
   REVOKED: { label: 'Retiré', className: 'text-neutral-400 border-white/15 bg-white/5' },
   SOLD: { label: 'Revendu', className: 'text-amber-200 border-amber-400/30 bg-amber-500/10' },
   USED: { label: 'Utilisé', className: 'text-neutral-400 border-white/15 bg-white/5' },

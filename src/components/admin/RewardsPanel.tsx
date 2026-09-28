@@ -23,7 +23,7 @@ interface RewardsPanelProps {
 type PendingAction = { reward: PlayerReward; status: 'DELIVERED' | 'REVOKED' | 'IN_INVENTORY' } | null;
 
 const ACTION_LABEL: Record<'DELIVERED' | 'REVOKED' | 'IN_INVENTORY', string> = {
-  DELIVERED: 'Confirmer la remise en jeu',
+  DELIVERED: 'Confirmer la livraison au joueur',
   REVOKED: 'Confirmer le retrait',
   IN_INVENTORY: 'Remettre dans l’inventaire',
 };
@@ -98,7 +98,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       await apiAdminUpdateReward(pending.reward.id, pending.status, pendingNote.trim() || undefined);
       showToast(
         pending.status === 'DELIVERED'
-          ? `« ${pending.reward.label} » marqué comme remis en jeu.`
+          ? `« ${pending.reward.label} » marqué comme livré au joueur.`
           : pending.status === 'REVOKED'
             ? `« ${pending.reward.label} » retiré au joueur.`
             : `« ${pending.reward.label} » remis dans l’inventaire.`,
@@ -214,7 +214,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
           onClick={() => setPending({ reward: r, status: 'DELIVERED' })}
           className="px-2.5 py-1.5 rounded-lg bg-white text-black text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-200 cursor-pointer flex items-center gap-1"
         >
-          <PackageCheck size={12} /> Remis en jeu
+          <PackageCheck size={12} /> Marquer livré
         </button>
       )}
       {r.status !== 'REVOKED' && r.status !== 'SOLD' && (
@@ -271,7 +271,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-1">Lots &amp; Véhicules</h1>
           <p className="text-xs sm:text-sm text-neutral-400">
-            Lots gagnés à la roue ou offerts, réclamations des joueurs et remise en jeu.
+            Lots gagnés à la roue ou offerts, réclamations des joueurs et livraison en ville.
           </p>
         </div>
         <button
@@ -286,7 +286,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       {/* Claims to handle */}
       <section className="p-5 rounded-2xl bg-sky-500/[0.04] border border-sky-500/20 flex flex-col gap-3">
         <h2 className="text-xs font-bold uppercase tracking-wider text-sky-300 flex items-center gap-2">
-          <PackageCheck size={14} /> Réclamations à remettre en jeu ({claims.length})
+          <PackageCheck size={14} /> Réclamations à livrer au joueur ({claims.length})
         </h2>
         {claims.length === 0 ? (
           <p className="text-xs text-neutral-500">Aucune réclamation en attente.</p>

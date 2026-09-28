@@ -365,7 +365,7 @@ export const BoostersGame: React.FC = () => {
                   <>
                     <div ref={carouselRef} className="relative flex-1 w-full flex items-center justify-center min-h-0">
                       {packs.length > 1 && (
-                        <button type="button" onClick={() => setIndex((i) => (i - 1 + packs.length) % packs.length)} className="absolute left-0 sm:left-[8%] z-20 w-11 h-11 rounded-full liquid-glass border border-white/20 text-white flex items-center justify-center hover:bg-white/10" aria-label="Booster précédent">
+                        <button type="button" onClick={() => setIndex((i) => (i - 1 + packs.length) % packs.length)} className="!absolute left-0 sm:left-[8%] z-20 w-11 h-11 rounded-full liquid-glass border border-white/20 text-white flex items-center justify-center hover:bg-white/10" aria-label="Booster précédent">
                           <ChevronLeft size={20} />
                         </button>
                       )}
@@ -397,7 +397,7 @@ export const BoostersGame: React.FC = () => {
                         })}
                       </div>
                       {packs.length > 1 && (
-                        <button type="button" onClick={() => setIndex((i) => (i + 1) % packs.length)} className="absolute right-0 sm:right-[8%] z-20 w-11 h-11 rounded-full liquid-glass border border-white/20 text-white flex items-center justify-center hover:bg-white/10" aria-label="Booster suivant">
+                        <button type="button" onClick={() => setIndex((i) => (i + 1) % packs.length)} className="!absolute right-0 sm:right-[8%] z-20 w-11 h-11 rounded-full liquid-glass border border-white/20 text-white flex items-center justify-center hover:bg-white/10" aria-label="Booster suivant">
                           <ChevronRight size={20} />
                         </button>
                       )}

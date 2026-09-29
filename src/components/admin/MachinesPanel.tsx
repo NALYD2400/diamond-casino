@@ -61,7 +61,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 
 /** Valeur moyenne des bonus achetés (en × la mise), mesurée sur les moteurs */
 const DOG_BONUS_VALUE = 110;
-const WANTED_BONUS_VALUE = { gtr: 78, duel: 200, dmh: 395 } as const;
+const WANTED_BONUS_VALUE = { gtr: 78, duel: 200, dmh: 392 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, wheel: 1.5, boosters: 1 };
 const MIN_ROUNDS = 200;

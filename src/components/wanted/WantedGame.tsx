@@ -64,6 +64,8 @@ interface BonusState {
   total: number;
   win: number;
   multiplier: number;
+  /** Dead Man's Hand : wilds collectés, replacés à chaque tour Showdown */
+  wilds: number;
 }
 
 interface DuelAnim {
@@ -75,10 +77,20 @@ interface DuelAnim {
 }
 
 interface DmhBoardState {
-  landings: DmhLanding[];
-  respins: number;
+  wilds: number;
   multiplier: number;
-  fresh: Set<string>;
+  respins: number;
+  /** cartes retournées sur ce respin */
+  revealed: DmhLanding[];
+  /** rolling : les cartes tournent · reveal : symboles visibles · collect : ils filent vers les compteurs */
+  stage: 'idle' | 'rolling' | 'reveal' | 'collect';
+}
+
+/** Compteurs de Dead Man's Hand : wilds, multiplicateur et balles du barillet */
+interface DmhHud {
+  wilds: number;
+  multiplier: number;
+  bullets: number;
 }
 
 export const WantedGame: React.FC = () => {
@@ -155,6 +167,7 @@ export const WantedGame: React.FC = () => {
   const [intro, setIntro] = useState<{ bonus: WantedBonus } | null>(null);
   const [end, setEnd] = useState<{ bonus: WantedBonus; win: number } | null>(null);
   const [dmhBoard, setDmhBoard] = useState<DmhBoardState | null>(null);
+  const [showdownIntro, setShowdownIntro] = useState(false);
 
   const [turbo, setTurbo] = useState(false);
   const [autoLeft, setAutoLeft] = useState(0);
@@ -359,50 +372,66 @@ export const WantedGame: React.FC = () => {
       let stickyVs: VsReel[] = [];
       const total = BONUS_INFO[bonus].spins;
 
+      const wilds = round.collect?.wilds ?? 0;
       if (round.collect) {
-        // Phase 1 : collecte (déjà tirée, on la rejoue)
+        // Phase 1 : collecte (déjà tirée, on la rejoue). Les cartes se retournent,
+        // wilds et multiplicateurs filent dans les compteurs, le barillet se recharge.
         setPhase('spinning');
-        const landings: DmhLanding[] = [];
-        let respins = 3;
+        let w = 0;
         let mult = 0;
-        setDmhBoard({ landings: [], respins, multiplier: 1, fresh: new Set() });
+        let respins = 3;
+        setDmhBoard({ wilds: 0, multiplier: 0, respins, revealed: [], stage: 'idle' });
         setMessage('COLLECTE');
-        await wait(700);
-        for (const step of round.collect.steps) {
-          audio.current.spinStart();
-          await wait(turboRef.current ? 350 : 700);
-          step.forEach((l) => {
-            landings.push(l);
-            if (l.kind === 'mult') mult += l.value;
-          });
-          respins = step.length > 0 ? 3 : respins - 1;
-          if (step.length > 0) audio.current.collect();
-          else audio.current.reelStop(2, false);
-          setDmhBoard({
-            landings: [...landings],
-            respins,
-            multiplier: Math.max(1, mult),
-            fresh: new Set(step.map((l) => `${l.reel}-${l.row}`)),
-          });
-          await wait(turboRef.current ? 250 : 500);
-        }
         await wait(900);
-        sticky = round.collect.wilds;
-        setDmhBoard(null);
+        for (const step of round.collect.steps) {
+          const fast = turboRef.current;
+          audio.current.spinStart();
+          setDmhBoard((b) => b && { ...b, revealed: [], stage: 'rolling' });
+          await wait(fast ? 260 : 480);
+          if (step.length > 0) {
+            setDmhBoard((b) => b && { ...b, revealed: step, stage: 'reveal' });
+            audio.current.collect();
+            await wait(fast ? 300 : 600);
+            setDmhBoard((b) => b && { ...b, stage: 'collect' });
+            await wait(fast ? 240 : 400);
+            step.forEach((l) => (l.kind === 'wild' ? w++ : (mult += l.value)));
+            if (respins < 3) audio.current.revolverReload();
+            respins = 3;
+            setDmhBoard({ wilds: w, multiplier: mult, respins, revealed: [], stage: 'idle' });
+          } else {
+            respins--;
+            audio.current.gunshot(0.45);
+            setDmhBoard((b) => b && { ...b, respins, stage: 'idle' });
+          }
+          await wait(fast ? 100 : 200);
+        }
+        await wait(600);
         setMessage('SHOWDOWN');
+        setShowdownIntro(true);
+        audio.current.revolverReload();
+        setDmhBoard({ wilds: w, multiplier: mult, respins: 3, revealed: [], stage: 'idle' });
+        await wait(turboRef.current ? 900 : 1700);
+        setShowdownIntro(false);
+        setDmhBoard(null);
       }
 
-      setBonusState({ bonus, spin: 0, total, win: 0, multiplier });
+      setBonusState({ bonus, spin: 0, total, win: 0, multiplier, wilds });
       setStickyWilds(sticky);
       setPhase('spinning');
 
       for (let i = 1; i <= round.spins.length; i++) {
         await wait(turboRef.current ? 250 : 550);
         setPresentation(null);
-        setBonusState({ bonus, spin: i, total, win: bonusWin, multiplier });
+        setBonusState({ bonus, spin: i, total, win: bonusWin, multiplier, wilds });
 
         const res = round.spins[i - 1];
+        // Showdown : les wilds collectés tombent à de nouvelles places à chaque tour
+        if (bonus === 'dmh') setStickyWilds([]);
         await animateReels(res, { anticipation: false, keepVs: stickyVs });
+        if (bonus === 'dmh') {
+          setStickyWilds(res.stickyWilds);
+          await wait(turboRef.current ? 150 : 350);
+        }
         if (bonus === 'gtr') {
           sticky = res.stickyWilds;
           setStickyWilds(sticky);
@@ -412,7 +441,7 @@ export const WantedGame: React.FC = () => {
         await presentWins(res, stakeBet, bonusWin);
         bonusWin += res.totalWin;
         setHiddenWin((h) => Math.max(0, h - res.totalWin));
-        setBonusState({ bonus, spin: i, total, win: bonusWin, multiplier });
+        setBonusState({ bonus, spin: i, total, win: bonusWin, multiplier, wilds });
       }
 
       await wait(600);
@@ -568,6 +597,11 @@ export const WantedGame: React.FC = () => {
   const locked = phase !== 'idle' || autoLeft > 0;
   const winShown = presentation ? counter : lastWin;
   const theme: WantedBonus | null = bonusState?.bonus ?? (dmhBoard ? 'dmh' : null);
+  const dmhHud: DmhHud | null = dmhBoard
+    ? { wilds: dmhBoard.wilds, multiplier: Math.max(1, dmhBoard.multiplier), bullets: dmhBoard.respins }
+    : bonusState?.bonus === 'dmh'
+      ? { wilds: bonusState.wilds, multiplier: bonusState.multiplier, bullets: bonusState.total - bonusState.spin }
+      : null;
 
   return (
     <div className="relative bg-[#120a07] pt-[80px] sm:pt-[90px]">
@@ -622,11 +656,19 @@ export const WantedGame: React.FC = () => {
           )}
           <div className="relative flex-1 h-full min-w-0 max-w-[720px] flex items-center justify-center" style={{ containerType: 'size' }}>
             <div className="relative flex flex-col items-center" style={{ width: 'min(100cqw, calc(100cqh * 0.84))' }}>
-              <WantedLogo className="relative z-20 -mb-[3%]" />
-              <div className="relative w-full rounded-lg border-[5px] border-[#1c120c] p-[2%] shadow-[0_20px_50px_rgba(0,0,0,0.6)] bg-[linear-gradient(180deg,#4a3322,#2a1a10)]">
+              <div className="relative z-20 w-full flex items-end justify-center gap-[2%] -mb-[3%]">
+                {dmhHud && <HudPlaque label="WILDS" value={String(dmhHud.wilds)} side="left" />}
+                <WantedLogo />
+                {dmhHud && <HudPlaque label="MULTIPLIER" value={`${dmhHud.multiplier}x`} side="right" />}
+              </div>
+              <div
+                className={`relative w-full rounded-lg border-[5px] border-[#1c120c] p-[2%] shadow-[0_20px_50px_rgba(0,0,0,0.6)] ${
+                  dmhHud ? 'flex gap-[1.5%] bg-[linear-gradient(180deg,#3a2230,#1c0e14)]' : 'bg-[linear-gradient(180deg,#4a3322,#2a1a10)]'
+                }`}
+              >
                 <div className="absolute inset-0 rounded-md opacity-40 bg-[repeating-linear-gradient(90deg,transparent_0_46px,rgba(0,0,0,0.35)_46px_49px)] pointer-events-none" />
                 {bonusState && <BonusBanner state={bonusState} />}
-                <div className="relative rounded bg-[#1a100a] overflow-hidden">
+                <div className="relative flex-1 min-w-0 rounded bg-[#1a100a] overflow-hidden">
                   {dmhBoard ? (
                     <DmhBoard board={dmhBoard} />
                   ) : (
@@ -652,7 +694,9 @@ export const WantedGame: React.FC = () => {
                       <Paylines lines={shownLines} />
                     </div>
                   )}
+                  {showdownIntro && <ShowdownTitle />}
                 </div>
+                {dmhHud && <BulletLoader bullets={dmhHud.bullets} />}
               </div>
             </div>
           </div>
@@ -1058,26 +1102,71 @@ const Paylines: React.FC<{ lines: WantedLineWin[] }> = ({ lines }) => (
 // Dead Man's Hand
 // =============================================================================
 
+/** Carte « Dead Man's Hand » face cachée : éventail de cartes sépia et crâne */
+const DeadCard: React.FC<{ rolling?: boolean; delay?: number }> = ({ rolling, delay = 0 }) => (
+  <div className={`w-full h-full ${rolling ? 'wd-card-roll' : ''}`} style={rolling ? { animationDelay: `${delay}ms` } : undefined}>
+    <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_3px_3px_rgba(0,0,0,0.6)]">
+      <defs>
+        <linearGradient id="dmh-paper" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f3ead2" />
+          <stop offset="1" stopColor="#bfae88" />
+        </linearGradient>
+      </defs>
+      {[-14, -5].map((a) => (
+        <rect key={a} x="24" y="12" width="52" height="74" rx="5" fill="#d6c7a2" stroke="#3a2a1a" strokeWidth="2" transform={`rotate(${a} 50 86)`} />
+      ))}
+      <g transform="rotate(5 50 86)">
+        <rect x="24" y="12" width="52" height="74" rx="5" fill="url(#dmh-paper)" stroke="#3a2a1a" strokeWidth="2.5" />
+        <rect x="29" y="17" width="42" height="64" rx="3" fill="none" stroke="#8a7452" strokeWidth="1" strokeDasharray="2 2" />
+        <path d="M37 44 Q37 30 50 30 Q63 30 63 44 Q63 51 58 54 L58 60 L42 60 L42 54 Q37 51 37 44 Z" fill="#4a3a2a" />
+        <ellipse cx="44.5" cy="44" rx="4" ry="4.6" fill="#f3ead2" />
+        <ellipse cx="55.5" cy="44" rx="4" ry="4.6" fill="#f3ead2" />
+        <path d="M50 49 L47.6 53.5 L52.4 53.5 Z" fill="#f3ead2" />
+        <path d="M45 60 V65 M48.3 60 V66 M51.7 60 V66 M55 60 V65" stroke="#4a3a2a" strokeWidth="2.2" />
+      </g>
+    </svg>
+  </div>
+);
+
 const DmhBoard: React.FC<{ board: DmhBoardState }> = ({ board }) => {
-  const byCell = new Map(board.landings.map((l) => [`${l.reel}-${l.row}`, l]));
+  const byCell = new Map(board.revealed.map((l) => [`${l.reel}-${l.row}`, l]));
+  const flying = board.stage === 'collect';
   return (
-    <div className="relative">
+    <div className="relative bg-[radial-gradient(ellipse_at_center,#2a1420,#12080e)]">
       <div className="grid grid-cols-5 gap-[2px] p-[2px]">
         {[0, 1, 2, 3, 4].map((row) =>
           [0, 1, 2, 3, 4].map((reel) => {
             const key = `${reel}-${row}`;
             const l = byCell.get(key);
             return (
-              <div key={key} className="relative aspect-square bg-[#140a14] border border-white/5 flex items-center justify-center">
+              <div key={key} className="relative aspect-square p-[5%]">
+                <div
+                  className={`w-full h-full transition-opacity duration-200 ${
+                    l && !flying ? 'opacity-0' : board.stage === 'reveal' ? 'opacity-40' : ''
+                  }`}
+                >
+                  <DeadCard rolling={board.stage === 'rolling'} delay={(reel * 5 + row) * 17} />
+                </div>
                 {l && (
-                  <div className={`w-full h-full p-[8%] flex items-center justify-center ${board.fresh.has(key) ? 'wd-pop' : ''}`}>
-                    {l.kind === 'wild' ? (
-                      <WantedSymbol id="wild" />
-                    ) : (
-                      <div className="w-[80%] aspect-square rounded-full border-[3px] border-[#1c120c] bg-[radial-gradient(circle_at_35%_30%,#fff1b0,#e0b040_55%,#8a5a10)] flex items-center justify-center font-['Oswald'] font-bold text-[#5a140c] text-[clamp(12px,3.4cqw,26px)] shadow-[0_0_14px_rgba(224,176,64,0.7)]">
-                        x{l.value}
-                      </div>
-                    )}
+                  <div
+                    className={`absolute inset-0 z-10 p-[5%] ${flying ? 'wd-card-fly' : 'wd-card-flip'}`}
+                    style={
+                      {
+                        // les wilds filent vers le compteur de gauche, les multiplicateurs vers la droite
+                        '--fx': l.kind === 'wild' ? `${-(reel + 0.6) * 100}%` : `${(4.6 - reel) * 100}%`,
+                        '--fy': `${-(row + 1.4) * 100}%`,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <div className="w-full h-full rounded-md border-2 border-[#e0b040] bg-[radial-gradient(circle,#5a3a1a,#1c120c)] shadow-[0_0_18px_rgba(255,200,80,0.8)] flex items-center justify-center p-[6%]">
+                      {l.kind === 'wild' ? (
+                        <WantedSymbol id="wild" />
+                      ) : (
+                        <div className="w-[86%] aspect-square rounded-full border-[3px] border-[#1c120c] bg-[radial-gradient(circle_at_35%_30%,#fff1b0,#e0b040_55%,#8a5a10)] flex items-center justify-center font-['Oswald'] font-bold text-[#5a140c] text-[clamp(12px,3.6cqw,28px)]">
+                          {l.value}x
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1085,22 +1174,85 @@ const DmhBoard: React.FC<{ board: DmhBoardState }> = ({ board }) => {
           }),
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-2 flex justify-center gap-2 pointer-events-none">
-        <span className="rounded-md bg-black/75 px-3 py-1 font-['Oswald'] font-bold text-white text-sm">
-          RESPINS <span className="text-[#e0b040]">{board.respins}</span>
-        </span>
-        <span className="rounded-md bg-black/75 px-3 py-1 font-['Oswald'] font-bold text-white text-sm">
-          MULTIPLICATEUR <span className="text-[#e0b040]">x{board.multiplier}</span>
-        </span>
-      </div>
     </div>
   );
 };
 
+/** Compteur en bois de part et d'autre du logo (WILDS / MULTIPLIER) */
+const HudPlaque: React.FC<{ label: string; value: string; side: 'left' | 'right' }> = ({ label, value, side }) => (
+  <div
+    className={`w-[21%] shrink-0 mb-[4%] rounded-md border-[3px] border-[#1c120c] bg-[linear-gradient(180deg,#4a3322,#24160c)] shadow-[0_4px_0_#1c120c,inset_0_0_0_2px_rgba(224,176,64,0.55)] px-1 py-[1.2%] text-center ${
+      side === 'left' ? '-rotate-2' : 'rotate-2'
+    }`}
+  >
+    <div className="font-['Oswald'] font-bold tracking-[0.04em] text-[#e0b040] text-[clamp(7px,1.6cqw,13px)] leading-none">{label}</div>
+    <div
+      key={value}
+      className="wd-pop font-['Rye'] text-[#fff1d8] text-[clamp(16px,4.6cqw,38px)] leading-none mt-[6%]"
+      style={{ WebkitTextStroke: '1px #1c120c', textShadow: '0 2px 0 #1c120c' }}
+    >
+      {value}
+    </div>
+  </div>
+);
+
+/** Chargeur de balles : respins restants (collecte) puis tours Showdown restants */
+const BulletLoader: React.FC<{ bullets: number }> = ({ bullets }) => (
+  <div className="relative w-[9%] shrink-0 rounded-md border-2 border-[#1c120c] bg-[linear-gradient(90deg,#0c0608,#2a1a14_45%,#0c0608)] shadow-[inset_0_0_10px_rgba(0,0,0,0.9)] flex flex-col justify-evenly items-center py-[4%]">
+    <div className="absolute inset-y-[3%] left-1/2 w-[2px] -translate-x-1/2 bg-[#e0b040]/20" />
+    {[0, 1, 2].map((i) => {
+      const loaded = 2 - i < bullets;
+      return (
+        <div key={i} className="relative w-[62%] aspect-[1/3.2] rounded-full bg-black/70 shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)]">
+          <svg
+            viewBox="0 0 20 64"
+            className={`absolute inset-0 w-full h-full transition-all duration-300 ease-out ${
+              loaded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-[70%] scale-75'
+            }`}
+          >
+            <defs>
+              <linearGradient id="bl-brass" x1="0" x2="1">
+                <stop offset="0" stopColor="#7a5410" />
+                <stop offset="0.4" stopColor="#ffe08a" />
+                <stop offset="1" stopColor="#8a5a10" />
+              </linearGradient>
+              <linearGradient id="bl-lead" x1="0" x2="1">
+                <stop offset="0" stopColor="#6a3a1a" />
+                <stop offset="0.4" stopColor="#e89a5a" />
+                <stop offset="1" stopColor="#6a3a1a" />
+              </linearGradient>
+            </defs>
+            <path d="M3 22 Q3 2 10 1 Q17 2 17 22 Z" fill="url(#bl-lead)" />
+            <rect x="2.5" y="21" width="15" height="38" rx="1.5" fill="url(#bl-brass)" />
+            <rect x="1.5" y="58" width="17" height="5" rx="1" fill="url(#bl-brass)" stroke="#5a3a08" strokeWidth="0.6" />
+          </svg>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const ShowdownTitle: React.FC = () => (
+  <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/55 pointer-events-none">
+    <div
+      className="wd-pop font-['Rye'] text-[clamp(30px,9cqw,76px)] leading-none"
+      style={{
+        background: 'linear-gradient(180deg, #fff1b0 0%, #e0b040 50%, #8a5a10 100%)',
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        color: 'transparent',
+        WebkitTextStroke: '2px #1c120c',
+        filter: 'drop-shadow(0 4px 0 #1c120c)',
+      }}
+    >
+      SHOWDOWN
+    </div>
+  </div>
+);
+
 const BonusBanner: React.FC<{ state: BonusState }> = ({ state }) => (
   <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-40 wd-pop whitespace-nowrap rounded-md border-[3px] border-[#1c120c] bg-[#efe4cc] px-3 py-0.5 font-['Oswald'] font-bold text-[#1c120c] text-xs sm:text-sm shadow-[0_3px_0_#1c120c]">
     {state.bonus === 'dmh' ? 'SHOWDOWN' : 'TOURS GRATUITS'} {state.spin}/{state.total}
-    {state.multiplier > 1 && <span className="ml-2 text-[#c2231a]">x{state.multiplier}</span>}
     <span className="ml-3 text-[#2f7a52]">GAIN {fmt(state.win)}</span>
   </div>
 );
@@ -1391,7 +1543,7 @@ const BonusIntro: React.FC<{ bonus: WantedBonus; onStart: () => void }> = ({ bon
           {bonus === 'gtr' && '10 tours gratuits. Chaque WILD qui tombe reste collé jusqu’à la fin.'}
           {bonus === 'duel' && '10 tours gratuits. Chaque VS s’étend, gain ou pas, et son rouleau reste collé avec son multiplicateur.'}
           {bonus === 'dmh' &&
-            'Collecte : wilds et multiplicateurs se posent, chaque nouvel atterrissage remet les respins à 3. Puis 3 tours Showdown avec vos wilds et le multiplicateur total.'}
+            'Collecte : les cartes se retournent, wilds et multiplicateurs vont dans leurs compteurs et chaque symbole recharge le barillet à 3 balles. Puis 3 tours Showdown : vos wilds sont replacés au hasard à chaque tour et tous les gains sont multipliés.'}
         </p>
         <button
           onClick={onStart}

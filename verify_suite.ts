@@ -36,6 +36,8 @@ import {
 import {
   evaluateWantedSpin,
   runDmhCollect,
+  placeShowdownWilds,
+  DMH_MAX_WILDS,
   simulateBonus,
   simulateWanted,
   BONUS_INFO,
@@ -304,6 +306,10 @@ async function main() {
     ["Dead Man's Hand collect ends after 3 empty respins", Array.from({ length: 300 }, (_, i) => runDmhCollect(seeded(i + 9))).every((c) =>
       c.steps.length >= 3 && c.steps.slice(-3).every((s) => s.length === 0) && c.multiplier >= 1,
     )],
+    ["Dead Man's Hand never collects more than 20 wilds and places them on distinct cells", Array.from({ length: 300 }, (_, i) => runDmhCollect(seeded(i + 90))).every((c) => {
+      const cells = placeShowdownWilds(c.wilds, seeded(c.wilds + 3));
+      return c.wilds <= DMH_MAX_WILDS && cells.length === c.wilds && new Set(cells.map((x) => `${x.reel}-${x.row}`)).size === c.wilds;
+    })],
     ['each bonus is worth close to its buy price (±15%)', (['gtr', 'duel', 'dmh'] as const).every((b) => {
       const rng = seeded(4242);
       let total = 0;

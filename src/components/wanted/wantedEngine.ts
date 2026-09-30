@@ -10,7 +10,8 @@
  *     3 BONUS                → The Great Train Robbery (10 tours, wilds collants)
  *     un DUEL parmi les 3    → Duel at Dawn (10 tours, VS fréquents, rouleaux VS collants)
  *     un DEAD parmi les 3    → Dead Man's Hand (collecte de wilds et multiplicateurs,
- *                              puis 3 tours « Showdown » avec le multiplicateur total)
+ *                              puis 3 tours « Showdown » : les wilds collectés sont
+ *                              replacés au hasard à chaque tour, gains x multiplicateur)
  * - Achat de bonus : 80x / 200x / 400x. Gain max : 12 500x la mise.
  */
 
@@ -78,8 +79,8 @@ export const PAYLINES: readonly (readonly number[])[] = [
 
 const VS_VALUES = [2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 25, 50, 100];
 const VS_WEIGHTS = [26, 20, 15, 11, 8, 6, 4.5, 3.4, 2.6, 1.3, 0.9, 0.35, 0.12];
-const DMH_TOKENS = [2, 3, 4, 5, 10, 20, 50];
-const DMH_TOKEN_WEIGHTS = [30, 24, 18, 14, 8, 4, 1.2];
+const DMH_TOKENS = [1, 2, 3, 4, 5, 10];
+const DMH_TOKEN_WEIGHTS = [30, 28, 18, 12, 8, 4];
 
 type Weights = Partial<Record<WantedSymbolId, number>>;
 
@@ -95,8 +96,8 @@ const TUNING = {
   gtrWild: 9,
   gtrVs: 3.3,
   duelVs: 0.52,
-  dmhWildChance: 0.07,
-  dmhTokenChance: 0.0302,
+  dmhWildChance: 0.0055,
+  dmhTokenChance: 0.04,
 };
 
 function pickWeighted<T extends string>(w: Partial<Record<T, number>>, rng: () => number): T {
@@ -355,36 +356,66 @@ export interface DmhLanding {
   value: number;
 }
 
-/** Un respin de collecte : renvoie les nouveaux symboles posés sur les cases libres */
-export function dmhCollectStep(occupied: Set<string>, rng: () => number = Math.random): DmhLanding[] {
+/** Plafond de wilds collectés (comme le vrai jeu) */
+export const DMH_MAX_WILDS = 20;
+/** Plafond du multiplicateur collecté */
+export const DMH_MAX_MULT = 100;
+
+/**
+ * Un respin de collecte : les 25 cartes se retournent, chaque carte peut révéler un
+ * wild ou un multiplicateur, aussitôt versé dans son compteur (la grille ne se remplit pas).
+ */
+export function dmhCollectStep(
+  collected: { wilds: number; multiplier: number },
+  rng: () => number = Math.random,
+): DmhLanding[] {
   const out: DmhLanding[] = [];
+  let wilds = collected.wilds;
+  let mult = collected.multiplier;
   for (let reel = 0; reel < REELS; reel++) {
     for (let row = 0; row < ROWS; row++) {
-      if (occupied.has(`${reel}-${row}`)) continue;
       const x = rng();
-      if (reel >= 1 && reel <= 3 && x < TUNING.dmhWildChance) out.push({ reel, row, kind: 'wild', value: 0 });
-      else if (x > 1 - TUNING.dmhTokenChance)
-        out.push({ reel, row, kind: 'mult', value: pickValue(DMH_TOKENS, DMH_TOKEN_WEIGHTS, rng) });
+      if (x < TUNING.dmhWildChance) {
+        if (wilds < DMH_MAX_WILDS) {
+          wilds++;
+          out.push({ reel, row, kind: 'wild', value: 0 });
+        }
+      } else if (x > 1 - TUNING.dmhTokenChance) {
+        const value = Math.min(pickValue(DMH_TOKENS, DMH_TOKEN_WEIGHTS, rng), DMH_MAX_MULT - mult);
+        if (value > 0) {
+          mult += value;
+          out.push({ reel, row, kind: 'mult', value });
+        }
+      }
     }
   }
   return out;
 }
 
-/** Déroule toute la collecte (3 respins, remis à 3 à chaque atterrissage) */
+/** Déroule toute la collecte (3 respins, remis à 3 à chaque symbole collecté) */
 export function runDmhCollect(rng: () => number = Math.random) {
-  const occupied = new Set<string>();
   const steps: DmhLanding[][] = [];
+  let wilds = 0;
+  let mult = 0;
   let left = 3;
-  while (left > 0 && occupied.size < REELS * ROWS) {
-    const landing = dmhCollectStep(occupied, rng);
-    landing.forEach((l) => occupied.add(`${l.reel}-${l.row}`));
+  while (left > 0) {
+    const landing = dmhCollectStep({ wilds, multiplier: mult }, rng);
+    landing.forEach((l) => (l.kind === 'wild' ? wilds++ : (mult += l.value)));
     steps.push(landing);
     left = landing.length > 0 ? 3 : left - 1;
   }
-  const all = steps.flat();
-  const wilds = all.filter((l) => l.kind === 'wild').map(({ reel, row }) => ({ reel, row }));
-  const multiplier = Math.max(1, all.filter((l) => l.kind === 'mult').reduce((a, l) => a + l.value, 0));
-  return { steps, wilds, multiplier };
+  return { steps, wilds, multiplier: Math.max(1, mult) };
+}
+
+/** Showdown : les wilds collectés sont replacés au hasard sur la grille à chaque tour */
+export function placeShowdownWilds(count: number, rng: () => number = Math.random): Cell[] {
+  const cells: Cell[] = [];
+  for (let reel = 0; reel < REELS; reel++) for (let row = 0; row < ROWS; row++) cells.push({ reel, row });
+  for (let i = cells.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  return cells.slice(0, Math.min(count, cells.length));
 }
 
 // =============================================================================
@@ -397,7 +428,8 @@ export function simulateBonus(bonus: WantedBonus, bet: number, rng: () => number
   if (bonus === 'dmh') {
     const { wilds, multiplier } = runDmhCollect(rng);
     for (let i = 0; i < 3 && total < cap; i++) {
-      total += evaluateWantedSpin({ bet, mode: 'dmh', stickyWilds: wilds, globalMultiplier: multiplier, rng }).totalWin;
+      const stickyWilds = placeShowdownWilds(wilds, rng);
+      total += evaluateWantedSpin({ bet, mode: 'dmh', stickyWilds, globalMultiplier: multiplier, rng }).totalWin;
     }
     return Math.min(total, cap);
   }
@@ -504,12 +536,12 @@ export function playWantedRound(params: {
     let collect: WantedBonusRound['collect'] = null;
     if (kind === 'dmh') {
       collect = runDmhCollect(rng);
-      sticky = collect.wilds;
       multiplier = collect.multiplier;
     }
     const spins: WantedSpinResult[] = [];
     let win = 0;
     for (let i = 0; i < BONUS_INFO[kind].spins; i++) {
+      if (collect) sticky = placeShowdownWilds(collect.wilds, rng);
       const res = evaluateWantedSpin({ bet, mode: kind, stickyWilds: sticky, stickyVs, globalMultiplier: multiplier, rng });
       res.totalWin = Math.min(res.totalWin, Math.max(0, cap - base.totalWin - win));
       if (kind === 'gtr') sticky = res.stickyWilds;

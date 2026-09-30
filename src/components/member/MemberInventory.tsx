@@ -2,11 +2,10 @@
  * Espace Membre → « Inventaire » : un seul endroit pour tout ce que le joueur a
  * gagné (véhicules de la roue, boosters de collection offerts, lots offerts).
  * Chaque objet peut être revendu contre des jetons ou réclamé en jeu.
- * La vue « Mes collections » montre la progression des albums de marques.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Check, Coins, Gift, Layers, Loader2, Package, PackageCheck, Play, Search, Shirt, Sparkles, Ticket, Watch, Wine, type LucideIcon } from 'lucide-react';
+import { Check, Coins, Gift, Layers, Loader2, PackageCheck, Play, Search, Shirt, Ticket, Watch, Wine, type LucideIcon } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { apiMyInventory, apiSellRewards, type BoosterRarity, type Inventory, type InventoryItem } from '../../lib/supabase';
 import { REWARD_STATUS, formatRewardDate } from '../../lib/rewards';
@@ -14,10 +13,8 @@ import { apiBoosterCatalog } from '../../lib/supabase';
 import { BoosterCardFace } from '../boosters/BoosterCard';
 import { fmtChips, fmtMoney, modelName, rarityMap, resolveCard, type ResolvedCard } from '../boosters/boosterUtils';
 import { useIncremental } from '../boosters/useIncremental';
-import { MemberCollection } from './MemberCollection';
 import { DogHouseCover, WantedCover } from '../slots/GameCovers';
 
-type View = 'items' | 'album';
 type SourceFilter = 'all' | 'booster' | 'wheel' | 'admin';
 type StatusFilter = 'available' | 'claimed' | 'history';
 type Sort = 'recent' | 'value';
@@ -156,7 +153,6 @@ function useGrid() {
 
 export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = ({ showToast }) => {
   const { applyServerProfile, refreshProfile, claimReward } = useCasinoUser();
-  const [view, setView] = useState<View>('items');
   const [inv, setInv] = useState<Inventory | null>(null);
   const [rarities, setRarities] = useState<Record<string, BoosterRarity>>({});
   const [error, setError] = useState<string | null>(null);
@@ -266,24 +262,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
   return (
     <div className="flex flex-col gap-6">
       {/* Vue */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-full bg-white/5 border border-white/10 p-1">
-          {(
-            [
-              ['items', 'Mes objets', Package],
-              ['album', 'Mes collections', Layers],
-            ] as const
-          ).map(([v, label, Icon]) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              className={`h-9 px-4 rounded-full text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${view === v ? 'bg-white text-black' : 'text-neutral-400 hover:text-white'}`}
-            >
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex gap-2">
           <Link to="/collections" className="h-9 px-4 rounded-full border border-white/20 hover:bg-white/10 text-xs font-semibold text-white flex items-center">
             Collections
@@ -294,9 +273,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
         </div>
       </div>
 
-      {view === 'album' ? (
-        <MemberCollection />
-      ) : error ? (
+      {error ? (
         <p className="text-sm text-rose-300">{error}</p>
       ) : !inv ? (
         <div className="py-16 flex items-center justify-center gap-2 text-neutral-400 text-sm">

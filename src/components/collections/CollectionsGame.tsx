@@ -13,13 +13,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, Car, Coins, Gift, Info, Loader2, Shirt, Sparkles, Trophy, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Gift, Info, Loader2, Sparkles, Trophy, X } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import {
   apiCollectionCatalog,
   apiMyCollections,
   apiOpenCollectionPack,
-  apiSellCollectionCards,
   type CollectionCatalog,
   type CollectionSetData,
   type MyCollections,
@@ -32,14 +31,13 @@ import { BoosterCardBack } from '../boosters/BoosterCard';
 import { BoosterPack } from '../boosters/BoosterPack';
 import { BoosterAudio } from '../boosters/boosterAudio';
 import { rgba } from '../boosters/boosterUtils';
-import { BrandCardFace, BrandCardSlot } from './BrandCard';
+import { BrandCardFace } from './BrandCard';
+import { readStoredSet, setIcon, storeSet } from './CollectionAlbum';
 import { fmtChips, fmtPct, rarityMap, rarityTier, resolveBrandCard, setOdds, type BrandCard } from './collectionUtils';
 
 type Stage = 'opening' | 'reveal' | 'summary';
-type Filter = 'all' | 'owned' | 'missing' | 'doubles';
 
 const VOLUME_KEY = 'collections_volume';
-const SET_KEY = 'collections_set';
 
 function useViewport() {
   const [size, setSize] = useState(() => ({ w: typeof window === 'undefined' ? 1280 : window.innerWidth, h: typeof window === 'undefined' ? 800 : window.innerHeight }));
@@ -51,7 +49,6 @@ function useViewport() {
   return size;
 }
 
-const setIcon = (id: string, size = 15) => (id === 'mode' ? <Shirt size={size} /> : <Car size={size} />);
 
 // ---------------------------------------------------------------------------
 // Effets
@@ -114,19 +111,9 @@ export const CollectionsGame: React.FC = () => {
   const [catalog, setCatalog] = useState<CollectionCatalog | null>(null);
   const [mine, setMine] = useState<MyCollections | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [setId, setSetId] = useState<string>(() => {
-    try {
-      return localStorage.getItem(SET_KEY) || 'autos';
-    } catch {
-      return 'autos';
-    }
-  });
-  const [filter, setFilter] = useState<Filter>('all');
+  const [setId, setSetId] = useState<string>(readStoredSet);
   const [oddsOpen, setOddsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [selling, setSelling] = useState<string | null>(null);
-  const [confirmSellAll, setConfirmSellAll] = useState(false);
 
   // Ouverture
   const [stage, setStage] = useState<Stage | null>(null);
@@ -162,11 +149,7 @@ export const CollectionsGame: React.FC = () => {
       localStorage.setItem(VOLUME_KEY, String(volume));
     } catch {}
   }, [volume, muted]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(SET_KEY, setId);
-    } catch {}
-  }, [setId]);
+  useEffect(() => storeSet(setId), [setId]);
 
   const loadCatalog = useCallback(() => {
     apiCollectionCatalog()
@@ -190,7 +173,13 @@ export const CollectionsGame: React.FC = () => {
 
   const rarities = useMemo(() => rarityMap(catalog?.rarities ?? []), [catalog]);
   const sets = catalog?.sets ?? [];
-  const set: CollectionSetData | undefined = sets.find((s) => s.id === setId) ?? sets[0];
+  const setIndex = Math.max(0, sets.findIndex((s) => s.id === setId));
+  const set: CollectionSetData | undefined = sets[setIndex];
+  const pick = (i: number) => {
+    if (!sets.length) return;
+    setSetId(sets[(i + sets.length) % sets.length].id);
+    setError(null);
+  };
   const owned = useMemo(() => new Map((mine?.owned ?? []).map((o) => [o.card_id, o])), [mine]);
   const secretsFound = useMemo(() => new Map((mine?.secrets ?? []).map((c) => [c.id, c])), [mine]);
 
@@ -203,34 +192,35 @@ export const CollectionsGame: React.FC = () => {
       .sort((a, b) => Number(a.secret) - Number(b.secret) || a.number - b.number);
   }, [catalog, set, rarities, secretsFound]);
   const albumCards = cards.filter((c) => !c.secret);
-  const secretCards = cards.filter((c) => c.secret);
   const setSize = albumCards.length;
   const ownedCount = albumCards.filter((c) => (owned.get(c.id)?.total_found ?? 0) > 0).length;
   const completion = mine?.completions.find((c) => c.set_id === set?.id);
   const gifts = (mine?.gifts ?? []).filter((g) => !g.set_id || g.set_id === set?.id || !sets.some((s) => s.id === g.set_id));
 
-  /** Exemplaires revendables : doublons des cartes d'album, toutes les secrètes */
-  const sellable = (c: BrandCard) => Math.max(0, (owned.get(c.id)?.count ?? 0) - (c.secret ? 0 : 1));
-  const doubles = cards.filter((c) => sellable(c) > 0 && !c.secret);
-  const doublesQty = doubles.reduce((a, c) => a + sellable(c), 0);
-  const doublesValue = doubles.reduce((a, c) => a + sellable(c) * c.rarity.sell_value, 0);
-
-  const fanCards = useMemo(
-    () => [...cards].filter((c) => !c.hidden && !c.secret).sort((a, b) => b.rarity.sort - a.rarity.sort || a.number - b.number).slice(0, 3).reverse(),
-    [cards],
+  /** Trois plus belles cartes d'un album (éventail sur le paquet) */
+  const fanFor = useCallback(
+    (id: string) =>
+      (catalog?.cards ?? [])
+        .filter((c) => c.set_id === id && !c.hidden)
+        .map((c) => resolveBrandCard(c, rarities))
+        .filter((c) => !c.secret)
+        .sort((a, b) => b.rarity.sort - a.rarity.sort || a.number - b.number)
+        .slice(0, 3)
+        .reverse(),
+    [catalog, rarities],
   );
-  const packLook = set
-    ? {
-        id: set.id,
-        name: set.name,
-        cover_image_url: null,
-        accent_color: set.accent_color,
-        cards_per_pack: set.cards_per_pack,
-        kicker: 'Collection de marques',
-        backTitle: `Contient ${set.cards_per_pack} cartes de marques tirées au hasard`,
-        backText: `Complétez l'album pour gagner ${fmtChips(set.reward)}. Les doublons se revendent en jetons.`,
-      }
-    : null;
+  const fanCards = useMemo(() => (set ? fanFor(set.id) : []), [set, fanFor]);
+  const lookFor = (x: CollectionSetData) => ({
+    id: x.id,
+    name: x.name,
+    cover_image_url: null,
+    accent_color: x.accent_color,
+    cards_per_pack: x.cards_per_pack,
+    kicker: 'Collection de marques',
+    backTitle: `Contient ${x.cards_per_pack} cartes de marques tirées au hasard`,
+    backText: `Complétez l'album pour gagner ${fmtChips(x.reward)}. Les doublons se revendent en jetons.`,
+  });
+  const packLook = set ? lookFor(set) : null;
 
   const balance = user?.chips ?? 0;
   const canAfford = !!set && balance >= set.pack_price;
@@ -239,8 +229,7 @@ export const CollectionsGame: React.FC = () => {
   // Dimensions
   const packW = Math.round(Math.max(170, Math.min(250, (vh - 300) / 1.62, vw - 120)));
   const cardW = Math.round(Math.max(190, Math.min(290, (vh - 260) / 1.4, vw - 70)));
-  const homePackW = Math.round(Math.max(150, Math.min(230, vw < 640 ? vw * 0.5 : 230)));
-  const gridW = vw < 640 ? Math.floor(Math.min(170, (vw - 44) / 2)) : vw < 1024 ? 160 : 170;
+  const homePackW = Math.round(Math.max(140, Math.min(240, (vh - 600) / 1.62, vw < 640 ? vw * 0.5 : 240)));
 
   // ------------------------------------------------------------------ actions
 
@@ -248,7 +237,6 @@ export const CollectionsGame: React.FC = () => {
     if (!set || busy.current || !isAuthenticated) return;
     audio.current!.unlock();
     setError(null);
-    setNotice(null);
     busy.current = true;
     setResult(null);
     setTorn(false);
@@ -344,23 +332,6 @@ export const CollectionsGame: React.FC = () => {
     };
   }, [stage]);
 
-  const sell = async (items: { card_id: string; qty: number }[], key: string) => {
-    if (!items.length || selling) return;
-    setSelling(key);
-    setError(null);
-    try {
-      const res = await apiSellCollectionCards(items);
-      applyServerProfile(res.profile);
-      setNotice(`${res.sold} carte(s) revendue(s) : +${fmtChips(res.chips)}`);
-      loadMine();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSelling(null);
-      setConfirmSellAll(false);
-    }
-  };
-
   const close = () => {
     setStage(null);
     setResult(null);
@@ -368,13 +339,6 @@ export const CollectionsGame: React.FC = () => {
 
   // ------------------------------------------------------------------ rendu
 
-  const visible = albumCards.filter((c) => {
-    const n = owned.get(c.id)?.total_found ?? 0;
-    if (filter === 'owned') return n > 0;
-    if (filter === 'missing') return n === 0;
-    if (filter === 'doubles') return sellable(c) > 0;
-    return true;
-  });
   const pct = setSize ? (ownedCount / setSize) * 100 : 0;
   const accent = set?.accent_color ?? '#d9b25f';
 
@@ -424,230 +388,126 @@ export const CollectionsGame: React.FC = () => {
         {catalog && sets.length === 0 && <div className="py-24 text-center text-white/60 text-sm">Aucune collection disponible pour le moment.</div>}
 
         {set && packLook && (
-          <>
-            {/* Choix de l'album */}
-            <div className="mt-6 flex justify-center">
-              <div className="inline-flex rounded-full bg-black/70 border border-white/15 p-1 backdrop-blur-md">
-                {sets.map((s) => {
-                  const n = catalog!.cards.filter((c) => c.set_id === s.id && rarities[c.rarity]?.in_collection !== false).length;
-                  const have = catalog!.cards.filter((c) => c.set_id === s.id && rarities[c.rarity]?.in_collection !== false && (owned.get(c.id)?.total_found ?? 0) > 0).length;
-                  const active = s.id === set.id;
+          <div className="flex flex-col items-center">
+            {/* Carrousel des boosters (un par album) */}
+            <div className="relative w-full flex items-center justify-center mt-4" style={{ height: homePackW * 1.62 + 40 }}>
+              {sets.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => pick(setIndex - 1)}
+                  className="!absolute left-0 sm:left-[12%] z-20 w-11 h-11 rounded-full liquid-glass border border-white/20 text-white flex items-center justify-center hover:bg-white/10"
+                  aria-label="Booster précédent"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+              <div className="relative flex items-center justify-center" style={{ height: homePackW * 1.62 }}>
+                {sets.map((s, i) => {
+                  const off = i - setIndex;
+                  const wrapped = Math.abs(off) > sets.length / 2 ? off - Math.sign(off) * sets.length : off;
+                  if (Math.abs(wrapped) > 2) return null;
                   return (
-                    <button
+                    <motion.button
                       key={s.id}
                       type="button"
-                      onClick={() => {
-                        setSetId(s.id);
-                        setFilter('all');
+                      onClick={() => (wrapped === 0 ? undefined : pick(i))}
+                      className="absolute"
+                      style={{ zIndex: 10 - Math.abs(wrapped), cursor: wrapped === 0 ? 'default' : 'pointer' }}
+                      animate={{
+                        x: wrapped * homePackW * (vw < 640 ? 0.6 : 0.95),
+                        scale: wrapped === 0 ? 1 : 0.72,
+                        opacity: wrapped === 0 ? 1 : 0.5,
+                        filter: wrapped === 0 ? 'brightness(1)' : 'brightness(0.55)',
                       }}
-                      className={`flex items-center gap-2 rounded-full px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold transition-colors ${active ? 'bg-white text-black' : 'text-white/70 hover:text-white'}`}
+                      transition={{ type: 'spring', stiffness: 220, damping: 26 }}
                     >
-                      {setIcon(s.id)} {s.name}
-                      {isAuthenticated && (
-                        <span className={`font-mono text-[10px] rounded-full px-1.5 py-0.5 ${active ? 'bg-black/10' : 'bg-white/10'}`}>
-                          {have}/{n}
-                        </span>
-                      )}
-                    </button>
+                      <div className={wrapped === 0 ? 'bst-float' : ''}>
+                        <BoosterPack
+                          pack={{ ...lookFor(s), cover: <PackFan cards={fanFor(s.id)} width={homePackW} setName={s.name} /> }}
+                          width={homePackW}
+                          idle={wrapped === 0}
+                          interactive={wrapped === 0}
+                          baseRotateY={wrapped * -28}
+                        />
+                      </div>
+                    </motion.button>
                   );
                 })}
               </div>
+              {sets.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => pick(setIndex + 1)}
+                  className="!absolute right-0 sm:right-[12%] z-20 w-11 h-11 rounded-full liquid-glass border border-white/20 text-white flex items-center justify-center hover:bg-white/10"
+                  aria-label="Booster suivant"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              )}
             </div>
 
-            {/* Booster + progression */}
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-6 lg:gap-10 items-center">
-              <div className="flex flex-col items-center">
-                <div className="bst-float" style={{ height: homePackW * 1.62 }}>
-                  <BoosterPack pack={{ ...packLook, cover: <PackFan cards={fanCards} width={homePackW} setName={set.name} /> }} width={homePackW} idle />
+            {/* Infos du booster sélectionné */}
+            <div className="w-full max-w-lg flex flex-col items-center text-center gap-3 mt-6">
+              <div>
+                <div className="flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.25em] font-semibold" style={{ color: accent }}>
+                  {setIcon(set.id, 13)} {set.subtitle || 'Album'}
                 </div>
-                <div className="mt-10 flex flex-col items-center gap-3 w-full max-w-sm">
-                  {isAuthenticated ? (
-                    <button
-                      type="button"
-                      onClick={() => void open()}
-                      disabled={closed || !canAfford}
-                      className="w-full bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 py-4 transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.35)] disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed"
-                    >
-                      {closed ? 'Collections fermées' : !canAfford ? `Solde insuffisant · ${fmtChips(set.pack_price)}` : `Acheter un booster · ${fmtChips(set.pack_price)}`}
-                    </button>
-                  ) : (
-                    <Link to="/espace-membre" className="w-full text-center bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 py-4 shadow-[0_0_30px_rgba(255,255,255,0.35)]">
-                      Se connecter pour jouer
-                    </Link>
-                  )}
-                  {gifts.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => void open(gifts[0].id)}
-                      disabled={closed}
-                      className="w-full flex items-center justify-center gap-2 rounded-full border border-amber-300/50 bg-amber-300/10 hover:bg-amber-300/20 text-amber-100 font-bold text-xs sm:text-sm uppercase tracking-wider px-6 py-3.5 disabled:opacity-40"
-                    >
-                      <Gift size={16} /> Ouvrir un booster offert ({gifts.length})
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setOddsOpen(true)} className="flex items-center gap-2 text-xs text-white/60 hover:text-white underline underline-offset-4">
-                    <Info size={13} /> Taux de rareté & prix de revente
-                  </button>
-                  {error && <p className="text-sm text-rose-300 text-center">{error}</p>}
-                  {notice && <p className="text-sm text-emerald-300 text-center">{notice}</p>}
-                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">{set.name}</h2>
+                {set.description && <p className="text-xs sm:text-sm text-white/60 mt-1">{set.description}</p>}
               </div>
-
-              <div className="rounded-3xl bg-black/65 border border-white/12 backdrop-blur-md p-5 sm:p-7">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] font-semibold" style={{ color: accent }}>
-                      {setIcon(set.id, 13)} {set.subtitle || 'Album'}
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-bold text-white mt-1 tracking-tight">{set.name}</h2>
-                    {set.description && <p className="text-sm text-white/60 mt-2 leading-relaxed">{set.description}</p>}
-                  </div>
-                </div>
-
-                {/* Progression */}
-                <div className="mt-5">
-                  <div className="flex items-end justify-between">
-                    <span className="text-sm text-white/70">Progression</span>
-                    <span className="font-mono text-white text-lg font-bold">
-                      {ownedCount}
-                      <span className="text-white/40 text-sm"> / {setSize}</span>
-                    </span>
-                  </div>
-                  <div className="mt-2 h-3 rounded-full bg-white/10 overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: `linear-gradient(90deg, ${rgba(accent, 0.7)}, ${accent})`, boxShadow: `0 0 16px ${rgba(accent, 0.6)}` }}
-                      initial={false}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.8, ease: 'easeOut' }}
-                    />
-                  </div>
-                  <div className="mt-2 grid grid-cols-5 gap-1.5">
-                    {(catalog?.rarities ?? [])
-                      .filter((r) => r.in_collection)
-                      .map((r) => {
-                        const list = albumCards.filter((c) => c.rarity.key === r.key);
-                        if (!list.length) return null;
-                        const have = list.filter((c) => (owned.get(c.id)?.total_found ?? 0) > 0).length;
-                        return (
-                          <div key={r.key} className="rounded-lg bg-white/[0.04] border border-white/10 px-2 py-1.5 text-center">
-                            <div className="text-[9px] uppercase tracking-wider font-bold truncate" style={{ color: r.color }}>
-                              {r.label}
-                            </div>
-                            <div className="font-mono text-xs text-white">
-                              {have}/{list.length}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-
-                {/* Récompense */}
-                <div
-                  className="mt-5 rounded-2xl p-4 flex items-center gap-4 border"
-                  style={{ borderColor: completion ? 'rgba(52,211,153,0.4)' : rgba(accent, 0.35), background: completion ? 'rgba(16,185,129,0.1)' : rgba(accent, 0.08) }}
-                >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ background: completion ? 'rgba(52,211,153,0.2)' : rgba(accent, 0.2), color: completion ? '#6ee7b7' : accent }}>
-                    <Trophy size={22} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] uppercase tracking-wider text-white/50">{completion ? 'Album complété' : 'Récompense de l’album complet'}</div>
-                    <div className="text-xl sm:text-2xl font-bold font-mono text-white">{fmtChips(set.reward)}</div>
-                    <div className="text-xs text-white/50">
-                      {completion
-                        ? `Gagnée le ${new Date(completion.completed_at).toLocaleDateString('fr-FR')} en ${completion.packs_opened} booster(s).`
-                        : `Il vous manque ${setSize - ownedCount} carte(s). Les cartes secrètes ne sont pas nécessaires.`}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Doublons */}
+              <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-white/80">
+                <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1">{set.cards_per_pack} cartes</span>
+                <span className="rounded-full px-2.5 py-1 flex items-center gap-1 border" style={{ color: accent, borderColor: rgba(accent, 0.4), background: rgba(accent, 0.12) }}>
+                  <Trophy size={12} /> Album complet : {fmtChips(set.reward)}
+                </span>
                 {isAuthenticated && (
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-                    <div>
-                      <div className="text-sm text-white font-semibold">Doublons</div>
-                      <div className="text-xs text-white/50">
-                        {doublesQty > 0 ? `${doublesQty} carte(s) en trop · valeur ${fmtChips(doublesValue)}` : 'Aucun doublon à revendre pour le moment.'}
-                      </div>
-                    </div>
-                    {doublesQty > 0 &&
-                      (confirmSellAll ? (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={!!selling}
-                            onClick={() => void sell(doubles.map((c) => ({ card_id: c.id, qty: sellable(c) })), 'all')}
-                            className="rounded-full bg-amber-300 text-black font-bold text-xs px-4 py-2.5 disabled:opacity-50"
-                          >
-                            {selling === 'all' ? 'Revente…' : `Confirmer +${fmtChips(doublesValue)}`}
-                          </button>
-                          <button type="button" onClick={() => setConfirmSellAll(false)} className="rounded-full border border-white/20 text-white text-xs px-4 py-2.5">
-                            Annuler
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmSellAll(true)}
-                          className="flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-300/10 hover:bg-amber-300/20 text-amber-100 font-semibold text-xs px-4 py-2.5"
-                        >
-                          <Coins size={14} /> Tout revendre
-                        </button>
-                      ))}
-                  </div>
+                  <span className={`rounded-full border px-2.5 py-1 ${completion ? 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10' : 'bg-white/10 border-white/15'}`}>
+                    {completion ? 'Album complété ✓' : `Mon album : ${ownedCount} / ${setSize}`}
+                  </span>
                 )}
               </div>
-            </div>
-
-            {/* Album */}
-            <section className="mt-12">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                <h3 className="text-lg sm:text-xl font-bold text-white">Album · {set.name}</h3>
-                <div className="flex rounded-full bg-black/70 border border-white/15 p-1 text-xs">
-                  {(
-                    [
-                      ['all', 'Toutes'],
-                      ['owned', 'Obtenues'],
-                      ['missing', 'Manquantes'],
-                      ['doubles', 'Doublons'],
-                    ] as [Filter, string][]
-                  ).map(([k, label]) => (
-                    <button key={k} type="button" onClick={() => setFilter(k)} className={`rounded-full px-3 py-1.5 font-semibold ${filter === k ? 'bg-white text-black' : 'text-white/70 hover:text-white'}`}>
-                      {label}
-                    </button>
-                  ))}
+              {isAuthenticated && !completion && (
+                <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${pct}%`, background: accent }} />
                 </div>
+              )}
+              {error && <p className="text-sm text-rose-300">{error}</p>}
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-1">
+                {isAuthenticated ? (
+                  <button
+                    type="button"
+                    onClick={() => void open()}
+                    disabled={closed || !canAfford}
+                    className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.35)] disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                  >
+                    {closed ? 'Collections fermées' : !canAfford ? `Solde insuffisant · ${fmtChips(set.pack_price)}` : `Ouvrir · ${fmtChips(set.pack_price)}`}
+                  </button>
+                ) : (
+                  <Link to="/espace-membre" className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 shadow-[0_0_30px_rgba(255,255,255,0.35)]">
+                    Se connecter pour ouvrir
+                  </Link>
+                )}
+                {gifts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void open(gifts[0].id)}
+                    disabled={closed}
+                    className="flex items-center gap-2 rounded-full border border-amber-300/50 bg-amber-300/10 hover:bg-amber-300/20 text-amber-100 font-bold text-xs sm:text-sm uppercase tracking-wider px-6 py-4 disabled:opacity-40"
+                  >
+                    <Gift size={16} /> Offert ({gifts.length})
+                  </button>
+                )}
+                <button type="button" onClick={() => setOddsOpen(true)} className="liquid-glass border border-white/20 hover:bg-white/10 text-white font-semibold text-xs sm:text-sm rounded-full px-6 py-4 flex items-center gap-2">
+                  <Info size={15} /> Taux &amp; cartes
+                </button>
               </div>
-              {visible.length === 0 ? (
-                <p className="text-center text-sm text-white/50 py-10">Aucune carte dans ce filtre.</p>
-              ) : (
-                <div className="grid gap-4 sm:gap-5 justify-center" style={{ gridTemplateColumns: `repeat(auto-fill, ${gridW}px)` }}>
-                  {visible.map((c) => (
-                    <AlbumCard key={c.id} card={c} width={gridW} setName={set.name} setSize={setSize} count={owned.get(c.id)?.count ?? 0} found={owned.get(c.id)?.total_found ?? 0} sellable={sellable(c)} selling={selling === c.id} onSell={() => void sell([{ card_id: c.id, qty: 1 }], c.id)} />
-                  ))}
-                </div>
+              {isAuthenticated && (
+                <Link to="/espace-membre" hash="collections" className="flex items-center gap-2 text-xs text-white/60 hover:text-white underline underline-offset-4 mt-1">
+                  <BookOpen size={13} /> Mon album et mes doublons (Espace Membre)
+                </Link>
               )}
-
-              {secretCards.length > 0 && (
-                <div className="mt-12">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Sparkles size={16} className="text-teal-300" />
-                    <h3 className="text-lg font-bold text-white">Cartes secrètes</h3>
-                  </div>
-                  <p className="text-xs text-white/50 mb-5">
-                    Ultra rares, hors album : elles ne sont pas nécessaires pour la récompense mais se revendent{' '}
-                    {fmtChips(secretCards[0].rarity.sell_value)} pièce.
-                  </p>
-                  <div className="grid gap-4 sm:gap-5 justify-center" style={{ gridTemplateColumns: `repeat(auto-fill, ${gridW}px)` }}>
-                    {secretCards.map((c) => (
-                      <AlbumCard key={c.id} card={c} width={gridW} setName={set.name} count={owned.get(c.id)?.count ?? 0} found={owned.get(c.id)?.total_found ?? 0} sellable={sellable(c)} selling={selling === c.id} onSell={() => void sell([{ card_id: c.id, qty: 1 }], c.id)} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-          </>
+            </div>
+          </div>
         )}
       </div>
 
@@ -842,45 +702,6 @@ export const CollectionsGame: React.FC = () => {
       </AnimatePresence>
 
       {oddsOpen && set && catalog && <OddsModal set={set} catalog={catalog} onClose={() => setOddsOpen(false)} />}
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Carte de l'album
-// ---------------------------------------------------------------------------
-
-const AlbumCard: React.FC<{
-  card: BrandCard;
-  width: number;
-  setName: string;
-  setSize?: number;
-  count: number;
-  found: number;
-  sellable: number;
-  selling: boolean;
-  onSell: () => void;
-}> = ({ card, width, setName, setSize, count, found, sellable, selling, onSell }) => {
-  // Carte revendue jusqu'au dernier exemplaire (secrète) : reste « découverte » dans l'album
-  if (found === 0) return <BrandCardSlot card={card} width={width} setSize={setSize} />;
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative">
-        <BrandCardFace card={card} width={width} lite setName={setName} setSize={setSize} className={count === 0 ? 'opacity-40 grayscale' : undefined} />
-        {count > 1 && <span className="absolute -top-2 -right-2 z-10 rounded-full bg-white text-black text-[11px] font-extrabold px-2 py-0.5 shadow-lg">×{count}</span>}
-      </div>
-      {sellable > 0 && card.rarity.sell_value > 0 ? (
-        <button
-          type="button"
-          onClick={onSell}
-          disabled={selling}
-          className="flex items-center gap-1.5 rounded-full border border-amber-300/35 bg-amber-300/10 hover:bg-amber-300/20 text-amber-100 text-[11px] font-semibold px-3 py-1.5 disabled:opacity-50"
-        >
-          <Coins size={12} /> {selling ? 'Revente…' : `Vendre 1 · +${fmtChips(card.rarity.sell_value)}`}
-        </button>
-      ) : (
-        <span className="h-[30px]" />
-      )}
     </div>
   );
 };

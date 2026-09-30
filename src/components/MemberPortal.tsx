@@ -23,13 +23,15 @@ import { useCasinoUser, type CasinoTransaction } from '../context/CasinoUserCont
 import { sanitizeText, isValidCitizenId, isValidRPName, isValidPhoneNumber } from '../lib/security';
 import { hasAdminPermissions } from '../lib/discord';
 import { MemberInventory } from './member/MemberInventory';
+import { MemberCollection } from './member/MemberCollection';
+import { MemberBackdrop } from './member/MemberBackdrop';
 
 interface MemberPortalProps {
   onBackToHome?: () => void;
   onNavigateToWheel?: () => void;
 }
 
-type ConsoleTab = 'overview' | 'inventory' | 'vault' | 'profile' | 'vip';
+type ConsoleTab = 'overview' | 'inventory' | 'collections' | 'vault' | 'profile' | 'vip';
 
 
 const CARD_THEMES = {
@@ -83,9 +85,11 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   useEffect(() => watchHistory(), [watchHistory]);
 
   // #inventaire dans l'adresse ouvre directement l'inventaire (lien depuis les jeux)
-  const [activeTab, setActiveTab] = useState<ConsoleTab>(() =>
-    typeof window !== 'undefined' && window.location.hash === '#inventaire' ? 'inventory' : 'overview',
-  );
+  // #collections ouvre l'album des collections (lien depuis la page Collections)
+  const [activeTab, setActiveTab] = useState<ConsoleTab>(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    return hash === '#inventaire' ? 'inventory' : hash === '#collections' ? 'collections' : 'overview';
+  });
   const [txFilter, setTxFilter] = useState<'ALL' | 'WHEEL' | 'VIP' | 'GAMES'>('ALL');
   const [txSearchQuery, setTxSearchQuery] = useState<string>('');
   const [isEditingModalOpen, setIsEditingModalOpen] = useState<boolean>(false);
@@ -257,7 +261,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // =========================================================================
   if (!isAuthenticated || !user) {
     return (
-      <div className="member-ambient w-full min-h-screen text-white flex flex-col justify-between selection:bg-white/30 selection:text-white">
+      <div className="member-ambient relative isolate w-full min-h-screen text-white flex flex-col justify-between selection:bg-white/30 selection:text-white">
+        <MemberBackdrop />
         {/* Toast */}
         <AnimatePresence>
           {toastMessage && (
@@ -448,7 +453,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
   // VIEW C : ESPACE MEMBRE AUTHENTIFIÉ (DESIGN VERCEL PUR ET CLAIR)
   // =========================================================================
   return (
-    <div className="member-ambient w-full min-h-screen text-white flex flex-col font-sans selection:bg-white/30 selection:text-white pt-[80px] sm:pt-[90px]">
+    <div className="member-ambient relative isolate w-full min-h-screen text-white flex flex-col font-sans selection:bg-white/30 selection:text-white pt-[80px] sm:pt-[90px]">
+      <MemberBackdrop />
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
@@ -475,6 +481,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
                 label: 'Inventaire',
                 count: user.rewards.filter((r) => r.status === 'IN_INVENTORY').length,
               },
+              { id: 'collections', label: 'Collections' },
               { id: 'vault', label: 'Historique des jetons' },
               { id: 'profile', label: 'Mon profil' },
               { id: 'vip', label: 'Avantages VIP' },
@@ -819,12 +826,33 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
             <div className="pb-4 border-b border-white/10">
               <h1 className="text-lg font-semibold text-white tracking-tight">Inventaire</h1>
               <p className="text-[13px] text-neutral-400 mt-0.5">
-                Tout ce que vous avez gagné (roue, boosters, cadeaux) au même endroit : revendez un objet contre des jetons ou réclamez-le pour le recevoir
+                Tout ce que vous avez gagné (roue, boosters offerts, cadeaux) au même endroit : revendez un objet contre des jetons ou réclamez-le pour le recevoir
                 en ville.
               </p>
             </div>
 
             <MemberInventory showToast={showToast} />
+          </div>
+        )}
+
+        {/* =================================================================== */}
+        {/* TAB : COLLECTIONS (ALBUMS DE CARTES MARQUES)                        */}
+        {/* =================================================================== */}
+        {activeTab === 'collections' && (
+          <div className="space-y-4">
+            <div className="pb-4 border-b border-white/10 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h1 className="text-lg font-semibold text-white tracking-tight">Collections</h1>
+                <p className="text-[13px] text-neutral-400 mt-0.5">
+                  Vos albums de cartes marques (autos &amp; mode) : complétez-les pour gagner la récompense et revendez vos doublons.
+                </p>
+              </div>
+              <Link to="/collections" className="h-9 px-4 rounded-full bg-white text-black text-xs font-bold hover:bg-neutral-200 flex items-center">
+                Ouvrir des boosters
+              </Link>
+            </div>
+
+            <MemberCollection />
           </div>
         )}
 

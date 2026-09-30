@@ -95,15 +95,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               Jeux
             </Link>
 
-            {/* Clean Roue de la Fortune Nav Link */}
+            {/* Espace Client (la roue reste accessible depuis Jeux) */}
             <Link
-              to="/roue-de-la-fortune"
-              onClick={() => setCurrentView?.('lucky-wheel')}
+              to="/espace-membre"
+              onClick={() => setCurrentView?.('member-portal')}
               className={`font-medium transition-colors cursor-pointer ${
-                isWheel ? 'text-white font-semibold' : 'text-white/70 hover:text-white'
+                isMember ? 'text-white font-semibold' : 'text-white/70 hover:text-white'
               }`}
             >
-              Roue de la Fortune
+              Espace Client
             </Link>
 
             {/* Clean Abonnements VIP Nav Link */}
@@ -205,7 +205,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             {[
               { to: '/', label: 'Accueil', active: isHome && !isWheel && !isVip && !isMember && !isGames, view: 'landing' as AppView },
               { to: '/jeux', label: 'Jeux', active: isGames },
-              { to: '/roue-de-la-fortune', label: 'Roue de la Fortune', active: isWheel, view: 'lucky-wheel' as AppView },
               { to: '/abonnements', label: 'Abonnements VIP', active: isVip },
             ].map((item) => (
               <Link

@@ -79,7 +79,7 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
     minBet: 10,
     maxBet: 100000,
     buyEnabled: true,
-    buyPrices: { gtr: 80, duel: 200, dmh: 400 },
+    buyPrices: { gtr: 80, duel: 204, dmh: 406 },
     maxPayout: 10000000,
   },
   wheel: { enabled: true, spinPrice: 25000, maxRtp: 95 },

@@ -12,7 +12,7 @@
  *     un DEAD parmi les 3    → Dead Man's Hand (collecte de wilds et multiplicateurs,
  *                              puis 3 tours « Showdown » : les wilds collectés sont
  *                              replacés au hasard à chaque tour, gains x multiplicateur)
- * - Achat de bonus : 80x / 200x / 400x. Gain max : 12 500x la mise.
+ * - Achat de bonus : 80x / 204x / 406x. Gain max : 12 500x la mise.
  */
 
 export type WantedSymbolId =
@@ -39,8 +39,8 @@ export const MAX_WIN_X = 12500;
 
 export const BONUS_INFO: Record<WantedBonus, { name: string; price: number; spins: number; tagline: string }> = {
   gtr: { name: 'The Great Train Robbery', price: 80, spins: 10, tagline: 'Wilds collants pendant 10 tours' },
-  duel: { name: 'Duel at Dawn', price: 200, spins: 10, tagline: 'VS fréquents, rouleaux VS collants' },
-  dmh: { name: "Dead Man's Hand", price: 400, spins: 3, tagline: 'Collecte puis 3 tours Showdown' },
+  duel: { name: 'Duel at Dawn', price: 204, spins: 10, tagline: 'VS fréquents, rouleaux VS collants' },
+  dmh: { name: "Dead Man's Hand", price: 406, spins: 3, tagline: 'Collecte puis 3 tours Showdown' },
 };
 
 /** Paiements en multiples de la MISE TOTALE pour 3, 4, 5 symboles */

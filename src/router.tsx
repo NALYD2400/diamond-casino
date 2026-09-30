@@ -10,19 +10,21 @@ import { motion } from 'framer-motion';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Footer } from './components/Footer';
-import { MemberPortal } from './components/MemberPortal';
-import { WheelOfFortune } from './components/WheelOfFortune';
-import { MinesGame } from './components/MinesGame';
-import { DogHouseGame } from './components/doghouse/DogHouseGame';
-import { WantedGame } from './components/wanted/WantedGame';
-import { BoostersGame } from './components/boosters/BoostersGame';
-import { CrashGame } from './components/crash/CrashGame';
-import { GamesHub } from './components/GamesHub';
-import { VipSubscriptions } from './components/VipSubscriptions';
-import { AdminConsole } from './components/AdminConsole';
 import { NotFound } from './components/NotFound';
 
 import { useCasinoUser } from './context/CasinoUserContext';
+
+// Pages de jeux, espace membre et console admin chargées à la demande
+const MemberPortal = React.lazy(() => import('./components/MemberPortal').then((m) => ({ default: m.MemberPortal })));
+const WheelOfFortune = React.lazy(() => import('./components/WheelOfFortune').then((m) => ({ default: m.WheelOfFortune })));
+const MinesGame = React.lazy(() => import('./components/MinesGame').then((m) => ({ default: m.MinesGame })));
+const DogHouseGame = React.lazy(() => import('./components/doghouse/DogHouseGame').then((m) => ({ default: m.DogHouseGame })));
+const WantedGame = React.lazy(() => import('./components/wanted/WantedGame').then((m) => ({ default: m.WantedGame })));
+const BoostersGame = React.lazy(() => import('./components/boosters/BoostersGame').then((m) => ({ default: m.BoostersGame })));
+const GamesHub = React.lazy(() => import('./components/GamesHub').then((m) => ({ default: m.GamesHub })));
+const VipSubscriptions = React.lazy(() => import('./components/VipSubscriptions').then((m) => ({ default: m.VipSubscriptions })));
+const CrashGame = React.lazy(() => import('./components/crash/CrashGame').then((m) => ({ default: m.CrashGame })));
+const AdminConsole = React.lazy(() => import('./components/AdminConsole').then((m) => ({ default: m.AdminConsole })));
 
 /**
  * Root Layout Component
@@ -42,7 +44,9 @@ function RootComponent() {
   return (
     <div className="relative min-h-screen bg-black text-white selection:bg-white/30 selection:text-white font-sans">
       {!hideNavbar && <Navbar />}
-      <Outlet />
+      <React.Suspense fallback={<div className="min-h-screen bg-black" />}>
+        <Outlet />
+      </React.Suspense>
     </div>
   );
 }

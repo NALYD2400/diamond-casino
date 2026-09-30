@@ -22,9 +22,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
-  Spade,
   Star,
-  TrendingUp,
   Trophy,
   User,
 } from 'lucide-react';
@@ -37,6 +35,7 @@ import { Wheel } from './wheel/Wheel';
 import { BombArt, GemArt } from './mines/MinesArt';
 import { DogHouseCover, WantedCover } from './slots/GameCovers';
 import { DogSymbol } from './doghouse/DogSymbols';
+import { CrashCover } from './originals/OriginalsCovers';
 
 type Category = 'all' | 'slots' | 'originals' | 'rewards';
 
@@ -252,15 +251,6 @@ const WheelCover: React.FC = () => {
   );
 };
 
-const SoonCover: React.FC<{ icon: React.ReactNode; from: string; to: string; title: string }> = ({ icon, from, to, title }) => (
-  <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${from}, ${to})` }}>
-    <div className="absolute inset-0 flex items-center justify-center text-white/25 [&>svg]:w-1/2 [&>svg]:h-1/2">{icon}</div>
-    <div className="absolute inset-x-0 bottom-[7%] text-center font-black tracking-tight text-white/80 text-[clamp(18px,2.2vw,26px)]">
-      {title}
-    </div>
-  </div>
-);
-
 const GAMES: GameTile[] = [
   {
     id: 'doghouse',
@@ -310,25 +300,13 @@ const GAMES: GameTile[] = [
     cover: <BoostersCover />,
   },
   {
-    id: 'blackjack',
-    title: 'Blackjack',
-    provider: 'Diamond Originals',
-    category: 'originals',
-    cover: <SoonCover icon={<Spade />} from="#1f5a3a" to="#0b2a1a" title="BLACKJACK" />,
-  },
-  {
-    id: 'dice',
-    title: 'Dice',
-    provider: 'Diamond Originals',
-    category: 'originals',
-    cover: <SoonCover icon={<Dices />} from="#4a2a8a" to="#1a0f3a" title="DICE" />,
-  },
-  {
     id: 'crash',
     title: 'Crash',
     provider: 'Diamond Originals',
     category: 'originals',
-    cover: <SoonCover icon={<TrendingUp />} from="#8a2a2a" to="#2a0b0b" title="CRASH" />,
+    link: '/crash',
+    tag: 'NOUVEAU',
+    cover: <CrashCover />,
   },
 ];
 
@@ -339,15 +317,16 @@ const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'rewards', label: 'Récompenses', icon: <Disc size={15} /> },
 ];
 
-const MACHINE_IDS = ['doghouse', 'wanted', 'mines', 'wheel', 'boosters'] as const;
+const MACHINE_IDS = ['doghouse', 'wanted', 'mines', 'crash', 'wheel', 'boosters'] as const;
 const isMachine = (id: string): id is keyof GamesConfig => (MACHINE_IDS as readonly string[]).includes(id);
 
 /** Carte d'une machine : suit en temps réel son ouverture / fermeture par la direction */
 const MachineTile: React.FC<{ game: GameTile & { id: keyof GamesConfig }; index: number }> = ({ game, index }) => {
   const closed = useMachineClosed(game.id);
   const { gamesConfig } = useCasinoAdmin();
-  // Le RTP de Mines se règle dans la console : on affiche la valeur en vigueur
-  const shown = game.id === 'mines' ? { ...game, rtp: formatRtp(gamesConfig.mines.rtp) } : game;
+  // Le RTP des Originals se règle dans la console : on affiche la valeur en vigueur
+  const rtp = game.id === 'mines' || game.id === 'crash' ? formatRtp(gamesConfig[game.id].rtp) : game.rtp;
+  const shown = { ...game, rtp };
   return <Tile game={shown} index={index} closed={closed} />;
 };
 

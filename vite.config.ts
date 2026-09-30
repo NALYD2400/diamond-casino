@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+// Port 5179 par défaut ; la variable PORT permet d'en choisir un autre (plusieurs serveurs en parallèle)
+const envPort = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PORT)
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -9,7 +12,7 @@ export default defineConfig({
     tailwindcss()
   ],
   server: {
-    port: 5179
+    port: envPort || 5179
   },
   build: {
     chunkSizeWarningLimit: 1500,

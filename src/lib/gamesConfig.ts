@@ -39,8 +39,20 @@ export interface WantedConfig {
   maxPayout: number;
 }
 
+export interface CrashConfig {
+  enabled: boolean;
+  minBet: number;
+  maxBet: number;
+  /** Taux de retour joueur en % : P(crash ≥ x) = RTP / x */
+  rtp: number;
+  /** Multiplicateur maximum d'une manche (au-delà, encaissement automatique) */
+  maxMultiplier: number;
+  maxPayout: number;
+}
+
 export interface GamesConfig {
   mines: MinesConfig;
+  crash: CrashConfig;
   doghouse: DogHouseConfig;
   wanted: WantedConfig;
   /**
@@ -60,6 +72,7 @@ export interface GamesConfig {
 
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
   mines: { enabled: true, minBet: 10, maxBet: 100000, rtp: 97, maxPayout: 5000000 },
+  crash: { enabled: true, minBet: 10, maxBet: 100000, rtp: 97, maxMultiplier: 1000, maxPayout: 5000000 },
   doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 115, boostEnabled: true, maxPayout: 10000000 },
   wanted: {
     enabled: true,
@@ -95,6 +108,7 @@ export function mergeGamesConfig(raw: unknown): GamesConfig {
   wanted.buyPrices = { ...DEFAULT_GAMES_CONFIG.wanted.buyPrices, ...((r.wanted as WantedConfig | undefined)?.buyPrices || {}) };
   return {
     mines: { ...DEFAULT_GAMES_CONFIG.mines, ...(r.mines || {}) },
+    crash: { ...DEFAULT_GAMES_CONFIG.crash, ...(r.crash || {}) },
     doghouse: { ...DEFAULT_GAMES_CONFIG.doghouse, ...(r.doghouse || {}) },
     wanted,
     wheel: { ...DEFAULT_GAMES_CONFIG.wheel, ...(r.wheel || {}) },
@@ -115,6 +129,7 @@ export function mergeVipConfig(raw: unknown): VipConfig {
 /** Libellés des identifiants de jeu utilisés dans l'historique (bets_history.game_id) */
 export const GAME_LABELS: Record<string, string> = {
   mines: 'Mines',
+  crash: 'Crash',
   doghouse: 'The Dog House',
   wanted: 'Wanted Dead or a Wild',
   lucky_wheel: 'Roue de la Fortune',

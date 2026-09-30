@@ -16,6 +16,7 @@ import { MinesGame } from './components/MinesGame';
 import { DogHouseGame } from './components/doghouse/DogHouseGame';
 import { WantedGame } from './components/wanted/WantedGame';
 import { BoostersGame } from './components/boosters/BoostersGame';
+import { CrashGame } from './components/crash/CrashGame';
 import { GamesHub } from './components/GamesHub';
 import { VipSubscriptions } from './components/VipSubscriptions';
 import { AdminConsole } from './components/AdminConsole';
@@ -166,6 +167,18 @@ function BoostersPage() {
   );
 }
 
+/** Diamond Originals : Crash */
+const OriginalPage: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => (
+  <motion.div key={`${id}-page`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+    {children}
+  </motion.div>
+);
+const CrashPage = () => (
+  <OriginalPage id="crash">
+    <CrashGame />
+  </OriginalPage>
+);
+
 /**
  * Games Catalog / Hub Route Component (/jeux)
  */
@@ -298,6 +311,12 @@ const boostersRoute = createRoute({
   component: BoostersPage,
 });
 
+const crashRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/crash',
+  component: CrashPage,
+});
+
 const gamesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/jeux',
@@ -338,6 +357,7 @@ const routeTree = rootRoute.addChildren([
   slotsRoute,
   wantedRoute,
   boostersRoute,
+  crashRoute,
   gamesRoute,
   subscriptionsRoute,
   adminRoute,

@@ -19,7 +19,7 @@ export const SUPABASE_ANON_KEY: string =
 const BREAKER_WINDOW_MS = 60_000;
 const BREAKER_DEFAULT_MAX = 40;
 const BREAKER_GAME_MAX = 240;
-const GAME_ENDPOINTS = /\/(functions\/v1\/slot-round|rest\/v1\/rpc\/(mines_reveal|mines_start|mines_cashout|spin_wheel|open_booster))$/;
+const GAME_ENDPOINTS = /\/(functions\/v1\/slot-round|rest\/v1\/rpc\/(mines_reveal|mines_start|mines_cashout|spin_wheel|open_booster|crash_start|crash_status|crash_cashout))$/;
 const breakerHits = new Map<string, number[]>();
 const breakerWarned = new Set<string>();
 
@@ -219,6 +219,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_BET: 'Mise invalide (hors des limites autorisées).',
   INVALID_MINES: 'Nombre de mines invalide.',
   INVALID_CELL: 'Case invalide.',
+  INVALID_TARGET: 'Objectif invalide.',
   ROUND_IN_PROGRESS: 'Une manche est déjà en cours.',
   ROUND_NOT_FOUND: 'Cette manche est terminée.',
   NOTHING_TO_CASHOUT: 'Révélez au moins une case avant d’encaisser.',
@@ -350,6 +351,47 @@ export const apiMinesReveal = (roundId: string, cell: number) =>
   rpc<MinesRoundState>('mines_reveal', { p_round_id: roundId, p_cell: cell });
 export const apiMinesCashout = (roundId: string) => rpc<MinesRoundState>('mines_cashout', { p_round_id: roundId });
 export const apiMinesCurrent = () => rpc<MinesRoundState | null>('mines_current');
+
+// -------------------------------------------------------------
+// Crash — le point de crash est secret, le temps écoulé est celui du serveur
+// -------------------------------------------------------------
+
+export interface CrashRoundState {
+  round_id: string;
+  status: 'ACTIVE' | 'LOST' | 'CASHED';
+  bet: number;
+  auto_cashout: number | null;
+  /** Encaissement automatique effectif (objectif, plafond de gain ou multiplicateur max) */
+  target: number;
+  rtp: number;
+  max_payout: number;
+  /** Temps écoulé côté serveur depuis le départ */
+  elapsed_ms: number;
+  multiplier: number;
+  cashout_at: number | null;
+  win: number;
+  hash: string;
+  /** Uniquement en fin de manche */
+  crash_point: number | null;
+  server_seed: string | null;
+  started_at: string;
+  profile?: ProfilePayload;
+}
+
+export interface CrashHistoryEntry {
+  crash_point: number;
+  cashout_at: number | null;
+  win: number;
+  bet: number;
+  at: string;
+}
+
+export const apiCrashStart = (bet: number, auto: number | null) =>
+  rpc<CrashRoundState>('crash_start', { p_bet: Math.trunc(bet), p_auto: auto });
+export const apiCrashStatus = (roundId: string) => rpc<CrashRoundState>('crash_status', { p_round_id: roundId });
+export const apiCrashCashout = (roundId: string) => rpc<CrashRoundState>('crash_cashout', { p_round_id: roundId });
+export const apiCrashCurrent = () => rpc<CrashRoundState | null>('crash_current');
+export const apiCrashHistory = (limit = 20) => rpc<CrashHistoryEntry[]>('crash_history', { p_limit: limit });
 
 // -------------------------------------------------------------
 // Machines à sous — tirage fait par la fonction Edge « slot-round »
@@ -893,6 +935,8 @@ export interface AdminDashboard {
     pending_rewards: number;
     mines_open_rounds: number;
     mines_open_stake: number;
+    crash_open_rounds?: number;
+    crash_open_stake?: number;
   };
   top_players: { id: string; name: string; citizen_id: string; role: ProfileRole; wagered: number; paid: number; net: number; rounds: number }[];
   daily: { day: string; wagered: number; paid: number; rounds: number }[];
@@ -900,7 +944,7 @@ export interface AdminDashboard {
 
 export const apiAdminDashboard = (days: number) => rpc<AdminDashboard>('admin_dashboard', { p_days: days });
 
-export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel' | 'boosters';
+export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel' | 'boosters' | 'crash';
 
 interface GameStatsPlayer {
   id: string;

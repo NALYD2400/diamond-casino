@@ -11,6 +11,7 @@ import {
   Layers,
   Power,
   RefreshCw,
+  Rocket,
   Settings2,
   Skull,
   Target,
@@ -51,6 +52,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
   { id: 'doghouse', statsId: 'doghouse', name: 'The Dog House', short: 'Dog House', icon: Dog, route: '/slots' },
   { id: 'wanted', statsId: 'wanted', name: 'Wanted Dead or a Wild', short: 'Wanted', icon: Skull, route: '/wanted' },
   { id: 'mines', statsId: 'mines', name: 'Mines', short: 'Mines', icon: Bomb, route: '/mines' },
+  { id: 'crash', statsId: 'crash', name: 'Crash', short: 'Crash', icon: Rocket, route: '/crash' },
   { id: 'wheel', statsId: 'lucky_wheel', name: 'Roue de la Fortune', short: 'Roue', icon: Disc, route: '/roue-de-la-fortune' },
   { id: 'boosters', statsId: 'boosters', name: 'Boosters de cartes', short: 'Boosters', icon: Layers, route: '/boosters' },
 ];
@@ -63,7 +65,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 const DOG_BONUS_VALUE = 110;
 const WANTED_BONUS_VALUE = { gtr: 78, duel: 200, dmh: 395 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
-const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, wheel: 1.5, boosters: 1 };
+const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1 };
 const MIN_ROUNDS = 200;
 
 /** Valeur moyenne d'un tour de roue : jetons + véhicules à leur valeur catalogue (comme wheel_ev() côté serveur) */
@@ -94,6 +96,8 @@ function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: 
     }
     case 'mines':
       return cfg.mines.rtp;
+    case 'crash':
+      return cfg.crash.rtp;
     case 'wheel':
       return key === '__all' && cfg.wheel.spinPrice > 0 ? (wheelExpected(segments) / cfg.wheel.spinPrice) * 100 : null;
     case 'boosters':
@@ -105,7 +109,7 @@ function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: 
 /** RTP visé global, pondéré par ce qui a été misé dans chaque mode */
 function overallTarget(machine: MachineId, stats: AdminGameStats | undefined, cfg: GamesConfig, segments: WheelSegmentConfig[]): number | null {
   if (machine === 'boosters') return null;
-  if (machine === 'wheel' || machine === 'mines') return targetFor(machine, '__all', cfg, segments);
+  if (machine === 'wheel' || machine === 'mines' || machine === 'crash') return targetFor(machine, '__all', cfg, segments);
   const rows = (stats?.breakdown ?? []).filter((r) => Number(r.wagered) > 0);
   const total = rows.reduce((a, r) => a + Number(r.wagered), 0);
   if (!total) return targetFor(machine, 'spin', cfg, segments);
@@ -143,6 +147,9 @@ function verdict(machine: MachineId, rounds: number, rtp: number | null, target:
 function breakdownLabel(machine: MachineId, key: string) {
   if (machine === 'mines') return key === '?' || key === '0' ? 'Ancien format' : `${key} mine${key === '1' ? '' : 's'}`;
   if (machine === 'wheel' || machine === 'boosters') return key;
+  if (machine === 'crash') {
+    return { manual: 'Encaissement manuel', auto_lt2: 'Objectif < ×2', auto_2_10: 'Objectif ×2 – ×10', auto_gt10: 'Objectif > ×10' }[key] ?? key;
+  }
   return (
     {
       spin: 'Tour normal',
@@ -543,7 +550,21 @@ const MachineDetail: React.FC<{
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card title={m.id === 'mines' ? 'Par nombre de mines' : m.id === 'wheel' ? 'Par lot tiré' : m.id === 'boosters' ? 'Par booster' : 'Par mode de jeu'} icon={<Settings2 size={15} />} padded={false}>
+            <Card
+              title={
+                m.id === 'mines'
+                  ? 'Par nombre de mines'
+                  : m.id === 'wheel'
+                    ? 'Par lot tiré'
+                    : m.id === 'boosters'
+                      ? 'Par booster'
+                      : m.id === 'crash'
+                        ? 'Par objectif'
+                        : 'Par mode de jeu'
+              }
+              icon={<Settings2 size={15} />}
+              padded={false}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[460px]">
                   <thead>
@@ -740,7 +761,7 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
     [draft.mines.rtp],
   );
 
-  const betFields = (g: 'mines' | 'doghouse' | 'wanted') => (
+  const betFields = (g: 'mines' | 'doghouse' | 'wanted' | 'crash') => (
     <>
     <Card title="Mises et plafond">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -791,6 +812,38 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {id === 'crash' && (
+        <>
+          {betFields('crash')}
+          <Card title="Taux de retour et plafond">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="flex flex-col gap-4">
+                <Field label="RTP (taux de retour joueur)" hint={`Le casino garde en moyenne ${fmt(100 - draft.crash.rtp, 1)} % des mises, quel que soit l'objectif du joueur. Entre 80 et 99 %.`}>
+                  <NumberInput value={draft.crash.rtp} min={80} max={99} step={0.5} onChange={(v) => set('crash', { rtp: v })} suffix="%" />
+                </Field>
+                <Field label="Multiplicateur maximum" hint="Une manche ne peut pas dépasser ce multiplicateur : arrivé là, le joueur encaisse automatiquement.">
+                  <NumberInput value={draft.crash.maxMultiplier} min={2} max={100000} onChange={(v) => set('crash', { maxMultiplier: v })} suffix="×" />
+                </Field>
+              </div>
+              <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3">
+                <div className="text-[11px] text-neutral-400 mb-2">Chance d'atteindre chaque multiplicateur avec ce RTP</div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+                  {[1.5, 2, 3, 10, 100, 1000].map((x) => (
+                    <div key={x}>
+                      <div className="font-mono text-sm font-bold text-white">×{fmt(x, 1)}</div>
+                      <div className="text-[10px] text-neutral-500">{fmt(Math.min(100, draft.crash.rtp / x), 2)} %</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px] text-neutral-500 mt-3">
+                  {fmt(100 - draft.crash.rtp / 1.01, 1)} % des manches s'arrêtent sous ×1,01 (perdues quel que soit l'objectif).
                 </div>
               </div>
             </div>
@@ -950,9 +1003,16 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
 // ---------------------------------------------------------------------------
 
 /** Ce que donnent réellement les mises et le plafond de gain réglés, avec les incohérences signalées */
-const CapCheck: React.FC<{ game: 'mines' | 'doghouse' | 'wanted'; cfg: GamesConfig }> = ({ game, cfg }) => {
+const CapCheck: React.FC<{ game: 'mines' | 'doghouse' | 'wanted' | 'crash'; cfg: GamesConfig }> = ({ game, cfg }) => {
   const c = cfg[game];
-  const theoretical = game === 'doghouse' ? MAX_WIN_X_BET : game === 'wanted' ? MAX_WIN_X : null;
+  const theoretical =
+    game === 'doghouse'
+      ? MAX_WIN_X_BET
+      : game === 'wanted'
+        ? MAX_WIN_X
+        : game === 'crash'
+          ? cfg.crash.maxMultiplier
+          : null;
   const capX = Math.floor(c.maxPayout / Math.max(1, c.maxBet));
   const effective = theoretical === null ? capX : Math.min(theoretical, capX);
   const cut = theoretical !== null && capX < theoretical;

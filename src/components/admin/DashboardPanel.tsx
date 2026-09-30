@@ -8,6 +8,7 @@ import { Badge, Button, Card, EmptyState, HelpBox, PageHeader, RoleBadge, Segmen
 /** RTP visé par jeu (pour comparer au RTP réellement observé) */
 const TARGET_RTP: Record<string, string> = {
   mines: 'réglable',
+  crash: 'réglable',
   doghouse: '≈ 95 %',
   wanted: '≈ 96 %',
 };
@@ -40,7 +41,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   if (economy.maintenanceMode) alerts.push({ tone: 'bad', text: 'Le casino est en MAINTENANCE : aucun joueur ne peut jouer.', action: { label: 'Système', tab: 'system' } });
   if (t && t.pending_vip > 0) alerts.push({ tone: 'warn', text: `${t.pending_vip} demande(s) VIP à valider (paiement en € à vérifier).`, action: { label: 'Voir', tab: 'vip' } });
   if (t && t.pending_rewards > 0) alerts.push({ tone: 'warn', text: `${t.pending_rewards} lot(s) réclamé(s) à livrer au joueur.`, action: { label: 'Voir', tab: 'rewards' } });
-  const closed = (['mines', 'doghouse', 'wanted', 'wheel', 'boosters'] as const).filter((g) => !gamesConfig[g].enabled);
+  const closed = (['mines', 'crash', 'doghouse', 'wanted', 'wheel', 'boosters'] as const).filter((g) => !gamesConfig[g].enabled);
   if (closed.length) alerts.push({ tone: 'info', text: `Jeu(x) fermé(s) : ${closed.map((g) => (g === 'wheel' ? 'Roue' : GAME_LABELS[g])).join(', ')}.`, action: { label: 'Jeux', tab: 'games' } });
   paidGames.forEach(([id, g]) => {
     if (g.rtp !== null && Number(g.wagered) > 200000 && Number(g.rtp) > 120) {
@@ -233,10 +234,12 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
           <Stat label="Lots à livrer" value={fmt(t?.pending_rewards)} icon={<Car size={16} />} hint="Réclamés par les joueurs, à livrer en ville" tone={t && t.pending_rewards > 0 ? 'gold' : 'default'} />
         </button>
         <Stat
-          label="Mines : manches en cours"
-          value={fmt(t?.mines_open_rounds)}
+          label="Manches en cours"
+          value={fmt(Number(t?.mines_open_rounds ?? 0) + Number(t?.crash_open_rounds ?? 0))}
           icon={<Wrench size={16} />}
-          hint={`${fmt(t?.mines_open_stake)} jetons misés, pas encore terminés`}
+          hint={`Mines ${fmt(t?.mines_open_rounds)} · Crash ${fmt(t?.crash_open_rounds ?? 0)} — ${fmt(
+            Number(t?.mines_open_stake ?? 0) + Number(t?.crash_open_stake ?? 0),
+          )} jetons misés`}
         />
       </div>
 

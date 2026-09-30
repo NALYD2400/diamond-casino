@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isHome = currentPath === '/' || propCurrentView === 'landing';
   const isWheel = currentPath === '/roue-de-la-fortune' || propCurrentView === 'lucky-wheel';
   const isVip = currentPath === '/abonnements';
-  const isGames = currentPath === '/jeux' || currentPath === '/mines' || currentPath === '/slots' || currentPath === '/wanted' || currentPath === '/boosters';
+  const isGames = currentPath === '/jeux' || currentPath === '/mines' || currentPath === '/slots' || currentPath === '/wanted' || currentPath === '/boosters' || currentPath === '/crash';
   const isMember = currentPath === '/espace-membre' || propCurrentView === 'member-portal';
 
   const handleSectionScroll = (sectionId: string) => {

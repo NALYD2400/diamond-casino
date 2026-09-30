@@ -171,6 +171,7 @@ function purgeLegacyStorage() {
       'diamond_slots_machines_cache',
       'diamond_slots_demo_chips',
       'diamond_mines_demo_chips',
+      'diamond_crash_demo_chips',
     ]);
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);

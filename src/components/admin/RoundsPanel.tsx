@@ -11,6 +11,7 @@ const GAMES: { id: string; label: string }[] = [
   { id: 'doghouse', label: 'Dog House' },
   { id: 'wanted', label: 'Wanted' },
   { id: 'mines', label: 'Mines' },
+  { id: 'crash', label: 'Crash' },
   { id: 'boosters', label: 'Boosters' },
 ];
 const GAME_LABEL = Object.fromEntries(GAMES.map((g) => [g.id, g.label])) as Record<string, string>;

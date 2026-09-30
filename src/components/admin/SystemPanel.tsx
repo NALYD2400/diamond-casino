@@ -6,12 +6,13 @@ import { apiAdminDbUsage, apiAdminExportHistory, dbCheckHealth, type DbUsage, ty
 import { Badge, Button, Card, Field, HelpBox, NumberInput, PageHeader, Toggle, fmt, inputClass } from './ui';
 
 const SECURITY_POINTS = [
-  ['Tirages des jeux', 'Mines, Dog House, Wanted et la roue sont tirés par le serveur avec un aléa cryptographique. Le navigateur ne fait qu’afficher.'],
+  ['Tirages des jeux', 'Mines, Crash, Dog House, Wanted et la roue sont tirés par le serveur avec un aléa cryptographique. Le navigateur ne fait qu’afficher.'],
   ['Soldes', 'Aucune écriture directe possible : chaque mouvement de jetons passe par une fonction serveur qui vérifie le solde et l’enregistre dans l’historique.'],
   ['Réglages', 'Validés et bornés par le serveur (mises, RTP, prix, chances…). Une valeur absurde est corrigée ou refusée.'],
   ['Droits', 'Le rôle est vérifié côté serveur à chaque action. Un directeur ne peut pas modifier un fondateur ou un développeur.'],
   ['Journal', 'Écrit uniquement par le serveur, avec le nom réel de l’auteur. Personne ne peut le modifier ni le vider depuis le site.'],
   ['Mines', 'La grille reste secrète en base jusqu’à la fin de la manche. Fermer l’onglet ne rembourse plus la mise.'],
+  ['Crash', 'Le point de crash est tiré et gardé secret par le serveur ; l’encaissement est jugé avec l’horloge du serveur. L’objectif automatique s’applique même onglet fermé.'],
 ] as const;
 
 const EXPORTS: { kind: HistoryExportKind; label: string; file: string; columns: string[] }[] = [

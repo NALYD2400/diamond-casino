@@ -36,6 +36,8 @@ import { BombArt, GemArt } from './mines/MinesArt';
 import { DogHouseCover, WantedCover } from './slots/GameCovers';
 import { DogSymbol } from './doghouse/DogSymbols';
 import { CrashCover } from './originals/OriginalsCovers';
+import { BrandCardFace } from './collections/BrandCard';
+import type { BrandCard } from './collections/collectionUtils';
 
 type Category = 'all' | 'slots' | 'originals' | 'rewards';
 
@@ -88,131 +90,69 @@ const MinesCover: React.FC = () => (
   </div>
 );
 
-const BoostersCover: React.FC = () => (
-  <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_50%_35%,#2e1f08_0%,#130f06_45%,#050507_100%)] select-none">
-    {/* Rayons dorés subtils en arrière-plan */}
-    <div
-      className="absolute left-1/2 top-[38%] w-[260%] aspect-square -translate-x-1/2 -translate-y-1/2 opacity-70 pointer-events-none transition-transform duration-1000 group-hover:rotate-12"
-      style={{
-        background: 'repeating-conic-gradient(from 0deg at 50% 50%, rgba(245, 158, 11, 0.07) 0deg 8deg, transparent 8deg 24deg)',
-      }}
-    />
+const COVER_RARITY = (key: string, label: string, color: string, effect: 'holo' | 'rays' | 'mythic') => ({ key, label, color, effect, sort: 0, sell_value: 0, in_collection: true });
+const COVER_CARDS: BrandCard[] = [
+  { id: 'c1', setId: 'mode', number: 24, name: 'Didier Sachs', tagline: 'Haute couture', rarity: COVER_RARITY('MYTHIQUE', 'Mythique', '#ef4444', 'mythic'), color: '#111111', color2: '#d4af37', font: 'serif-italic', emblem: 'DS', image: null, hidden: false, secret: false },
+  { id: 'c2', setId: 'autos', number: 47, name: 'Pegassi', tagline: 'Supercars de légende', rarity: COVER_RARITY('MYTHIQUE', 'Mythique', '#ef4444', 'mythic'), color: '#f5b301', color2: '#1a1a1a', font: 'oswald', emblem: 'P', image: null, hidden: false, secret: false },
+  { id: 'c3', setId: 'autos', number: 43, name: 'Grotti', tagline: 'Sportives de légende', rarity: COVER_RARITY('LEGENDAIRE', 'Légendaire', '#f59e0b', 'rays'), color: '#d11a2a', color2: '#f7d046', font: 'serif-italic', emblem: 'G', image: null, hidden: false, secret: false },
+];
 
-    {/* Halo lumineux doré central */}
-    <div className="absolute left-1/2 top-[38%] w-[85%] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/20 blur-2xl pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
-
-    {/* Éventail de 3 cartes 3D */}
-    <div className="absolute left-1/2 top-[12%] w-[44%] aspect-[5/7] -translate-x-1/2">
-      {/* Carte GAUCHE (Rare / Bleue Néon) */}
+const CollectionsCover: React.FC = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const cw = Math.max(40, w * 0.42);
+  return (
+    <div ref={ref} className="absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_50%_35%,#3a2a0c_0%,#140f06_45%,#050507_100%)] select-none">
       <div
-        className="absolute inset-0 rounded-[11px] border border-sky-400/60 transition-all duration-500 origin-bottom-center group-hover:-translate-x-[48%] group-hover:-rotate-[22deg] group-hover:scale-95 -translate-x-[36%] -rotate-[16deg] scale-90"
-        style={{
-          background: 'linear-gradient(145deg, #0b1528 0%, #060b14 100%)',
-          boxShadow: '0 0 20px rgba(56, 189, 248, 0.45), 0 10px 25px rgba(0, 0, 0, 0.8)',
-        }}
-      >
-        <div className="absolute inset-[2px] rounded-[9px] border border-sky-400/20 overflow-hidden p-1.5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[7px] font-mono font-bold tracking-widest text-sky-300">RARE</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
-          </div>
-          <div className="flex flex-col items-center justify-center my-auto opacity-80">
-            <Car size={22} className="text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
-          </div>
-          <div className="text-[6px] font-mono text-neutral-400 truncate">#SUPER-01</div>
-        </div>
-      </div>
-
-      {/* Carte DROITE (Mythique / Violette Néon) */}
-      <div
-        className="absolute inset-0 rounded-[11px] border border-fuchsia-400/60 transition-all duration-500 origin-bottom-center group-hover:translate-x-[48%] group-hover:rotate-[22deg] group-hover:scale-95 translate-x-[36%] rotate-[16deg] scale-90"
-        style={{
-          background: 'linear-gradient(145deg, #240a2c 0%, #100414 100%)',
-          boxShadow: '0 0 20px rgba(217, 70, 239, 0.45), 0 10px 25px rgba(0, 0, 0, 0.8)',
-        }}
-      >
-        <div className="absolute inset-[2px] rounded-[9px] border border-fuchsia-400/20 overflow-hidden p-1.5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[7px] font-mono font-bold tracking-widest text-fuchsia-300">MYTHIC</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 shadow-[0_0_6px_#d946ef]" />
-          </div>
-          <div className="flex flex-col items-center justify-center my-auto opacity-80">
-            <Gem size={20} className="text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.8)]" />
-          </div>
-          <div className="text-[6px] font-mono text-neutral-400 truncate">#DIAMOND-X</div>
-        </div>
-      </div>
-
-      {/* Carte CENTRALE (Légendaire Dorée avec Supercar) */}
-      <div
-        className="absolute inset-0 z-10 rounded-[12px] p-[2px] transition-all duration-500 group-hover:-translate-y-2 group-hover:scale-105"
-        style={{
-          background: 'linear-gradient(135deg, #fef08a 0%, #f59e0b 35%, #78350f 70%, #fde047 100%)',
-          boxShadow: '0 0 25px rgba(245, 158, 11, 0.55), 0 14px 30px rgba(0, 0, 0, 0.9)',
-        }}
-      >
-        <div className="relative w-full h-full rounded-[10px] bg-[#0c0a0e] overflow-hidden flex flex-col justify-between p-1.5">
-          {/* Header carte */}
-          <div className="flex items-center justify-between px-0.5">
-            <span className="text-[8px] font-black tracking-widest text-amber-300 uppercase">PEGASSI</span>
-            <span className="flex items-center gap-0.5 text-[7px] font-bold text-amber-200 bg-amber-500/20 border border-amber-400/30 px-1 py-0.2 rounded-full">
-              <Sparkles size={7} className="text-amber-300" /> OR
-            </span>
-          </div>
-
-          {/* Visuel Supercar */}
-          <div className="relative my-0.5 flex-1 rounded-[6px] overflow-hidden border border-amber-400/30 bg-neutral-950">
-            <img
-              src="/podium_supercar.jpg"
-              alt="Supercar"
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20" />
-            <div className="absolute bottom-0.5 left-1 right-1 flex items-center justify-between text-[6.5px] font-mono font-bold text-white">
-              <span className="truncate">TEZERACT</span>
-              <span className="text-amber-300">$2.8M</span>
+        className="absolute left-1/2 top-[38%] w-[260%] aspect-square -translate-x-1/2 -translate-y-1/2 opacity-70 pointer-events-none transition-transform duration-1000 group-hover:rotate-12"
+        style={{ background: 'repeating-conic-gradient(from 0deg at 50% 50%, rgba(245, 158, 11, 0.07) 0deg 8deg, transparent 8deg 24deg)' }}
+      />
+      {w > 0 &&
+        COVER_CARDS.map((c, i) => {
+          const off = i - 1;
+          return (
+            <div
+              key={c.id}
+              className="absolute left-1/2 top-[9%] transition-transform duration-500"
+              style={{
+                marginLeft: -cw / 2,
+                zIndex: off === 0 ? 3 : 1,
+                transform: `translateX(${off * cw * 0.5}px) translateY(${Math.abs(off) * 8}px) rotate(${off * 13}deg) scale(${off === 0 ? 1 : 0.9})`,
+              }}
+            >
+              <BrandCardFace card={c} width={cw} lite interactive={false} setName={c.setId === 'mode' ? 'Marques de mode' : 'Marques automobiles'} />
             </div>
-          </div>
-
-          {/* Footer carte */}
-          <div className="flex items-center justify-between px-0.5 text-[6.5px] font-mono text-neutral-400">
-            <span className="tracking-wider">THE DIAMOND</span>
-            <span className="text-amber-400/80 font-bold">★★★★★</span>
-          </div>
-
-          {/* Reflet holographique animé au survol */}
-          <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-            style={{
-              background: 'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.4) 45%, rgba(245,158,11,0.3) 55%, transparent 75%)',
-            }}
-          />
+          );
+        })}
+      <div className="absolute inset-x-0 bottom-[6%] flex flex-col items-center text-center px-2">
+        <div className="flex items-center gap-1 text-[9px] font-mono tracking-[0.25em] text-amber-300/90 font-bold uppercase mb-0.5">
+          <Sparkles size={10} className="text-amber-400" />
+          AUTOS & MODE
+        </div>
+        <div
+          className="font-['Oswald'] text-[clamp(22px,2.6vw,32px)] font-bold tracking-[0.06em] leading-none uppercase"
+          style={{
+            background: 'linear-gradient(180deg, #ffffff 0%, #fff1c2 35%, #f5c24a 70%, #b77a10 100%)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            color: 'transparent',
+            WebkitTextStroke: '1px rgba(0,0,0,0.8)',
+            filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 16px rgba(245, 158, 11, 0.4))',
+          }}
+        >
+          COLLECTIONS
         </div>
       </div>
     </div>
-
-    {/* Section Titre & Badge en bas */}
-    <div className="absolute inset-x-0 bottom-[6%] flex flex-col items-center text-center px-2">
-      <div className="flex items-center gap-1 text-[9px] font-mono tracking-[0.25em] text-amber-300/90 font-bold uppercase mb-0.5">
-        <Sparkles size={10} className="text-amber-400" />
-        CARTES VÉHICULES
-      </div>
-      <div
-        className="font-['Oswald'] text-[clamp(24px,2.8vw,34px)] font-bold tracking-[0.06em] leading-none uppercase"
-        style={{
-          background: 'linear-gradient(180deg, #ffffff 0%, #fff1c2 35%, #f5c24a 70%, #b77a10 100%)',
-          WebkitBackgroundClip: 'text',
-          backgroundClip: 'text',
-          color: 'transparent',
-          WebkitTextStroke: '1px rgba(0,0,0,0.8)',
-          filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 16px rgba(245, 158, 11, 0.4))',
-        }}
-      >
-        BOOSTERS
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 const WheelCover: React.FC = () => {
   const { segments } = useCasinoAdmin();
@@ -291,13 +231,13 @@ const GAMES: GameTile[] = [
     cover: <WheelCover />,
   },
   {
-    id: 'boosters',
-    title: 'Boosters Véhicules',
+    id: 'collections',
+    title: 'Collections de marques',
     provider: 'Diamond Originals',
     category: 'rewards',
-    link: '/boosters',
+    link: '/collections',
     tag: 'NOUVEAU',
-    cover: <BoostersCover />,
+    cover: <CollectionsCover />,
   },
   {
     id: 'crash',
@@ -317,7 +257,7 @@ const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'rewards', label: 'Récompenses', icon: <Disc size={15} /> },
 ];
 
-const MACHINE_IDS = ['doghouse', 'wanted', 'mines', 'crash', 'wheel', 'boosters'] as const;
+const MACHINE_IDS = ['doghouse', 'wanted', 'mines', 'crash', 'wheel', 'collections'] as const;
 const isMachine = (id: string): id is keyof GamesConfig => (MACHINE_IDS as readonly string[]).includes(id);
 
 /** Carte d'une machine : suit en temps réel son ouverture / fermeture par la direction */

@@ -1,8 +1,8 @@
 /**
  * Espace Membre → « Inventaire » : un seul endroit pour tout ce que le joueur a
- * gagné (véhicules de la roue, cartes des boosters, lots offerts).
+ * gagné (véhicules de la roue, boosters de collection offerts, lots offerts).
  * Chaque objet peut être revendu contre des jetons ou réclamé en jeu.
- * La vue « Album » montre la progression de la collection de cartes.
+ * La vue « Mes collections » montre la progression des albums de marques.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
@@ -85,6 +85,34 @@ function ItemCard({ item, width, dim }: { item: InventoryItem; width: number; di
   );
 }
 
+/** Booster de collection offert (roue, direction) : à ouvrir sur la page Collections */
+function PackCard({ item, width }: { item: InventoryItem; width: number }) {
+  const color = '#d9b25f';
+  return (
+    <div
+      className="relative overflow-hidden rounded-[14px] border flex flex-col items-center justify-between text-center p-4"
+      style={{ width, height: width * 1.4, borderColor: `${color}80`, background: `radial-gradient(circle at 50% 38%, ${color}30, #0a0a0d 65%)` }}
+    >
+      <span className="text-[9px] uppercase tracking-[0.18em] font-bold px-2.5 py-1 rounded-full bg-amber-300 text-black">Booster offert</span>
+      <div className="relative w-[46%] aspect-[5/7]">
+        {[-10, 0, 10].map((r, i) => (
+          <div
+            key={r}
+            className="absolute inset-0 rounded-[8px] border"
+            style={{ transform: `rotate(${r}deg) translateY(${Math.abs(r) / 3}px)`, zIndex: i === 1 ? 2 : 1, borderColor: `${color}aa`, background: `linear-gradient(145deg, #2a2110, #0b0906)` }}
+          >
+            {i === 1 && <Layers size={22} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ color }} />}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-[13px] font-bold text-white leading-tight">{item.label}</span>
+        <span className="text-[10px] text-neutral-500">Collection de marques · 5 cartes</span>
+      </div>
+    </div>
+  );
+}
+
 /** Carte d'un bon de bonus offert : illustration de la machine, valeur en grand */
 function VoucherCard({ item, width, dim }: { item: InventoryItem; width: number; dim: boolean }) {
   const wanted = item.voucher?.game === 'wanted';
@@ -161,7 +189,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
   const stats = useMemo(
     () => ({
       available: available.length,
-      value: available.filter((i) => i.kind !== 'voucher').reduce((a, i) => a + i.value, 0),
+      value: available.filter((i) => i.kind === 'vehicle').reduce((a, i) => a + i.value, 0),
       resale: sellable.reduce((a, i) => a + i.sell_value, 0),
       claimed: items.filter((i) => i.status === 'CLAIMED').length,
     }),
@@ -243,7 +271,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
           {(
             [
               ['items', 'Mes objets', Package],
-              ['album', 'Album des cartes', Layers],
+              ['album', 'Mes collections', Layers],
             ] as const
           ).map(([v, label, Icon]) => (
             <button
@@ -257,8 +285,8 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
           ))}
         </div>
         <div className="flex gap-2">
-          <Link to="/boosters" className="h-9 px-4 rounded-full border border-white/20 hover:bg-white/10 text-xs font-semibold text-white flex items-center">
-            Ouvrir un booster
+          <Link to="/collections" className="h-9 px-4 rounded-full border border-white/20 hover:bg-white/10 text-xs font-semibold text-white flex items-center">
+            Collections
           </Link>
           <Link to="/roue-de-la-fortune" className="h-9 px-4 rounded-full border border-white/20 hover:bg-white/10 text-xs font-semibold text-white flex items-center">
             Tourner la roue
@@ -371,7 +399,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
             <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-10 flex flex-col items-center text-center gap-3">
               <Gift size={28} className="text-white/60" />
               <p className="text-sm text-neutral-300">{status === 'available' ? 'Aucun objet disponible.' : 'Rien ici pour le moment.'}</p>
-              <p className="text-xs text-neutral-500">Ouvrez un booster ou tournez la roue pour gagner des véhicules.</p>
+              <p className="text-xs text-neutral-500">Tournez la roue pour gagner des véhicules, des lots et des boosters.</p>
             </div>
           ) : (
             <div ref={grid.ref} className="grid pt-2" style={{ gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`, gap: GAP }}>
@@ -385,6 +413,8 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                     <div className={`relative ${item.status === 'IN_INVENTORY' ? '' : 'opacity-60'}`}>
                       {item.kind === 'vehicle' || item.card ? (
                         <BoosterCardFace card={card} width={grid.cardW} lite />
+                      ) : item.kind === 'pack' ? (
+                        <PackCard item={item} width={grid.cardW} />
                       ) : item.kind === 'voucher' ? (
                         <VoucherCard item={item} width={grid.cardW} dim={false} />
                       ) : (
@@ -407,7 +437,15 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                         </span>
                       )}
                     </div>
-                    {item.status === 'IN_INVENTORY' && item.kind === 'voucher' ? (
+                    {item.status === 'IN_INVENTORY' && item.kind === 'pack' ? (
+                      <Link
+                        to="/collections"
+                        title="Ouvrir le booster sur la page Collections"
+                        className="h-8 rounded-full bg-white text-black text-[11px] font-bold hover:bg-neutral-200 flex items-center justify-center gap-1.5"
+                      >
+                        <Layers size={12} /> Ouvrir
+                      </Link>
+                    ) : item.status === 'IN_INVENTORY' && item.kind === 'voucher' ? (
                       <Link
                         to={item.voucher?.game === 'wanted' ? '/wanted' : '/slots'}
                         title="Ouvrir la machine et utiliser le bonus"

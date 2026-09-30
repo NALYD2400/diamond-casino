@@ -8,6 +8,7 @@ import {
   type WheelSegmentConfig,
 } from '../../context/CasinoAdminContext';
 import { vehicleDisplayName } from '../../lib/rewards';
+import { apiCollectionCatalog } from '../../lib/supabase';
 import { VehiclePicker } from './VehiclePicker';
 import { Badge, Button, Card, Field, HelpBox, Modal, NumberInput, PageHeader, SaveBar, cx, fmt, inputClass } from './ui';
 
@@ -17,7 +18,15 @@ const TYPE_LABEL: Record<RewardType, string> = {
   mystery: 'Objet mystère',
   clothing: 'Vêtement',
   voucher: 'Bonus offert (machine)',
+  pack: 'Booster de collection',
 };
+
+/** Albums de collection (id, nom, prix du booster) pour les lots « booster » */
+type PackSet = { id: string; name: string; price: number };
+const DEFAULT_PACK_SETS: PackSet[] = [
+  { id: 'autos', name: 'Marques automobiles', price: 25000 },
+  { id: 'mode', name: 'Marques de mode', price: 25000 },
+];
 
 export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
   const {
@@ -36,6 +45,14 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
   const spinPrice = gamesConfig.wheel.spinPrice;
   const [priceDraft, setPriceDraft] = useState(spinPrice);
 
+  const [packSets, setPackSets] = useState<PackSet[]>(DEFAULT_PACK_SETS);
+  useEffect(() => {
+    apiCollectionCatalog()
+      .then((c) => c.sets.length && setPackSets(c.sets.map((x) => ({ id: x.id, name: x.name, price: x.pack_price }))))
+      .catch(() => {});
+  }, []);
+  const packPrice = (s: WheelSegmentConfig) => packSets.find((p) => p.id === s.packSet)?.price ?? Math.max(...packSets.map((p) => p.price));
+
   useEffect(() => setDraft(segments), [segments]);
   useEffect(() => setPodiumDraft(podiumVehicle), [podiumVehicle]);
   useEffect(() => setPriceDraft(spinPrice), [spinPrice]);
@@ -50,9 +67,9 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
   );
   // Véhicules comptés à leur valeur catalogue (1 jeton = 1 $), comme le fait le serveur
   const expectedVehicles = useMemo(
-    () => draft.reduce((a, s) => a + (s.type === 'vehicle' ? (Number(s.vehicleValue) || 0) * (chance(s) / 100) : s.type === 'voucher' ? (Number(s.voucherValue) || 0) * (chance(s) / 100) : 0), 0),
+    () => draft.reduce((a, s) => a + (s.type === 'vehicle' ? (Number(s.vehicleValue) || 0) * (chance(s) / 100) : s.type === 'voucher' ? (Number(s.voucherValue) || 0) * (chance(s) / 100) : s.type === 'pack' ? packPrice(s) * (chance(s) / 100) : 0), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, totalWeight],
+    [draft, totalWeight, packSets],
   );
   const maxRtp = gamesConfig.wheel.maxRtp;
   const expectedTotal = expectedChips + expectedVehicles;
@@ -252,6 +269,10 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                     <td className="px-3 py-2.5 text-neutral-300 text-[13px]">
                       {seg.type === 'chips' ? <span className="font-mono text-white">{fmt(Number(seg.value))} jetons</span> : seg.type === 'voucher' ? (
                         <span className="font-mono text-white">{seg.voucherGame === 'wanted' ? 'Wanted' : 'Dog House'} · bonus de {fmt(Number(seg.voucherValue) || 0)}</span>
+                      ) : seg.type === 'pack' ? (
+                        <span className="font-mono text-white">
+                          {packSets.find((p) => p.id === seg.packSet)?.name ?? 'Collection'} · valeur {fmt(packPrice(seg))}
+                        </span>
                       ) : String(seg.value)}
                       {seg.type === 'vehicle' && (
                         <span className="block text-[11px] font-mono text-neutral-500">
@@ -319,6 +340,7 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
       {editing && (
         <SegmentEditor
           seg={editing.seg}
+          packSets={packSets}
           onClose={() => setEditing(null)}
           onApply={(seg) => {
             setDraft(editing.index < 0 ? [...draft, seg] : draft.map((s, j) => (j === editing.index ? seg : s)));
@@ -330,8 +352,9 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
   );
 };
 
-const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; onClose: () => void; onApply: (s: WheelSegmentConfig) => void }> = ({
+const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; packSets: PackSet[]; onClose: () => void; onApply: (s: WheelSegmentConfig) => void }> = ({
   seg: initial,
+  packSets,
   onClose,
   onApply,
 }) => {
@@ -366,6 +389,7 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; onClose: () => void; on
                   voucherGame: type === 'voucher' ? seg.voucherGame ?? 'doghouse' : undefined,
                   voucherBuy: type === 'voucher' ? seg.voucherBuy ?? 'buy' : undefined,
                   voucherValue: type === 'voucher' ? seg.voucherValue ?? 20000 : undefined,
+                  packSet: type === 'pack' ? seg.packSet ?? packSets[0]?.id : undefined,
                 });
               }}
             >
@@ -383,6 +407,16 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; onClose: () => void; on
         {seg.type === 'chips' ? (
           <Field label="Nombre de jetons gagnés">
             <NumberInput value={Number(seg.value) || 0} min={0} onChange={(v) => setSeg({ ...seg, value: Math.max(0, v) })} suffix="⛁" />
+          </Field>
+        ) : seg.type === 'pack' ? (
+          <Field label="Album du booster" hint="Le joueur reçoit un booster à ouvrir gratuitement sur la page Collections. Compte dans le retour de la roue au prix du booster.">
+            <select className={cx(inputClass, 'cursor-pointer')} value={seg.packSet ?? packSets[0]?.id} onChange={(e) => setSeg({ ...seg, packSet: e.target.value })}>
+              {packSets.map((p) => (
+                <option key={p.id} value={p.id} className="bg-black">
+                  {p.name} · {fmt(p.price)} jetons
+                </option>
+              ))}
+            </select>
           </Field>
         ) : seg.type === 'voucher' ? (
           <>

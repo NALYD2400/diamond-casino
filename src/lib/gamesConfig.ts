@@ -68,6 +68,12 @@ export interface GamesConfig {
     /** Taux de reprise des lots en jetons (% de leur valeur, 0 = revente désactivée) */
     sellRate: number;
   };
+  /**
+   * Collections de marques (autos & mode) : prix, récompense et cartes réglés
+   * dans l'onglet Collections de la console. Garde-fous de rentabilité :
+   * maxRtp = retour max sur un album complet, packMaxRtp = revente max d'un booster.
+   */
+  collections: { enabled: boolean; maxRtp: number; packMaxRtp: number };
 }
 
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
@@ -83,7 +89,8 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
     maxPayout: 10000000,
   },
   wheel: { enabled: true, spinPrice: 25000, maxRtp: 95 },
-  boosters: { enabled: true, maxRtp: 90, sellRate: 70 },
+  boosters: { enabled: false, maxRtp: 90, sellRate: 70 },
+  collections: { enabled: true, maxRtp: 90, packMaxRtp: 60 },
 };
 
 export interface VipTierConfig {
@@ -113,6 +120,7 @@ export function mergeGamesConfig(raw: unknown): GamesConfig {
     wanted,
     wheel: { ...DEFAULT_GAMES_CONFIG.wheel, ...(r.wheel || {}) },
     boosters: { ...DEFAULT_GAMES_CONFIG.boosters, ...(r.boosters || {}) },
+    collections: { ...DEFAULT_GAMES_CONFIG.collections, ...(r.collections || {}) },
   };
 }
 
@@ -133,7 +141,8 @@ export const GAME_LABELS: Record<string, string> = {
   doghouse: 'The Dog House',
   wanted: 'Wanted Dead or a Wild',
   lucky_wheel: 'Roue de la Fortune',
-  boosters: 'Boosters',
+  boosters: 'Boosters véhicules',
+  collections: 'Collections',
   'The Dog House': 'The Dog House',
   'Wanted Dead or a Wild': 'Wanted Dead or a Wild',
 };

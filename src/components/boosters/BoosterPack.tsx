@@ -11,7 +11,15 @@ import { Layers } from 'lucide-react';
 import type { BoosterPackData } from '../../lib/supabase';
 import { hexToRgb, rgba } from './boosterUtils';
 
-type PackLook = Pick<BoosterPackData, 'name' | 'cover_image_url' | 'accent_color' | 'cards_per_pack'>;
+type PackLook = Pick<BoosterPackData, 'name' | 'cover_image_url' | 'accent_color' | 'cards_per_pack'> & {
+  /** Visuel de la fenêtre à la place de cover_image_url (ex. éventail de cartes) */
+  cover?: React.ReactNode;
+  /** Surtitre de la face avant */
+  kicker?: string;
+  /** Textes du dos */
+  backTitle?: string;
+  backText?: string;
+};
 
 const TEAR_Y = 12.5; // % depuis le haut
 const CRIMP = 5.5; // hauteur des soudures (%)
@@ -127,7 +135,7 @@ const PackFront: React.FC<{ pack: PackLook; width: number }> = ({ pack, width })
       {/* Impression */}
       <div className="absolute inset-x-[8%] flex flex-col items-center" style={{ top: `${CRIMP + 6}%`, bottom: `${CRIMP + 3}%` }}>
         <div className="text-center uppercase font-semibold text-white/80" style={{ fontSize: 6.5 * s, letterSpacing: '0.42em' }}>
-          Collection officielle
+          {pack.kicker ?? 'Collection officielle'}
         </div>
         <img src="/hero_logo.png" alt="" draggable={false} className="w-[64%] h-auto mt-[3%] drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]" />
 
@@ -146,7 +154,9 @@ const PackFront: React.FC<{ pack: PackLook; width: number }> = ({ pack, width })
             />
             <div className="absolute inset-x-0 bottom-0 h-[35%]" style={{ background: `linear-gradient(to top, ${rgba(accent, 0.35)}, transparent)` }} />
           </div>
-          {pack.cover_image_url ? (
+          {pack.cover ? (
+            <div className="absolute inset-0">{pack.cover}</div>
+          ) : pack.cover_image_url ? (
             // La voiture déborde légèrement de la fenêtre
             <img
               src={pack.cover_image_url}
@@ -213,9 +223,10 @@ const PackBack: React.FC<{ pack: PackLook; width: number }> = ({ pack, width }) 
       <div className="absolute inset-x-[10%] flex flex-col items-center text-center text-white/70" style={{ top: `${CRIMP + 8}%`, bottom: `${CRIMP + 5}%`, fontSize: 7 * s }}>
         <img src="/hero_logo.png" alt="" draggable={false} className="w-[46%] h-auto opacity-80" />
         <p className="mt-[8%] leading-relaxed uppercase" style={{ letterSpacing: '0.12em' }}>
-          Contient {pack.cards_per_pack} carte{pack.cards_per_pack > 1 ? 's' : ''} véhicule{pack.cards_per_pack > 1 ? 's' : ''} tirée{pack.cards_per_pack > 1 ? 's' : ''} au hasard
+          {pack.backTitle ??
+            `Contient ${pack.cards_per_pack} carte${pack.cards_per_pack > 1 ? 's' : ''} véhicule${pack.cards_per_pack > 1 ? 's' : ''} tirée${pack.cards_per_pack > 1 ? 's' : ''} au hasard`}
         </p>
-        <p className="mt-[4%] text-white/45 leading-relaxed">Chaque véhicule obtenu est livré dans l'inventaire de l'Espace Membre.</p>
+        <p className="mt-[4%] text-white/45 leading-relaxed">{pack.backText ?? "Chaque véhicule obtenu est livré dans l'inventaire de l'Espace Membre."}</p>
         <div className="mt-auto w-full flex items-end justify-between">
           <div className="flex flex-col items-start gap-1">
             <div style={{ width: 70 * s, height: 22 * s, background: 'repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 3px, #fff 3px 5px, transparent 5px 6px, #fff 6px 7px, transparent 7px 10px)', opacity: 0.85 }} />

@@ -54,7 +54,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
   { id: 'mines', statsId: 'mines', name: 'Mines', short: 'Mines', icon: Bomb, route: '/mines' },
   { id: 'crash', statsId: 'crash', name: 'Crash', short: 'Crash', icon: Rocket, route: '/crash' },
   { id: 'wheel', statsId: 'lucky_wheel', name: 'Roue de la Fortune', short: 'Roue', icon: Disc, route: '/roue-de-la-fortune' },
-  { id: 'boosters', statsId: 'boosters', name: 'Boosters de cartes', short: 'Boosters', icon: Layers, route: '/boosters' },
+  { id: 'collections', statsId: 'collections', name: 'Collections de marques', short: 'Collections', icon: Layers, route: '/collections' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 const DOG_BONUS_VALUE = 110;
 const WANTED_BONUS_VALUE = { gtr: 78, duel: 197, dmh: 392 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
-const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1 };
+const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
 const MIN_ROUNDS = 200;
 
 /** Valeur moyenne d'un tour de roue : jetons + véhicules à leur valeur catalogue (comme wheel_ev() côté serveur) */
@@ -101,14 +101,15 @@ function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: 
     case 'wheel':
       return key === '__all' && cfg.wheel.spinPrice > 0 ? (wheelExpected(segments) / cfg.wheel.spinPrice) * 100 : null;
     case 'boosters':
-      // Les boosters rendent des véhicules, pas des jetons : pas de RTP en jetons
+    case 'collections':
+      // Les collections rendent des cartes (revente et récompense à part) : pas de RTP par booster
       return null;
   }
 }
 
 /** RTP visé global, pondéré par ce qui a été misé dans chaque mode */
 function overallTarget(machine: MachineId, stats: AdminGameStats | undefined, cfg: GamesConfig, segments: WheelSegmentConfig[]): number | null {
-  if (machine === 'boosters') return null;
+  if (machine === 'boosters' || machine === 'collections') return null;
   if (machine === 'wheel' || machine === 'mines' || machine === 'crash') return targetFor(machine, '__all', cfg, segments);
   const rows = (stats?.breakdown ?? []).filter((r) => Number(r.wagered) > 0);
   const total = rows.reduce((a, r) => a + Number(r.wagered), 0);
@@ -146,7 +147,7 @@ function verdict(machine: MachineId, rounds: number, rtp: number | null, target:
 
 function breakdownLabel(machine: MachineId, key: string) {
   if (machine === 'mines') return key === '?' || key === '0' ? 'Ancien format' : `${key} mine${key === '1' ? '' : 's'}`;
-  if (machine === 'wheel' || machine === 'boosters') return key;
+  if (machine === 'wheel' || machine === 'boosters' || machine === 'collections') return key;
   if (machine === 'crash') {
     return { manual: 'Encaissement manuel', auto_lt2: 'Objectif < ×2', auto_2_10: 'Objectif ×2 – ×10', auto_gt10: 'Objectif > ×10' }[key] ?? key;
   }
@@ -556,8 +557,8 @@ const MachineDetail: React.FC<{
                   ? 'Par nombre de mines'
                   : m.id === 'wheel'
                     ? 'Par lot tiré'
-                    : m.id === 'boosters'
-                      ? 'Par booster'
+                    : m.id === 'collections'
+                      ? 'Par collection'
                       : m.id === 'crash'
                         ? 'Par objectif'
                         : 'Par mode de jeu'
@@ -569,10 +570,10 @@ const MachineDetail: React.FC<{
                 <table className="w-full text-sm min-w-[460px]">
                   <thead>
                     <tr className="text-[11px] text-neutral-500 text-left border-b border-white/10">
-                      <th className="px-5 py-2.5 font-medium">{m.id === 'wheel' ? 'Lot' : m.id === 'boosters' ? 'Booster' : 'Mode'}</th>
+                      <th className="px-5 py-2.5 font-medium">{m.id === 'wheel' ? 'Lot' : m.id === 'collections' ? 'Collection' : 'Mode'}</th>
                       <th className="px-3 py-2.5 font-medium text-right">Parties</th>
                       <th className="px-3 py-2.5 font-medium text-right">Bénéfice</th>
-                      <th className="px-5 py-2.5 font-medium text-right">{m.id === 'wheel' || m.id === 'boosters' ? 'Part' : 'RTP réel / visé'}</th>
+                      <th className="px-5 py-2.5 font-medium text-right">{m.id === 'wheel' || m.id === 'collections' ? 'Part' : 'RTP réel / visé'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -585,7 +586,7 @@ const MachineDetail: React.FC<{
                           <td className="px-3 py-2.5 text-right font-mono text-neutral-300">{fmt(b.rounds)}</td>
                           <td className={cx('px-3 py-2.5 text-right font-mono', profitClass(p))}>{signed(p)}</td>
                           <td className="px-5 py-2.5 text-right font-mono">
-                            {m.id === 'wheel' || m.id === 'boosters' ? (
+                            {m.id === 'wheel' || m.id === 'collections' ? (
                               <span className="text-neutral-300">{fmt((Number(b.rounds) / rounds) * 100, 1)} %</span>
                             ) : (
                               <>
@@ -947,27 +948,32 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
         </Card>
       )}
 
-      {id === 'boosters' && (
-        <Card title="Rentabilité des boosters">
+      {id === 'collections' && (
+        <Card title="Rentabilité des collections">
           <div className="flex flex-col gap-4">
             <Field
-              label="Retour joueur maximum"
+              label="Retour joueur maximum sur un album complet"
               hint={
                 <>
-                  Valeur moyenne des véhicules d'un booster ≤ {fmt(draft.boosters.maxRtp)} % de son prix (1 jeton = 1 $). Le casino garde au minimum{' '}
-                  {fmt(100 - draft.boosters.maxRtp)} % de chaque booster vendu. Un booster au-dessus est caché aux joueurs et ne peut pas être ouvert.
+                  (Récompense + revente moyenne des doublons) ≤ {fmt(draft.collections.maxRtp)} % du coût moyen des boosters pour compléter l'album.
+                  Calcul exact fait par le serveur ; un album au-dessus est caché aux joueurs et ne peut pas être ouvert.
                 </>
               }
             >
-              <NumberInput value={draft.boosters.maxRtp} min={10} max={100} onChange={(v) => set('boosters', { maxRtp: Math.min(100, Math.max(10, v)) })} suffix="%" />
+              <NumberInput value={draft.collections.maxRtp} min={10} max={100} onChange={(v) => set('collections', { maxRtp: Math.min(100, Math.max(10, v)) })} suffix="%" />
             </Field>
             <Field
-              label="Taux de reprise des lots"
+              label="Revente maximum d'un booster"
+              hint={<>Valeur de revente moyenne des 5 cartes d'un booster ≤ {fmt(draft.collections.packMaxRtp)} % de son prix.</>}
+            >
+              <NumberInput value={draft.collections.packMaxRtp} min={0} max={100} onChange={(v) => set('collections', { packMaxRtp: Math.min(100, Math.max(0, v)) })} suffix="%" />
+            </Field>
+            <Field
+              label="Taux de reprise des véhicules"
               hint={
                 <>
-                  Un joueur peut revendre un véhicule gagné (roue ou booster) contre {fmt(draft.boosters.sellRate)} % de sa valeur en jetons, au lieu de le
-                  réclamer en jeu. 0 % = revente désactivée. Sur un booster à {fmt(draft.boosters.maxRtp)} % de retour, tout revendre rend au maximum{' '}
-                  {fmt((draft.boosters.maxRtp * draft.boosters.sellRate) / 100, 1)} % des jetons dépensés.
+                  Un joueur peut revendre un véhicule gagné à la roue contre {fmt(draft.boosters.sellRate)} % de sa valeur en jetons, au lieu de le
+                  réclamer en jeu. 0 % = revente désactivée.
                 </>
               }
             >
@@ -975,11 +981,11 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
             </Field>
           </div>
           <div className="text-[13px] text-neutral-400 mt-4">
-            Les boosters, leurs prix, les cartes et les raretés se règlent dans{' '}
-            <button type="button" className="text-white underline cursor-pointer" onClick={() => goTo('boosters')}>
-              Boosters
+            Les albums, le prix des boosters, la récompense, les cartes et les raretés se règlent dans{' '}
+            <button type="button" className="text-white underline cursor-pointer" onClick={() => goTo('collections')}>
+              Collections
             </button>
-            . Chaque carte tirée est un véhicule ajouté à l'inventaire du joueur.
+            .
           </div>
         </Card>
       )}

@@ -20,7 +20,7 @@ const WheelOfFortune = React.lazy(() => import('./components/WheelOfFortune').th
 const MinesGame = React.lazy(() => import('./components/MinesGame').then((m) => ({ default: m.MinesGame })));
 const DogHouseGame = React.lazy(() => import('./components/doghouse/DogHouseGame').then((m) => ({ default: m.DogHouseGame })));
 const WantedGame = React.lazy(() => import('./components/wanted/WantedGame').then((m) => ({ default: m.WantedGame })));
-const BoostersGame = React.lazy(() => import('./components/boosters/BoostersGame').then((m) => ({ default: m.BoostersGame })));
+const CollectionsGame = React.lazy(() => import('./components/collections/CollectionsGame').then((m) => ({ default: m.CollectionsGame })));
 const GamesHub = React.lazy(() => import('./components/GamesHub').then((m) => ({ default: m.GamesHub })));
 const VipSubscriptions = React.lazy(() => import('./components/VipSubscriptions').then((m) => ({ default: m.VipSubscriptions })));
 const CrashGame = React.lazy(() => import('./components/crash/CrashGame').then((m) => ({ default: m.CrashGame })));
@@ -155,18 +155,18 @@ function WantedPage() {
 }
 
 /**
- * Boosters de cartes véhicules (/boosters)
+ * Collections de cartes « marques » (/collections, ancien lien /boosters)
  */
-function BoostersPage() {
+function CollectionsPage() {
   return (
     <motion.div
-      key="boosters-page"
+      key="collections-page"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <BoostersGame />
+      <CollectionsGame />
     </motion.div>
   );
 }
@@ -309,10 +309,17 @@ const wantedRoute = createRoute({
   component: WantedPage,
 });
 
+const collectionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/collections',
+  component: CollectionsPage,
+});
+
+// Ancien jeu « Boosters véhicules » : les liens mènent aux collections
 const boostersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/boosters',
-  component: BoostersPage,
+  component: CollectionsPage,
 });
 
 const crashRoute = createRoute({
@@ -360,6 +367,7 @@ const routeTree = rootRoute.addChildren([
   minesRoute,
   slotsRoute,
   wantedRoute,
+  collectionsRoute,
   boostersRoute,
   crashRoute,
   gamesRoute,

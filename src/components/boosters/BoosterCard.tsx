@@ -28,7 +28,7 @@ interface BoosterCardProps {
 }
 
 /** Inclinaison 3D + position du reflet, pilotées par variables CSS (sans re-rendu) */
-function useCardTilt(interactive: boolean) {
+export function useCardTilt(interactive: boolean) {
   const ref = useRef<HTMLDivElement>(null);
   const onMove = (e: React.PointerEvent) => {
     const el = ref.current;
@@ -213,13 +213,15 @@ function corner(pos: string, rot: number, s: number) {
  * guilloché façon billet, médaillon central avec le logo, losanges d'angle,
  * reflet holographique. `hint` = couleur qui pulse (carte rare ou mieux à venir).
  */
-export const BoosterCardBack: React.FC<{ width?: number; hint?: string | null; interactive?: boolean; className?: string; style?: React.CSSProperties }> = ({
-  width = 260,
-  hint,
-  interactive = true,
-  className,
-  style,
-}) => {
+export const BoosterCardBack: React.FC<{
+  width?: number;
+  hint?: string | null;
+  interactive?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  /** Mention en bas du dos */
+  caption?: string;
+}> = ({ width = 260, hint, interactive = true, className, style, caption = 'Carte véhicule · Série 01' }) => {
   const { ref, onMove, onLeave } = useCardTilt(interactive);
   const s = width / 260;
     return (
@@ -271,7 +273,7 @@ export const BoosterCardBack: React.FC<{ width?: number; hint?: string | null; i
           The Diamond Casino
         </div>
         <div className="absolute inset-x-0 text-center uppercase" style={{ bottom: '11%', fontSize: 7 * s, letterSpacing: '0.35em', color: rgba(GOLD, 0.6) }}>
-          Carte véhicule · Série 01
+          {caption}
         </div>
 
         {/* Médaillon */}

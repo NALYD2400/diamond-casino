@@ -43,8 +43,9 @@ const PRIZE_IMAGES: Record<WheelSegmentConfig['type'], string> = {
   mystery: '/mystery_vault.jpg',
   clothing: '/diamond_vip_couture.jpg',
   voucher: '/diamond_chips_jackpot.jpg',
+  pack: '/diamond_vip_couture.jpg',
 };
-const TYPE_EMOJI: Record<WheelSegmentConfig['type'], string> = { vehicle: '🏎️', chips: '🪙', mystery: '🎁', clothing: '👔', voucher: '🎰' };
+const TYPE_EMOJI: Record<WheelSegmentConfig['type'], string> = { vehicle: '🏎️', chips: '🪙', mystery: '🎁', clothing: '👔', voucher: '🎰', pack: '🃏' };
 
 type Phase = 'idle' | 'requesting' | 'spinning';
 type Mood = 'idle' | 'spin' | 'win';
@@ -1006,7 +1007,7 @@ const BigWinOverlay: React.FC<{ amount: number; ratio: number; onClick: () => vo
 const PrizeOverlay: React.FC<{ result: SpinResult; podiumImage: string; onClose: () => void }> = ({ result, podiumImage, onClose }) => {
   const seg = result.segment;
   const fallback = PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg';
-  const title = seg.type === 'vehicle' ? 'JACKPOT !' : seg.type === 'clothing' ? 'LOT VIP !' : seg.type === 'voucher' ? 'BONUS OFFERT !' : 'LOT MYSTÈRE !';
+  const title = seg.type === 'vehicle' ? 'JACKPOT !' : seg.type === 'clothing' ? 'LOT VIP !' : seg.type === 'voucher' ? 'BONUS OFFERT !' : seg.type === 'pack' ? 'BOOSTER OFFERT !' : 'LOT MYSTÈRE !';
   return (
     <div
       onClick={onClose}
@@ -1053,12 +1054,21 @@ const PrizeOverlay: React.FC<{ result: SpinResult; podiumImage: string; onClose:
           <p className="mt-3 text-xs text-white/60">
             {result.mode === 'demo'
               ? 'Tour de démonstration : ce lot n’est pas crédité.'
-              : result.segment.type === 'voucher'
+              : result.segment.type === 'pack'
+                ? 'Le booster rejoint votre inventaire : ouvrez-le gratuitement sur la page Collections.'
+                : result.segment.type === 'voucher'
                 ? 'Le bonus rejoint votre inventaire : utilisez-le depuis la machine, il est totalement gratuit.'
                 : 'Le lot rejoint votre inventaire. Réclamez-le depuis votre Espace Membre pour la remise en ville.'}
           </p>
           <div className="mt-4 flex gap-2">
-            {result.mode === 'real' && (
+            {result.mode === 'real' && result.segment.type === 'pack' ? (
+              <Link
+                to="/collections"
+                className="flex-1 font-['Oswald'] font-bold py-2.5 rounded-lg bg-[linear-gradient(180deg,#fff4b0,#ffd84a_55%,#d48a0c)] text-[#140c22] border-[3px] border-[#140c22] shadow-[0_4px_0_#140c22]"
+              >
+                OUVRIR LE BOOSTER
+              </Link>
+            ) : result.mode === 'real' && (
               <Link
                 to="/espace-membre"
                 className="flex-1 font-['Oswald'] font-bold py-2.5 rounded-lg bg-[linear-gradient(180deg,#fff4b0,#ffd84a_55%,#d48a0c)] text-[#140c22] border-[3px] border-[#140c22] shadow-[0_4px_0_#140c22]"

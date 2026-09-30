@@ -41,7 +41,7 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   if (economy.maintenanceMode) alerts.push({ tone: 'bad', text: 'Le casino est en MAINTENANCE : aucun joueur ne peut jouer.', action: { label: 'Système', tab: 'system' } });
   if (t && t.pending_vip > 0) alerts.push({ tone: 'warn', text: `${t.pending_vip} demande(s) VIP à valider (paiement en € à vérifier).`, action: { label: 'Voir', tab: 'vip' } });
   if (t && t.pending_rewards > 0) alerts.push({ tone: 'warn', text: `${t.pending_rewards} lot(s) réclamé(s) à livrer au joueur.`, action: { label: 'Voir', tab: 'rewards' } });
-  const closed = (['mines', 'crash', 'doghouse', 'wanted', 'wheel', 'boosters'] as const).filter((g) => !gamesConfig[g].enabled);
+  const closed = (['mines', 'crash', 'doghouse', 'wanted', 'wheel', 'collections'] as const).filter((g) => !gamesConfig[g].enabled);
   if (closed.length) alerts.push({ tone: 'info', text: `Jeu(x) fermé(s) : ${closed.map((g) => (g === 'wheel' ? 'Roue' : GAME_LABELS[g])).join(', ')}.`, action: { label: 'Jeux', tab: 'games' } });
   paidGames.forEach(([id, g]) => {
     if (g.rtp !== null && Number(g.wagered) > 200000 && Number(g.rtp) > 120) {

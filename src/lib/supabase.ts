@@ -255,6 +255,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   RARITY_IN_USE: 'Impossible de supprimer une rareté encore utilisée par des cartes.',
   INVALID_THRESHOLDS: 'Indiquez au moins un palier de rareté.',
   EMPTY_FILTER: 'Choisissez au moins une classe, une marque ou un véhicule.',
+  SET_NOT_FOUND: 'Cette collection n’est pas disponible.',
+  GIFT_NOT_FOUND: 'Ce booster offert a déjà été ouvert.',
+  GIFT_WRONG_SET: 'Ce booster offert appartient à l’autre collection.',
+  COLLECTION_UNPROFITABLE: 'Collection perdante pour le casino : la revente moyenne d’un booster ou le retour sur un album complet dépasse la limite. Baissez les prix de revente / la récompense, montez le prix du booster ou rendez les cartes rares plus rares.',
+  COLLECTION_UNREACHABLE: 'Une carte de l’album ne peut jamais sortir (rareté à 0 % dans ce booster) : l’album serait impossible à compléter.',
 };
 
 export class CasinoApiError extends Error {
@@ -483,7 +488,7 @@ export type RewardStatus = 'IN_INVENTORY' | 'CLAIMED' | 'DELIVERED' | 'REVOKED' 
 export interface PlayerReward {
   id: string;
   profile_id: string;
-  kind: 'vehicle' | 'item' | 'voucher';
+  kind: 'vehicle' | 'item' | 'voucher' | 'pack';
   label: string;
   vehicle_model: string | null;
   image_url: string | null;
@@ -501,6 +506,8 @@ export interface PlayerReward {
   sold_for?: number | null;
   /** Bon de bonus offert : machine, type de bonus et mise déduite de sa valeur */
   voucher?: VoucherSpec | null;
+  /** Booster de collection offert (kind 'pack') : album concerné */
+  pack_set?: string | null;
 }
 
 export interface VoucherSpec {
@@ -728,6 +735,137 @@ export const apiAdminSimulateBooster = (packId: string, count: number) =>
 export const apiAdminSaveBoosterRarities = (rows: BoosterRarity[]) =>
   rpc<null>('admin_save_booster_rarities', { p_rows: rows });
 
+// -------------------------------------------------------------
+// Collections de marques (cartes à collectionner)
+// -------------------------------------------------------------
+
+export type CollectionFont = 'tight' | 'tight-italic' | 'serif' | 'serif-italic' | 'mono' | 'oswald' | 'lilita' | 'luckiest' | 'rye';
+
+export interface CollectionRarity {
+  key: string;
+  label: string;
+  color: string;
+  effect: BoosterEffect;
+  sort: number;
+  /** Prix de revente d'un exemplaire (jetons) */
+  sell_value: number;
+  /** false = carte secrète, hors album */
+  in_collection: boolean;
+}
+
+export interface CollectionCardData {
+  id: string;
+  set_id: string;
+  number: number;
+  rarity: string;
+  active: boolean;
+  /** Carte secrète pas encore trouvée : seuls numéro et rareté sont connus */
+  hidden: boolean;
+  name?: string;
+  tagline?: string | null;
+  color?: string;
+  color2?: string;
+  font?: CollectionFont;
+  emblem?: string | null;
+  image_url?: string | null;
+  weight?: number;
+}
+
+export interface CollectionSetStats {
+  playable?: boolean;
+  cards?: number;
+  unreachable?: number;
+  pack_resale_ev?: number;
+  pack_rtp?: number;
+  expected_packs?: number;
+  expected_cost?: number;
+  completion_resale?: number;
+  completion_rtp?: number | null;
+}
+
+export interface CollectionSetData {
+  id: string;
+  name: string;
+  subtitle: string | null;
+  description: string | null;
+  accent_color: string;
+  pack_price: number;
+  cards_per_pack: number;
+  reward: number;
+  rarity_weights: Record<string, number>;
+  sort_order: number;
+  active?: boolean;
+  stats?: CollectionSetStats;
+  ok?: boolean;
+  players?: number;
+  completions?: number;
+  openings?: number;
+}
+
+export interface CollectionsConfig {
+  enabled: boolean;
+  /** Retour joueur max sur un album complet (%) */
+  maxRtp: number;
+  /** Revente moyenne max d'un booster (% du prix) */
+  packMaxRtp: number;
+}
+
+export interface CollectionCatalog {
+  rarities: CollectionRarity[];
+  sets: CollectionSetData[];
+  cards: CollectionCardData[];
+  config: CollectionsConfig;
+}
+
+export interface MyCollections {
+  owned: { card_id: string; count: number; total_found: number; first_at: string; last_at: string }[];
+  secrets: CollectionCardData[];
+  completions: { set_id: string; reward: number; packs_opened: number; completed_at: string }[];
+  gifts: { id: string; set_id: string | null; label: string; source: string; created_at: string }[];
+  openings: number;
+}
+
+export interface OpenedCollectionCard extends CollectionCardData {
+  is_new: boolean;
+  count: number;
+  secret: boolean;
+}
+
+export interface OpenCollectionPackResult {
+  set_id: string;
+  price: number;
+  gift: boolean;
+  cards: OpenedCollectionCard[];
+  completed: boolean;
+  reward: number;
+  profile: ProfilePayload;
+}
+
+export const apiCollectionCatalog = () => rpc<CollectionCatalog>('collection_catalog');
+export const apiMyCollections = () => rpc<MyCollections>('my_collections');
+export const apiOpenCollectionPack = (setId: string, giftId?: string | null) =>
+  rpc<OpenCollectionPackResult>('open_collection_pack', { p_set_id: setId, p_reward_id: giftId ?? null });
+export const apiSellCollectionCards = (items: { card_id: string; qty: number }[]) =>
+  rpc<{ sold: number; chips: number; profile: ProfilePayload }>('sell_collection_cards', { p_items: items });
+
+export interface AdminCollectionCard extends CollectionCardData {
+  owners: number;
+  found: number;
+}
+export interface AdminCollectionCatalog extends Omit<CollectionCatalog, 'cards'> {
+  cards: AdminCollectionCard[];
+}
+export const apiAdminCollectionCatalog = () => rpc<AdminCollectionCatalog>('admin_collection_catalog');
+export const apiAdminSaveCollectionSet = (set: Omit<CollectionSetData, 'stats' | 'ok' | 'players' | 'completions' | 'openings'>) =>
+  rpc<null>('admin_save_collection_set', { p_set: set });
+export const apiAdminSaveCollectionCard = (card: Partial<CollectionCardData> & { set_id: string; name: string; rarity: string }) =>
+  rpc<CollectionCardData>('admin_save_collection_card', { p_card: card });
+export const apiAdminDeleteCollectionCard = (id: string) => rpc<null>('admin_delete_collection_card', { p_id: id });
+export const apiAdminSaveCollectionRarities = (rows: CollectionRarity[]) =>
+  rpc<null>('admin_save_collection_rarities', { p_rows: rows });
+export const apiAdminGrantCollectionPack = (profileId: string, setId: string, qty: number, note?: string) =>
+  rpc<number>('admin_grant_collection_pack', { p_profile_id: profileId, p_set_id: setId, p_qty: qty, p_note: note ?? null });
+
 export const apiClaimReward = (rewardId: string) => rpc<PlayerReward>('claim_reward', { p_reward_id: rewardId });
 
 export const apiAdminGrantReward = (profileId: string, p: { vehicleModel?: string; label?: string; note?: string }) =>
@@ -944,7 +1082,7 @@ export interface AdminDashboard {
 
 export const apiAdminDashboard = (days: number) => rpc<AdminDashboard>('admin_dashboard', { p_days: days });
 
-export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel' | 'boosters' | 'crash';
+export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel' | 'boosters' | 'crash' | 'collections';
 
 interface GameStatsPlayer {
   id: string;

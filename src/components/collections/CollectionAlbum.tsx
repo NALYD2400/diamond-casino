@@ -4,6 +4,7 @@
  * revente des doublons.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import { Car, Coins, Shirt, Sparkles, Trophy } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { apiSellCollectionCards, type CollectionCatalog, type MyCollections } from '../../lib/supabase';
@@ -79,11 +80,14 @@ export const CollectionAlbum: React.FC<{ catalog: CollectionCatalog; mine: MyCol
   const accent = set.accent_color;
   const pct = setSize ? (ownedCount / setSize) * 100 : 0;
 
-  /** Exemplaires revendables : doublons des cartes d'album, toutes les secrètes */
-  const sellable = (c: BrandCard) => Math.max(0, (owned.get(c.id)?.count ?? 0) - (c.secret ? 0 : 1));
-  const doubles = cards.filter((c) => sellable(c) > 0 && !c.secret);
+  /** Seuls les doublons se revendent (secrètes comprises) : le premier exemplaire reste dans l'album */
+  const sellable = (c: BrandCard) => Math.max(0, (owned.get(c.id)?.count ?? 0) - 1);
+  const rate = mine?.sell_rate ?? catalog.config.sellRate;
+  const priceOf = (c: BrandCard) => Math.floor((c.rarity.sell_value * rate) / 100);
+  const doubles = cards.filter((c) => sellable(c) > 0);
   const doublesQty = doubles.reduce((a, c) => a + sellable(c), 0);
-  const doublesValue = doubles.reduce((a, c) => a + sellable(c) * c.rarity.sell_value, 0);
+  const doublesValue = doubles.reduce((a, c) => a + sellable(c) * priceOf(c), 0);
+  const bestBonus = Math.max(catalog.config.sellBonusGold, catalog.config.sellBonusDiamond);
 
   const visible = albumCards.filter((c) => {
     const n = owned.get(c.id)?.total_found ?? 0;
@@ -129,6 +133,7 @@ export const CollectionAlbum: React.FC<{ catalog: CollectionCatalog; mine: MyCol
             count={owned.get(c.id)?.count ?? 0}
             found={owned.get(c.id)?.total_found ?? 0}
             sellable={isAuthenticated ? sellable(c) : 0}
+            price={priceOf(c)}
             selling={selling === c.id}
             onSell={() => void sell([{ card_id: c.id, qty: 1 }], c.id)}
           />
@@ -223,8 +228,16 @@ export const CollectionAlbum: React.FC<{ catalog: CollectionCatalog; mine: MyCol
           </div>
           {isAuthenticated && (
             <div className="rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md p-4">
-              <div className="text-sm text-white font-semibold">Doublons</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-white font-semibold">Doublons</span>
+                <span className="text-[11px] font-mono rounded-full bg-amber-300/15 text-amber-200 px-2 py-0.5">revente {rate} %</span>
+              </div>
               <div className="text-xs text-white/50">{doublesQty > 0 ? `${doublesQty} carte(s) en trop · ${fmtChips(doublesValue)}` : 'Aucun doublon pour le moment.'}</div>
+              {rate < catalog.config.sellRate + bestBonus && (
+                <Link to="/abonnements" className="block mt-1 text-[11px] text-white/45 hover:text-white underline underline-offset-2">
+                  Gold : {catalog.config.sellRate + catalog.config.sellBonusGold} % · Diamond : {catalog.config.sellRate + catalog.config.sellBonusDiamond} % de revente
+                </Link>
+              )}
               {doublesQty > 0 &&
                 (confirmSellAll ? (
                   <div className="flex gap-2 mt-3">
@@ -283,7 +296,8 @@ export const CollectionAlbum: React.FC<{ catalog: CollectionCatalog; mine: MyCol
               <h3 className="text-base sm:text-lg font-bold text-white">Cartes secrètes</h3>
             </div>
             <p className="text-xs text-white/50 mb-4">
-              Ultra rares, hors album : pas nécessaires pour la récompense, mais revendables {fmtChips(secretCards[0].rarity.sell_value)} pièce.
+              En plus de l'album, si vous avez de la chance : pas nécessaires pour la récompense. Un doublon se revend{' '}
+              {fmtChips(priceOf(secretCards[0]))}.
             </p>
             {grid(secretCards, false)}
           </div>
@@ -305,9 +319,10 @@ const AlbumCard: React.FC<{
   count: number;
   found: number;
   sellable: number;
+  price: number;
   selling: boolean;
   onSell: () => void;
-}> = ({ card, width, setName, setSize, count, found, sellable, selling, onSell }) => (
+}> = ({ card, width, setName, setSize, count, found, sellable, price, selling, onSell }) => (
   <div className="flex flex-col items-center gap-2">
     <div className="relative">
       {found === 0 ? (
@@ -318,14 +333,14 @@ const AlbumCard: React.FC<{
       )}
       {count > 1 && <span className="absolute -top-2 -right-2 z-10 rounded-full bg-white text-black text-[11px] font-extrabold px-2 py-0.5 shadow-lg">×{count}</span>}
     </div>
-    {sellable > 0 && card.rarity.sell_value > 0 ? (
+    {sellable > 0 && price > 0 ? (
       <button
         type="button"
         onClick={onSell}
         disabled={selling}
         className="flex items-center gap-1.5 rounded-full border border-amber-300/35 bg-amber-300/10 hover:bg-amber-300/20 text-amber-100 text-[11px] font-semibold px-3 py-1.5 disabled:opacity-50 cursor-pointer"
       >
-        <Coins size={12} /> {selling ? 'Revente…' : `Vendre 1 · +${fmtChips(card.rarity.sell_value)}`}
+        <Coins size={12} /> {selling ? 'Revente…' : `Vendre 1 doublon · +${fmtChips(price)}`}
       </button>
     ) : (
       <span className="h-[30px]" />

@@ -799,14 +799,19 @@ const OddsModal: React.FC<{ set: CollectionSetData; catalog: CollectionCatalog; 
                 </span>
                 <span className="text-right font-mono text-white/70">{o.count}</span>
                 <span className="text-right font-mono text-white">{fmtPct(o.pct)}</span>
-                <span className="text-right font-mono text-amber-200">{fmtChips(o.rarity.sell_value)}</span>
+                <span className="text-right font-mono text-amber-200">{fmtChips(Math.floor((o.rarity.sell_value * catalog.config.sellRate) / 100))}</span>
               </React.Fragment>
             ))}
           </div>
           <ul className="mt-5 text-xs text-white/55 space-y-1.5 list-disc pl-4">
             <li>Chaque carte d'un booster est tirée indépendamment par le serveur, avec les chances ci-dessus.</li>
             <li>Compléter l'album (toutes les cartes hors secrètes) rapporte {fmtChips(set.reward)}, une seule fois par joueur, crédités automatiquement.</li>
-            <li>Seuls les doublons se revendent : le premier exemplaire d'une carte reste dans l'album. Les cartes secrètes se revendent toutes.</li>
+            <li>
+              Seuls les doublons se revendent : le premier exemplaire de chaque carte reste dans l'album. Revente à {catalog.config.sellRate} % de la
+              valeur de la carte, {catalog.config.sellRate + catalog.config.sellBonusGold} % avec la carte Gold et{' '}
+              {catalog.config.sellRate + catalog.config.sellBonusDiamond} % avec la carte Diamond.
+            </li>
+            <li>Les cartes secrètes sont en plus de l'album : pas nécessaires pour la récompense, mais c'est le jackpot si vous en tirez une.</li>
             <li>Des boosters offerts peuvent aussi se gagner à la Roue de la Fortune.</li>
           </ul>
         </div>

@@ -73,7 +73,16 @@ export interface GamesConfig {
    * dans l'onglet Collections de la console. Garde-fous de rentabilité :
    * maxRtp = retour max sur un album complet, packMaxRtp = revente max d'un booster.
    */
-  collections: { enabled: boolean; maxRtp: number; packMaxRtp: number };
+  collections: {
+    enabled: boolean;
+    maxRtp: number;
+    packMaxRtp: number;
+    /** Revente des doublons : % de la valeur de la carte, + bonus (points) selon la carte VIP */
+    sellRate: number;
+    sellBonusSilver: number;
+    sellBonusGold: number;
+    sellBonusDiamond: number;
+  };
 }
 
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
@@ -90,7 +99,7 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
   },
   wheel: { enabled: true, spinPrice: 25000, maxRtp: 95 },
   boosters: { enabled: false, maxRtp: 90, sellRate: 70 },
-  collections: { enabled: true, maxRtp: 90, packMaxRtp: 60 },
+  collections: { enabled: true, maxRtp: 90, packMaxRtp: 60, sellRate: 70, sellBonusSilver: 0, sellBonusGold: 5, sellBonusDiamond: 10 },
 };
 
 export interface VipTierConfig {

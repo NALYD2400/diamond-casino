@@ -511,8 +511,10 @@ const RaritiesSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () =>
     <>
       <HelpBox title="Raretés et revente">
         <p>
-          <b>Revente</b> : jetons versés pour un exemplaire revendu. Seuls les doublons se revendent (le premier exemplaire reste dans l'album), sauf les
-          raretés <b>hors album</b> (cartes secrètes), revendables dès le premier exemplaire. Le serveur refuse un réglage qui rendrait un album perdant.
+          <b>Valeur</b> : valeur d'une carte. Un doublon se revend à {fmt(catalog.config.sellRate)} % de sa valeur ({fmt(catalog.config.sellRate + catalog.config.sellBonusGold)} % en Gold,{' '}
+          {fmt(catalog.config.sellRate + catalog.config.sellBonusDiamond)} % en Diamond — taux réglables dans Machines → Collections). Seuls les doublons se
+          revendent, cartes secrètes comprises : le premier exemplaire reste dans l'album. Les raretés <b>hors album</b> sont les cartes secrètes. Le serveur
+          refuse un réglage qui rendrait un album perdant (calculé au meilleur taux VIP).
         </p>
       </HelpBox>
       <Card title="Niveaux de rareté" icon={<Gem size={15} />} padded={false}>
@@ -524,7 +526,7 @@ const RaritiesSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () =>
                 <th className="px-3 py-2.5 font-medium">Libellé</th>
                 <th className="px-3 py-2.5 font-medium">Couleur</th>
                 <th className="px-3 py-2.5 font-medium">Effet</th>
-                <th className="px-3 py-2.5 font-medium">Revente</th>
+                <th className="px-3 py-2.5 font-medium">Valeur (revente {fmt(catalog.config.sellRate)} %)</th>
                 <th className="px-5 py-2.5 font-medium">Compte dans l'album</th>
               </tr>
             </thead>
@@ -549,6 +551,10 @@ const RaritiesSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () =>
                   </td>
                   <td className="px-3 py-2 w-40">
                     <NumberInput value={r.sell_value} min={0} onChange={(v) => patch(i, { sell_value: Math.max(0, Math.round(v)) })} suffix="⛁" />
+                    <span className="block mt-1 text-[10px] font-mono text-neutral-500">
+                      revendue {fmt(Math.floor((r.sell_value * catalog.config.sellRate) / 100))} · Diamond{' '}
+                      {fmt(Math.floor((r.sell_value * (catalog.config.sellRate + catalog.config.sellBonusDiamond)) / 100))}
+                    </span>
                   </td>
                   <td className="px-5 py-2 w-44">
                     <Toggle checked={r.in_collection} onChange={(v) => patch(i, { in_collection: v })} />

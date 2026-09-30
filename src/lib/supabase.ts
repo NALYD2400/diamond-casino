@@ -747,7 +747,7 @@ export interface CollectionRarity {
   color: string;
   effect: BoosterEffect;
   sort: number;
-  /** Prix de revente d'un exemplaire (jetons) */
+  /** Valeur d'une carte (jetons) : un doublon se revend valeur × taux de revente du joueur */
   sell_value: number;
   /** false = carte secrète, hors album */
   in_collection: boolean;
@@ -808,6 +808,11 @@ export interface CollectionsConfig {
   maxRtp: number;
   /** Revente moyenne max d'un booster (% du prix) */
   packMaxRtp: number;
+  /** Taux de revente des doublons (% de la valeur) et bonus par carte VIP (points) */
+  sellRate: number;
+  sellBonusSilver: number;
+  sellBonusGold: number;
+  sellBonusDiamond: number;
 }
 
 export interface CollectionCatalog {
@@ -823,6 +828,8 @@ export interface MyCollections {
   completions: { set_id: string; reward: number; packs_opened: number; completed_at: string }[];
   gifts: { id: string; set_id: string | null; label: string; source: string; created_at: string }[];
   openings: number;
+  /** Taux de revente des doublons du joueur (%, bonus VIP compris) */
+  sell_rate: number;
 }
 
 export interface OpenedCollectionCard extends CollectionCardData {
@@ -846,7 +853,7 @@ export const apiMyCollections = () => rpc<MyCollections>('my_collections');
 export const apiOpenCollectionPack = (setId: string, giftId?: string | null) =>
   rpc<OpenCollectionPackResult>('open_collection_pack', { p_set_id: setId, p_reward_id: giftId ?? null });
 export const apiSellCollectionCards = (items: { card_id: string; qty: number }[]) =>
-  rpc<{ sold: number; chips: number; profile: ProfilePayload }>('sell_collection_cards', { p_items: items });
+  rpc<{ sold: number; chips: number; rate: number; profile: ProfilePayload }>('sell_collection_cards', { p_items: items });
 
 export interface AdminCollectionCard extends CollectionCardData {
   owners: number;

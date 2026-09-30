@@ -982,6 +982,23 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
             >
               <NumberInput value={draft.collections.packMaxRtp} min={0} max={100} onChange={(v) => set('collections', { packMaxRtp: Math.min(100, Math.max(0, v)) })} suffix="%" />
             </Field>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <Field label="Revente des doublons" hint="% de la valeur de la carte">
+                <NumberInput value={draft.collections.sellRate} min={0} max={100} onChange={(v) => set('collections', { sellRate: Math.min(100, Math.max(0, v)) })} suffix="%" />
+              </Field>
+              <Field label="Bonus Silver" hint={`= ${fmt(draft.collections.sellRate + draft.collections.sellBonusSilver)} %`}>
+                <NumberInput value={draft.collections.sellBonusSilver} min={0} max={100} onChange={(v) => set('collections', { sellBonusSilver: Math.max(0, v) })} suffix="pts" />
+              </Field>
+              <Field label="Bonus Gold" hint={`= ${fmt(draft.collections.sellRate + draft.collections.sellBonusGold)} %`}>
+                <NumberInput value={draft.collections.sellBonusGold} min={0} max={100} onChange={(v) => set('collections', { sellBonusGold: Math.max(0, v) })} suffix="pts" />
+              </Field>
+              <Field label="Bonus Diamond" hint={`= ${fmt(draft.collections.sellRate + draft.collections.sellBonusDiamond)} %`}>
+                <NumberInput value={draft.collections.sellBonusDiamond} min={0} max={100} onChange={(v) => set('collections', { sellBonusDiamond: Math.max(0, v) })} suffix="pts" />
+              </Field>
+            </div>
+            <p className="text-[11px] text-neutral-500 -mt-2">
+              Seuls les doublons se revendent. La rentabilité des albums est vérifiée au meilleur taux (Diamond) : un taux trop haut est refusé.
+            </p>
             <Field
               label="Taux de reprise des véhicules"
               hint={

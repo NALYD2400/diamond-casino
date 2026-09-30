@@ -442,9 +442,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ onBackToHome, onNavi
         </main>
 
         {/* Minimal Footer */}
-        <footer className="border-t border-white/5 px-6 py-4 text-center text-[13px] text-neutral-600 font-mono">
-          Diamond Casino &bull; FiveM Los Santos RP
-        </footer>
       </div>
     );
   }

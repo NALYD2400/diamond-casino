@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Car, Check, Download, Gift, Loader2, PackageCheck, RefreshCw, Search, Undo2, Upload, X } from 'lucide-react';
+import { Car, Check, Download, Gift, Layers, Loader2, PackageCheck, RefreshCw, Search, Undo2, Upload, X } from 'lucide-react';
 import { useCasinoAdmin, type MockCitizen } from '../../context/CasinoAdminContext';
 import {
   apiAdminGrantReward,
+  apiAdminGrantCollectionPack,
   apiAdminGrantVoucher,
+  apiCollectionCatalog,
   apiAdminImportVehicles,
   apiAdminUpdateReward,
   dbCountVehicles,
@@ -132,6 +134,37 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       showToast('Lot ajouté à l’inventaire du joueur.');
       setGrantVehicle(null);
       setGrantLabel('');
+      setGrantNote('');
+      await Promise.all([load(), refreshLogs()]);
+    } catch (err) {
+      showToast((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Boosters de collection offerts
+  const [packSets, setPackSets] = useState<{ id: string; name: string }[]>([]);
+  const [packSet, setPackSet] = useState('autos');
+  const [packQty, setPackQty] = useState(1);
+  useEffect(() => {
+    apiCollectionCatalog()
+      .then((c) => {
+        setPackSets(c.sets.map((x) => ({ id: x.id, name: x.name })));
+        if (c.sets[0]) setPackSet((cur) => (c.sets.some((x) => x.id === cur) ? cur : c.sets[0].id));
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleGrantPack = async () => {
+    if (!grantCitizenId) {
+      showToast('Choisissez un citoyen.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const n = await apiAdminGrantCollectionPack(grantCitizenId, packSet, Math.min(50, Math.max(1, Math.floor(packQty) || 1)), grantNote.trim() || undefined);
+      showToast(`${n} booster(s) de collection ajouté(s) à l’inventaire du joueur.`);
       setGrantNote('');
       await Promise.all([load(), refreshLogs()]);
     } catch (err) {
@@ -432,6 +465,42 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
               className="h-11 rounded-xl border border-white/20 text-white text-xs font-bold uppercase tracking-wider hover:bg-white/10 disabled:opacity-50 cursor-pointer"
             >
               Offrir le bonus au joueur
+            </button>
+          </div>
+
+          <div className="mt-2 pt-4 border-t border-white/10 flex flex-col gap-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <Layers size={14} /> Offrir des boosters de collection (même citoyen)
+            </h3>
+            <p className="text-xs text-neutral-400">Le joueur les ouvre gratuitement sur la page Collections (1 à 50 boosters).</p>
+            <div className="grid grid-cols-[1fr_96px] gap-3">
+              <select
+                value={packSet}
+                onChange={(e) => setPackSet(e.target.value)}
+                className="h-10 px-3 rounded-xl bg-neutral-900 border border-white/10 text-sm text-white focus:outline-none cursor-pointer"
+              >
+                {packSets.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={packQty}
+                onChange={(e) => setPackQty(Number(e.target.value))}
+                className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white font-mono focus:outline-none focus:border-white/30"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleGrantPack}
+              disabled={busy || packSets.length === 0}
+              className="h-11 rounded-xl border border-white/20 text-white text-xs font-bold uppercase tracking-wider hover:bg-white/10 disabled:opacity-50 cursor-pointer"
+            >
+              Offrir les boosters au joueur
             </button>
           </div>
         </section>

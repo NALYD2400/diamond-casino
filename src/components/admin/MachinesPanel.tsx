@@ -68,12 +68,26 @@ const WANTED_BONUS_VALUE = { gtr: 78, duel: 197, dmh: 392 } as const;
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
 const MIN_ROUNDS = 200;
 
-/** Valeur moyenne d'un tour de roue : jetons + véhicules à leur valeur catalogue (comme wheel_ev() côté serveur) */
+/** Prix d'un booster de collection, pour les lots « booster » de la roue (25 000 par défaut) */
+const WHEEL_PACK_VALUE = 25000;
+
+/**
+ * Valeur moyenne d'un tour de roue : jetons + véhicules à leur valeur catalogue + bons de bonus
+ * + boosters de collection (comme wheel_ev() côté serveur, à l'arrondi de la mise des bons près)
+ */
 function wheelExpected(segments: WheelSegmentConfig[]) {
   const total = segments.reduce((a, s) => a + Math.max(0, Number(s.dropRate) || 0), 0);
   if (total <= 0) return 0;
   const value = (s: WheelSegmentConfig) =>
-    s.type === 'chips' ? Number(s.value) || 0 : s.type === 'vehicle' ? Number(s.vehicleValue) || 0 : 0;
+    s.type === 'chips'
+      ? Number(s.value) || 0
+      : s.type === 'vehicle'
+        ? Number(s.vehicleValue) || 0
+        : s.type === 'voucher'
+          ? Number(s.voucherValue) || 0
+          : s.type === 'pack'
+            ? WHEEL_PACK_VALUE
+            : 0;
   return segments.reduce((a, s) => a + value(s) * (Math.max(0, s.dropRate) / total), 0);
 }
 

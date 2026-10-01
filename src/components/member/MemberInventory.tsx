@@ -452,7 +452,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                             type="button"
                             disabled={busy !== null}
                             onClick={() => askSell([item.id])}
-                            title={`Revendre ${inv.sell_rate} % de la valeur`}
+                            title={item.kind === 'item' ? 'Revendre cet objet au lieu de l’utiliser' : `Revendre ${inv.sell_rate} % de la valeur`}
                             className="flex-1 min-w-0 h-8 rounded-full bg-white text-black text-[11px] font-bold hover:bg-neutral-200 disabled:opacity-50 cursor-pointer truncate px-2"
                           >
                             {fmtChips(item.sell_value)}
@@ -485,7 +485,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
             </div>
           )}
           <p className="text-xs text-neutral-500">
-            <b className="text-neutral-300">Revendre</b> crédite immédiatement {inv.sell_rate} % de la valeur du véhicule en jetons.{' '}
+            <b className="text-neutral-300">Revendre</b> crédite immédiatement {inv.sell_rate} % de la valeur du véhicule en jetons, ou un prix fixe pour un objet (bouteille, montre, costume…).{' '}
             <b className="text-neutral-300">Réclamer</b> (<PackageCheck size={11} className="inline" />) prévient la direction qui vous remet le véhicule en ville. <b className="text-neutral-300">Utiliser</b> un objet prévient la direction qui l’applique en jeu.{' '}
             Un <b className="text-neutral-300">bonus offert</b> se lance directement dans la machine.
           </p>

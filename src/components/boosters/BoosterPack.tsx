@@ -372,6 +372,8 @@ export const BoosterPack: React.FC<BoosterPackProps> = ({
 
   const onDown = (e: React.PointerEvent) => {
     if (!tearable || tornRef.current) return;
+    // Pas de sélection de texte ni de glisser-déposer natif pendant le geste
+    e.preventDefault();
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     drag.current = { x: e.clientX, last: 0 };
   };
@@ -399,8 +401,9 @@ export const BoosterPack: React.FC<BoosterPackProps> = ({
   return (
     <div
       ref={rootRef}
-      className={`relative ${className ?? ''}`}
-      style={{ width, height, perspective: width * 5 }}
+      className={`relative select-none ${className ?? ''}`}
+      style={{ width, height, perspective: width * 5, WebkitUserSelect: 'none' }}
+      onDragStart={(e) => e.preventDefault()}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
     >
@@ -459,10 +462,10 @@ export const BoosterPack: React.FC<BoosterPackProps> = ({
         )}
       </motion.div>
 
-      {/* Zone de prise pour déchirer */}
+      {/* Zone de prise pour déchirer : tout le paquet (le geste est horizontal) */}
       {tearable && !torn && (
         <div
-          className="absolute inset-x-0 -top-4 h-[30%] cursor-grab active:cursor-grabbing touch-none"
+          className="absolute inset-x-0 -top-4 bottom-0 z-20 cursor-grab active:cursor-grabbing touch-none"
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}

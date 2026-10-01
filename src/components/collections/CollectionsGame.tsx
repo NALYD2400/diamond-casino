@@ -548,7 +548,7 @@ export const CollectionsGame: React.FC = () => {
                             <motion.span animate={{ x: [-14, 14, -14] }} transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}>
                               ↔
                             </motion.span>
-                            Glissez le long du haut du paquet pour le déchirer
+                            Glissez le doigt de gauche à droite sur le paquet pour le déchirer
                           </p>
                           <button type="button" onClick={() => setAutoTear(true)} className="text-xs text-white/60 hover:text-white underline underline-offset-4">
                             ou cliquez ici pour l'ouvrir

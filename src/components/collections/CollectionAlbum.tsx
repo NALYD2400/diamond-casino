@@ -325,10 +325,11 @@ const AlbumCard: React.FC<{
 }> = ({ card, width, setName, setSize, count, found, sellable, price, selling, onSell }) => (
   <div className="flex flex-col items-center gap-2">
     <div className="relative">
-      {found === 0 ? (
+      {found === 0 && (card.secret || card.hidden) ? (
+        // Carte secrète non découverte : emplacement « ??? »
         <BrandCardSlot card={card} width={width} setSize={setSize} />
       ) : (
-        // Carte secrète revendue jusqu'au dernier exemplaire : reste « découverte », grisée
+        // Carte pas encore obtenue : visible mais grisée. Aussi : carte revendue jusqu'au dernier exemplaire
         <BrandCardFace card={card} width={width} lite setName={setName} setSize={setSize} className={count === 0 ? 'opacity-40 grayscale' : undefined} />
       )}
       {count > 1 && <span className="absolute -top-2 -right-2 z-10 rounded-full bg-white text-black text-[11px] font-extrabold px-2 py-0.5 shadow-lg">×{count}</span>}

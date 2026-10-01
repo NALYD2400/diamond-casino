@@ -5,7 +5,7 @@
 --   tirée, à partager entre les cartes de la rareté), Secrète 0,05 %.
 -- * Valeurs de revente fortement baissées :
 --   Commune 100, Rare 250, Épique 750, Légendaire 2 500, Mythique 10 000,
---   Secrète 50 000 (revendues à 70 / 75 / 80 % selon le VIP).
+--   Secrète 75 000 (revendues à 70 / 75 / 80 % selon le VIP).
 -- * Limite d'achat : games_config.collections.dailyPackLimit boosters achetés
 --   par album et par jour (heure de Paris), 3 par défaut, 0 = illimité.
 --   Les boosters offerts (roue, direction) ne comptent pas.
@@ -91,7 +91,7 @@ $$;
 
 -- 4. Économie
 update public.collection_rarities set sell_value = v.val, updated_at = now()
-from (values ('COMMUNE', 100), ('RARE', 250), ('EPIQUE', 750), ('LEGENDAIRE', 2500), ('MYTHIQUE', 10000), ('SECRETE', 50000)) as v(key, val)
+from (values ('COMMUNE', 100), ('RARE', 250), ('EPIQUE', 750), ('LEGENDAIRE', 2500), ('MYTHIQUE', 10000), ('SECRETE', 75000)) as v(key, val)
 where collection_rarities.key = v.key;
 
 update public.collection_sets

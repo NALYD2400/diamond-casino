@@ -32,6 +32,8 @@ import {
   MAX_WIN_X_BET,
   PAYING_SYMBOLS,
   SCATTER_PAY_X_BET,
+  payoutScale,
+  maxWinMultiplier,
   dogRoundCost,
   getWinTier,
   maxBuyBet,
@@ -143,7 +145,7 @@ export const DogHouseGame: React.FC = () => {
   const buyMaxBet = maxBuyBet(buyPriceX, cfg.maxPayout);
   const buyBetTooHigh = bet > buyMaxBet;
   // Gain maximum réellement possible à cette mise (plafond de la machine ou de la manche)
-  const maxWinX = Math.min(MAX_WIN_X_BET, Math.floor(cfg.maxPayout / bet));
+  const maxWinX = Math.floor(Math.min(maxWinMultiplier(bet), cfg.maxPayout / bet));
 
   const [grid, setGrid] = useState<DogSymbolId[][]>(INITIAL_GRID);
   const [mults, setMults] = useState<number[][]>(() => INITIAL_GRID.map((c) => c.map((s) => (s === 'wild' ? 3 : 1))));
@@ -834,7 +836,7 @@ export const DogHouseGame: React.FC = () => {
             </p>
             {buyBetTooHigh && (
               <p className="text-center text-[#ff9a8a] text-xs mb-4">
-                Mise trop haute pour acheter : le gain maximum est plafonné à {fmt(cfg.maxPayout)}. Achat possible jusqu'à {fmt(buyMaxBet)} de mise.
+                Mise trop haute pour acheter : le gain maximum baisse quand la mise monte. Achat possible jusqu'à {fmt(buyMaxBet)} de mise.
               </p>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -1232,7 +1234,7 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-white/60">Gain maximum</span>
-                  <span className="text-white font-bold">6 750x</span>
+                  <span className="text-white font-bold">jusqu'à {fmt(MAX_WIN_X_BET)}x</span>
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-white/60">Lignes</span>
@@ -1600,7 +1602,7 @@ const PaytableModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, on
               {[5, 4, 3].map((n) => (
                 <div key={n}>
                   <span className="text-[#ffe14a]">{n} </span>
-                  <span className="text-white">{fmt(lineBet * DOG_SYMBOLS[id].pays[n - 3])}</span>
+                  <span className="text-white">{fmt(Math.round(lineBet * DOG_SYMBOLS[id].pays[n - 3] * payoutScale(bet) * 100) / 100)}</span>
                 </div>
               ))}
             </div>
@@ -1652,7 +1654,7 @@ const PaytableModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, on
       </div>
       <p className="text-white/50 text-[11px] text-center mt-4">
         Gains de gauche à droite sur lignes adjacentes. Seul le gain le plus élevé par ligne est payé. Gain maximum :{' '}
-        {fmt(MAX_WIN_X_BET)}x la mise. RTP théorique {formatRtp(SLOT_RTP.doghouse)} (tirages effectués par le serveur).
+        {fmt(MAX_WIN_X_BET)}x la mise (il baisse quand la mise monte : {fmt(MAX_WIN_X_BET)}x jusqu'à 100, 100 000 jetons jusqu'à 500…). RTP théorique {formatRtp(SLOT_RTP.doghouse)} (tirages effectués par le serveur).
       </p>
     </Modal>
   );
@@ -1668,7 +1670,7 @@ const GameInfoStrip: React.FC = () => (
       {[
         { l: 'RTP', v: formatRtp(SLOT_RTP.doghouse) },
         { l: 'Volatilité', v: 'Élevée' },
-        { l: 'Gain max', v: `${fmt(MAX_WIN_X_BET)}x` },
+        { l: 'Gain max', v: `≤ ${fmt(MAX_WIN_X_BET)}x` },
         { l: 'Lignes', v: '20 fixes' },
       ].map((s) => (
         <div key={s.l} className="rounded-lg bg-[#1a2c38] px-3 py-2">

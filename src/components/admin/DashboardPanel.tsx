@@ -9,8 +9,8 @@ import { Badge, Button, Card, EmptyState, HelpBox, PageHeader, RoleBadge, Segmen
 const TARGET_RTP: Record<string, string> = {
   mines: 'réglable',
   crash: 'réglable',
-  doghouse: '≈ 95 %',
-  wanted: '≈ 96 %',
+  doghouse: '≈ 90 %',
+  wanted: '≈ 90 %',
 };
 
 export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ goTo }) => {

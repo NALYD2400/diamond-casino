@@ -12,7 +12,7 @@
  *     un DEAD parmi les 3    → Dead Man's Hand (collecte de wilds et multiplicateurs,
  *                              puis 3 tours « Showdown » : les wilds collectés sont
  *                              replacés au hasard à chaque tour, gains x multiplicateur)
- * - Achat de bonus : 80x / 204x / 406x. Gain max : 12 500x la mise.
+ * - Achat de bonus : 80x / 204x / 406x. Gain max : selon la mise (voir maxWinFor).
  */
 
 export type WantedSymbolId =
@@ -35,7 +35,8 @@ export type WantedBonus = 'gtr' | 'duel' | 'dmh';
 
 export const REELS = 5;
 export const ROWS = 5;
-export const MAX_WIN_X = 12500;
+/** Multiplicateur maximum absolu (petites mises) ; voir maxWinFor pour les mises plus hautes */
+export const MAX_WIN_X = 1000;
 
 export const BONUS_INFO: Record<WantedBonus, { name: string; price: number; spins: number; tagline: string }> = {
   gtr: { name: 'The Great Train Robbery', price: 80, spins: 10, tagline: 'Wilds collants pendant 10 tours' },
@@ -56,6 +57,38 @@ export const PAYTABLE: Partial<Record<WantedSymbolId, [number, number, number]>>
   J: [0.1, 0.25, 0.75],
   '10': [0.1, 0.25, 0.75],
 };
+
+
+/**
+ * Gain maximum d'une manche selon la mise (jetons) : plus on mise gros, plus le multiplicateur
+ * maximum baisse, pour qu'un tour à 10 000 ne puisse pas rapporter des millions.
+ *   mise ≤ 100 : ×1 000   mise 200 : ×500   mise 500 : ×200 (100 000)   mise 2 000 : ×65 (130 000)
+ *   mise 10 000 : ×29 (290 000)   mise 100 000 : ×20 (2 000 000)
+ */
+export function maxWinFor(bet: number): number {
+  return Math.floor(Math.min(1000 * bet, 100000 + 20 * Math.max(0, bet - 500)));
+}
+export const maxWinMultiplier = (bet: number): number => maxWinFor(bet) / Math.max(1, bet);
+
+/**
+ * Coefficient de gains selon le plafond de la mise (interpolé sur le logarithme du multiplicateur max).
+ * Couper les gros gains fait baisser le retour : ce coefficient (jeu de base seulement, pas les bonus ni les achats)
+ * le ramène vers ≈ 90 %, plafonné à ×2.
+ * Table calibrée par simulation (voir supabase/migrations/20261002100000_audit_house_edge_floors.sql).
+ */
+const SCALE_TABLE: readonly (readonly [number, number])[] = [[100, 2.0], [200, 1.571], [300, 1.465], [500, 1.361], [1000, 1.235]];
+export function payoutScale(bet: number): number {
+  const x = Math.min(1000, Math.max(1, maxWinMultiplier(bet)));
+  const t = SCALE_TABLE;
+  if (x <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) {
+    if (x <= t[i][0]) {
+      const f = (Math.log(x) - Math.log(t[i - 1][0])) / (Math.log(t[i][0]) - Math.log(t[i - 1][0]));
+      return t[i - 1][1] + f * (t[i][1] - t[i - 1][1]);
+    }
+  }
+  return t[t.length - 1][1];
+}
 
 export const PAYING: WantedSymbolId[] = ['skull', 'bag', 'whiskey', 'revolver', 'A', 'K', 'Q', 'J', '10'];
 
@@ -192,7 +225,7 @@ export interface WantedSpinResult {
 const isWildLike = (s: WantedSymbolId) => s === 'wild' || s === 'vs';
 const isScatter = (s: WantedSymbolId) => s === 'fs' || s === 'duel' || s === 'dead';
 
-function evaluateLines(grid: WantedSymbolId[][], reelMult: number[], bet: number): WantedLineWin[] {
+function evaluateLines(grid: WantedSymbolId[][], reelMult: number[], bet: number, scale = 1): WantedLineWin[] {
   const wins: WantedLineWin[] = [];
   PAYLINES.forEach((rows, lineIndex) => {
     const cells = rows.map((row, r) => grid[r][row]);
@@ -212,10 +245,10 @@ function evaluateLines(grid: WantedSymbolId[][], reelMult: number[], bet: number
       for (let r = 0; r < count; r++) m += reelMult[r];
       return m > 0 ? m : 1;
     };
-    const wildPay = wildRun >= 3 ? PAYTABLE.wild![wildRun - 3] * multFor(wildRun) : 0;
+    const wildPay = wildRun >= 3 ? PAYTABLE.wild![wildRun - 3] * scale * multFor(wildRun) : 0;
     const symPay =
       target && !isScatter(target) && symCount >= 3 && PAYTABLE[target]
-        ? PAYTABLE[target]![symCount - 3] * multFor(symCount)
+        ? PAYTABLE[target]![symCount - 3] * scale * multFor(symCount)
         : 0;
 
     if (wildPay <= 0 && symPay <= 0) return;
@@ -326,10 +359,10 @@ export function evaluateWantedSpin(params: {
   });
 
   // 3. Évaluation finale
-  const wins = evaluateLines(grid, reelMult, bet);
+  const wins = evaluateLines(grid, reelMult, bet, mode === 'base' && !forceBonus ? payoutScale(bet) : 1);
   if (globalMultiplier > 1) wins.forEach((w) => (w.win = Math.round(w.win * globalMultiplier * 100) / 100));
   let totalWin = Math.round(wins.reduce((a, w) => a + w.win, 0) * 100) / 100;
-  totalWin = Math.min(totalWin, bet * MAX_WIN_X);
+  totalWin = Math.min(totalWin, maxWinFor(bet));
 
   const nextSticky: Cell[] = [...stickyWilds];
   if (mode === 'gtr') {
@@ -424,7 +457,7 @@ export function placeShowdownWilds(count: number, rng: () => number = Math.rando
 
 export function simulateBonus(bonus: WantedBonus, bet: number, rng: () => number = Math.random): number {
   let total = 0;
-  const cap = bet * MAX_WIN_X;
+  const cap = maxWinFor(bet);
   if (bonus === 'dmh') {
     const { wilds, multiplier } = runDmhCollect(rng);
     for (let i = 0; i < 3 && total < cap; i++) {
@@ -511,8 +544,21 @@ export interface WantedRound {
  */
 export const BUY_CAP_RATIO = 5;
 export function maxBuyBet(buyPriceX: number, maxPayout: number): number {
-  return Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
+  // Duel at Dawn (×204) et Dead Man's Hand (×406) tirent leur valeur de gains énormes que le
+  // plafond de gain coupe : leur achat est retiré (ils restent possibles en jeu normal).
+  if (buyPriceX >= BUY_DISABLED_FROM_PRICE) return 0;
+  const byPayout = Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
+  // Great Train Robbery : retour correct tant que le plafond de la mise reste ≥ ×200
+  let lo = 1;
+  let hi = 100000;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (maxWinMultiplier(mid) >= 200) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.min(byPayout, lo);
 }
+const BUY_DISABLED_FROM_PRICE = 150;
 
 export function playWantedRound(params: {
   bet: number;
@@ -523,7 +569,7 @@ export function playWantedRound(params: {
   rng?: () => number;
 }): WantedRound {
   const { bet, buy = null, buyPrices = {}, maxPayout = Infinity, rng = Math.random } = params;
-  const cap = Math.min(bet * MAX_WIN_X, maxPayout);
+  const cap = Math.min(maxWinFor(bet), maxPayout);
   const base = evaluateWantedSpin({ bet, forceBonus: buy ?? undefined, rng });
   base.totalWin = Math.min(base.totalWin, cap);
 

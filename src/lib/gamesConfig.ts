@@ -88,8 +88,8 @@ export interface GamesConfig {
 }
 
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
-  mines: { enabled: true, minBet: 10, maxBet: 100000, rtp: 97, maxPayout: 5000000 },
-  crash: { enabled: true, minBet: 10, maxBet: 100000, rtp: 97, maxMultiplier: 1000, maxPayout: 5000000 },
+  mines: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxPayout: 5000000 },
+  crash: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxMultiplier: 1000, maxPayout: 5000000 },
   doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 115, boostEnabled: true, maxPayout: 10000000 },
   wanted: {
     enabled: true,
@@ -99,7 +99,7 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
     buyPrices: { gtr: 80, duel: 204, dmh: 406 },
     maxPayout: 10000000,
   },
-  wheel: { enabled: true, spinPrice: 25000, maxRtp: 95 },
+  wheel: { enabled: true, spinPrice: 25000, maxRtp: 90 },
   boosters: { enabled: false, maxRtp: 90, sellRate: 70 },
   collections: { enabled: true, maxRtp: 90, packMaxRtp: 60, dailyPackLimit: 0, sellRate: 70, sellBonusSilver: 0, sellBonusGold: 5, sellBonusDiamond: 10 },
 };
@@ -165,7 +165,7 @@ export const GAME_LABELS: Record<string, string> = {
  * Toute l'interface passe par ces valeurs pour rester cohérente.
  * Vérification : npm run check:rtp (simulation des moteurs, ~2 min).
  */
-export const SLOT_RTP = { doghouse: 95, wanted: 96.4 } as const;
+export const SLOT_RTP = { doghouse: 90, wanted: 90 } as const;
 
 /** 96.5 -> "96,5 %", 97 -> "97 %" */
 export const formatRtp = (rtp: number): string =>

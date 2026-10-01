@@ -42,6 +42,7 @@ import {
   simulateWanted,
   BONUS_INFO,
   MAX_WIN_X as WANTED_MAX_WIN_X,
+  maxBuyBet as maxWantedBuy,
 } from './src/components/wanted/wantedEngine';
 
 type TestCase = [string, boolean | Promise<boolean>];
@@ -268,7 +269,7 @@ async function main() {
     ['free spins grid awards 9 to 27 spins', Array.from({ length: 500 }, (_, i) => rollFreeSpinsGrid(seeded(i + 3))).every(
       (g) => g.length === 9 && g.every((v) => v >= 1 && v <= 3),
     )],
-    ['a single spin never exceeds the 6 750x max win', dogSpins.every((r) => r.totalWin <= 200 * MAX_WIN_X_BET)],
+    ['a single spin never exceeds the bet-based max win', dogSpins.every((r) => r.totalWin <= 200 * MAX_WIN_X_BET)],
     ['simulated RTP over 300k spins stays close to 96.5%', (() => {
       const sim = simulateDogHouse(300000, seeded(2026));
       return sim.rtp > 90 && sim.rtp < 103 && sim.hitRate > 20 && sim.bonusFrequency > 200 && sim.bonusFrequency < 500;
@@ -310,15 +311,23 @@ async function main() {
       const cells = placeShowdownWilds(c.wilds, seeded(c.wilds + 3));
       return c.wilds <= DMH_MAX_WILDS && cells.length === c.wilds && new Set(cells.map((x) => `${x.reel}-${x.row}`)).size === c.wilds;
     })],
-    ['each bonus is worth close to its buy price (±15%)', (['gtr', 'duel', 'dmh'] as const).every((b) => {
+    // Seul Great Train Robbery reste achetable (retour correct sous le plafond de gain) ;
+    // Duel et Dead Man's Hand ne s'achètent plus : ils ne doivent jamais valoir plus que leur prix.
+    ['the buyable bonus (gtr) is worth close to its buy price (±15%)', (() => {
       const rng = seeded(4242);
       let total = 0;
-      const n = b === 'gtr' ? 6000 : 12000;
-      for (let i = 0; i < n; i++) total += simulateBonus(b, 1, rng);
-      const ratio = total / n / BONUS_INFO[b].price;
+      for (let i = 0; i < 6000; i++) total += simulateBonus('gtr', 1, rng);
+      const ratio = total / 6000 / BONUS_INFO.gtr.price;
       return ratio > 0.8 && ratio < 1.15;
+    })()],
+    ['duel and dmh bonuses are never worth more than their buy price', (['duel', 'dmh'] as const).every((b) => {
+      const rng = seeded(4242);
+      let total = 0;
+      for (let i = 0; i < 12000; i++) total += simulateBonus(b, 1, rng);
+      return total / 12000 / BONUS_INFO[b].price < 1;
     })],
-    ['a single spin never exceeds the 12 500x max win', wantedSpins.every((r) => r.totalWin <= 200 * WANTED_MAX_WIN_X)],
+    ['wanted buy: only gtr is purchasable, duel and dmh are not', maxWantedBuy(80, 1e7) > 0 && maxWantedBuy(204, 1e7) === 0 && maxWantedBuy(406, 1e7) === 0],
+    ['a single spin never exceeds the max win', wantedSpins.every((r) => r.totalWin <= 200 * WANTED_MAX_WIN_X)],
     ['simulated RTP over 300k spins stays in a sane range', (() => {
       const sim = simulateWanted(300000, seeded(2027));
       return sim.rtp > 80 && sim.rtp < 112 && sim.hitRate > 20;

@@ -62,8 +62,8 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 // ---------------------------------------------------------------------------
 
 /** Valeur moyenne des bonus achetés (en × la mise), mesurée sur les moteurs */
-const DOG_BONUS_VALUE = 110;
-const WANTED_BONUS_VALUE = { gtr: 78, duel: 197, dmh: 392 } as const;
+const DOG_BONUS_VALUE = 104;
+const WANTED_BONUS_VALUE = { gtr: 73, duel: 184, dmh: 366 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
 const MIN_ROUNDS = 200;
@@ -951,7 +951,7 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
                 </>
               }
             >
-              <NumberInput value={draft.wheel.maxRtp} min={10} max={100} onChange={(v) => set('wheel', { maxRtp: Math.min(100, Math.max(10, v)) })} suffix="%" />
+              <NumberInput value={draft.wheel.maxRtp} min={10} max={98} onChange={(v) => set('wheel', { maxRtp: Math.min(98, Math.max(10, v)) })} suffix="%" />
             </Field>
             <div className="text-[13px] text-neutral-400">
               Les lots et leurs chances se règlent dans{' '}
@@ -976,7 +976,7 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
                 </>
               }
             >
-              <NumberInput value={draft.collections.maxRtp} min={10} max={100} onChange={(v) => set('collections', { maxRtp: Math.min(100, Math.max(10, v)) })} suffix="%" />
+              <NumberInput value={draft.collections.maxRtp} min={10} max={98} onChange={(v) => set('collections', { maxRtp: Math.min(98, Math.max(10, v)) })} suffix="%" />
             </Field>
             <Field
               label="Revente maximum d'un booster"

@@ -744,7 +744,7 @@ export const GamesHub: React.FC = () => {
                 THE DOG HOUSE
               </h2>
               <p className="mt-3 text-sm font-semibold text-[#1b2a3a] max-w-sm">
-                Wilds x2 et x3 additionnés, jusqu'à 27 tours gratuits avec wilds collants. Gain max 6 750x.
+                Wilds x2 et x3 additionnés, jusqu'à 27 tours gratuits avec wilds collants. Gain max jusqu'à ×1 000 (selon la mise).
               </p>
               <span className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-[#3b1d0e] px-5 py-2.5 text-sm font-bold text-white group-hover:bg-[#5a2c10] transition-colors shadow-md">
                 <Play size={15} fill="currentColor" /> Jouer maintenant

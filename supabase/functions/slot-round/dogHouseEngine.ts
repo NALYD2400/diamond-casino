@@ -11,7 +11,7 @@
  * - Tours Gratuits : une grille 3x3 de valeurs 1 à 3 est tirée, la somme donne le nombre
  *   de tours (9 à 27). Pendant les tours, chaque WILD qui tombe devient COLLANT (sticky)
  *   avec son multiplicateur jusqu'à la fin du bonus. Pas de SCATTER pendant les tours.
- * - Gain maximum plafonné à 6 750x la mise.
+ * - Gain maximum plafonné à 2 000x la mise.
  */
 
 export type DogSymbolId =
@@ -91,7 +91,38 @@ export const DOG_PAYLINES: readonly (readonly number[])[] = [
 ];
 
 export const SCATTER_PAY_X_BET = 5;
-export const MAX_WIN_X_BET = 6750;
+/** Multiplicateur maximum absolu (petites mises) ; voir maxWinFor pour les mises plus hautes */
+export const MAX_WIN_X_BET = 1000;
+/**
+ * Gain maximum d'une manche selon la mise (jetons) : plus on mise gros, plus le multiplicateur
+ * maximum baisse, pour qu'un tour à 10 000 ne puisse pas rapporter des millions.
+ *   mise ≤ 100 : ×1 000   mise 200 : ×500   mise 500 : ×200 (100 000)   mise 2 000 : ×65 (130 000)
+ *   mise 10 000 : ×29 (290 000)   mise 100 000 : ×20 (2 000 000)
+ */
+export function maxWinFor(bet: number): number {
+  return Math.floor(Math.min(1000 * bet, 100000 + 20 * Math.max(0, bet - 500)));
+}
+export const maxWinMultiplier = (bet: number): number => maxWinFor(bet) / Math.max(1, bet);
+
+/**
+ * Coefficient de gains selon le plafond de la mise (interpolé sur le logarithme du multiplicateur max).
+ * Couper les gros gains fait baisser le retour : ce coefficient le ramène vers ≈ 90 %.
+ * Table calibrée par simulation (voir supabase/migrations/20261002100000_audit_house_edge_floors.sql).
+ */
+const SCALE_TABLE: readonly (readonly [number, number])[] = [[20, 1.69], [30, 1.493], [50, 1.345], [100, 1.202], [200, 1.085], [300, 1.031], [500, 0.983], [1000, 0.955]];
+export function payoutScale(bet: number): number {
+  const x = Math.min(1000, Math.max(1, maxWinMultiplier(bet)));
+  const t = SCALE_TABLE;
+  if (x <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) {
+    if (x <= t[i][0]) {
+      const f = (Math.log(x) - Math.log(t[i - 1][0])) / (Math.log(t[i][0]) - Math.log(t[i - 1][0]));
+      return t[i - 1][1] + f * (t[i][1] - t[i - 1][1]);
+    }
+  }
+  return t[t.length - 1][1];
+}
+
 
 /**
  * Achat de bonus : le gain maximum d'une manche (maxPayout) doit rester au moins
@@ -101,8 +132,18 @@ export const MAX_WIN_X_BET = 6750;
  */
 export const BUY_CAP_RATIO = 5;
 export function maxBuyBet(buyPriceX: number, maxPayout: number): number {
-  return Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
+  const byPayout = Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
+  // Un bonus acheté ne rend un retour correct que si le plafond de la mise reste ≥ ×300
+  let lo = 1;
+  let hi = 100000;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (maxWinMultiplier(mid) >= BUY_MIN_MAX_WIN_X) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.min(byPayout, lo);
 }
+const BUY_MIN_MAX_WIN_X = 300;
 
 /**
  * Prix d'achat du bonus (valeur par défaut, réglable dans la console admin).
@@ -296,7 +337,7 @@ export function evaluateDogHouseSpin(params: {
     if (count < 3) return;
     const base = DOG_SYMBOLS[target].pays[count - 3];
     const wildMultiplier = multSum > 0 ? multSum : 1;
-    const win = Math.round(lineBet * base * wildMultiplier * 100) / 100;
+    const win = Math.round(lineBet * base * payoutScale(bet) * wildMultiplier * 100) / 100;
     if (win > 0) {
       wins.push({ lineIndex, symbol: target, count, positions, wildMultiplier, win });
     }
@@ -318,7 +359,7 @@ export function evaluateDogHouseSpin(params: {
   }
 
   let totalWin = Math.round(wins.reduce((a, w) => a + w.win, 0) * 100) / 100;
-  totalWin = Math.min(totalWin, bet * MAX_WIN_X_BET);
+  totalWin = Math.min(totalWin, maxWinFor(bet));
 
   const nextSticky: StickyWild[] = isFreeSpin ? [...stickyWilds] : [];
   if (isFreeSpin) {
@@ -377,7 +418,7 @@ export function simulateDogHouse(spins = 200000, rng: () => number = Math.random
         spinWin += fs.totalWin;
       }
     }
-    spinWin = Math.min(spinWin, bet * MAX_WIN_X_BET);
+    spinWin = Math.min(spinWin, maxWinFor(bet));
     returned += spinWin;
     maxX = Math.max(maxX, spinWin / bet);
   }
@@ -428,7 +469,7 @@ export function playDogHouseRound(params: {
   rng?: () => number;
 }): DogHouseRound {
   const { bet, mode, buyPriceX = BONUS_BUY_X_BET, maxPayout = Infinity, rng = Math.random } = params;
-  const cap = Math.min(bet * MAX_WIN_X_BET, maxPayout);
+  const cap = Math.min(maxWinFor(bet), maxPayout);
   const base = evaluateDogHouseSpin({ bet, forceScatters: mode === 'buy', isBoost: mode === 'boost', rng });
   base.totalWin = Math.min(base.totalWin, cap);
 

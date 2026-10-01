@@ -19,6 +19,8 @@ import {
   PAYING,
   PAYLINES,
   PAYTABLE,
+  payoutScale,
+  maxWinMultiplier,
   REELS,
   ROWS,
   getWantedTier,
@@ -701,7 +703,7 @@ export const WantedGame: React.FC = () => {
             </div>
           </div>
           <div className="hidden lg:flex w-[170px] shrink-0 flex-col gap-2">
-            <InfoCard title="GAIN MAX" value={`${fmt(Math.min(MAX_WIN_X, Math.floor(cfg.maxPayout / bet)))}x`} />
+            <InfoCard title="GAIN MAX" value={`${fmt(Math.floor(Math.min(maxWinMultiplier(bet), cfg.maxPayout / bet)))}x`} />
             <InfoCard title="VS" value="x2 → x100" sub="Multiplicateurs additionnés sur la ligne" />
             <InfoCard title="RTP" value={formatRtp(SLOT_RTP.wanted)} />
           </div>
@@ -812,7 +814,7 @@ export const WantedGame: React.FC = () => {
                     <div className="text-center text-[11px] opacity-70">{buyPrices[b]}x la mise</div>
                     {tooHigh && (
                       <div className="mt-1 text-center text-[11px] font-bold text-[#8a1c10]">
-                        Mise max : {fmt(maxBuyBet(buyPrices[b], cfg.maxPayout))}
+                        {maxBuyBet(buyPrices[b], cfg.maxPayout) === 0 ? 'Achat indisponible' : `Mise max : ${fmt(maxBuyBet(buyPrices[b], cfg.maxPayout))}`}
                       </div>
                     )}
                   </button>
@@ -1644,7 +1646,7 @@ const RulesModal: React.FC<{ bet: number; prices: Record<WantedBonus, number>; o
             {[5, 4, 3].map((n) => (
               <div key={n}>
                 <span className="text-[#e0b040]">{n} </span>
-                <span className="text-white">{fmt(bet * PAYTABLE[id]![n - 3])}</span>
+                <span className="text-white">{fmt(Math.round(bet * PAYTABLE[id]![n - 3] * payoutScale(bet) * 100) / 100)}</span>
               </div>
             ))}
           </div>
@@ -1694,7 +1696,7 @@ const RulesModal: React.FC<{ bet: number; prices: Record<WantedBonus, number>; o
       ))}
     </div>
     <p className="text-white/50 text-[11px] text-center mt-4">
-      Gain maximum : {fmt(MAX_WIN_X)}x la mise, le tour s'arrête dès qu'il est atteint. RTP théorique {formatRtp(SLOT_RTP.wanted)} (tirages effectués par le serveur).
+      Gain maximum : jusqu'à {fmt(MAX_WIN_X)}x la mise (il baisse quand la mise monte : {fmt(MAX_WIN_X)}x jusqu'à 100, 100 000 jetons jusqu'à 500…), le tour s'arrête dès qu'il est atteint. RTP théorique {formatRtp(SLOT_RTP.wanted)} (tirages effectués par le serveur).
     </p>
   </Modal>
 );

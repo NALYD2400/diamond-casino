@@ -1,0 +1,90 @@
+/**
+ * Visuel d'un lot de la roue : vrai paquet de l'album pour un booster offert,
+ * couverture de la machine pour un bonus offert, image du lot sinon.
+ */
+import React, { useEffect, useState } from 'react';
+import type { WheelSegmentConfig } from '../../context/CasinoAdminContext';
+import { apiCollectionCatalog, type CollectionCatalog } from '../../lib/supabase';
+import { BoosterPack } from '../boosters/BoosterPack';
+import { PackFan, packFanCards, packLookFor } from '../collections/PackFan';
+import { DogHouseCover, WantedCover } from '../slots/GameCovers';
+
+// Catalogue des collections, chargé une seule fois pour toute la page
+let catalogPromise: Promise<CollectionCatalog | null> | null = null;
+function useCollectionCatalog() {
+  const [catalog, setCatalog] = useState<CollectionCatalog | null>(null);
+  useEffect(() => {
+    let alive = true;
+    catalogPromise ??= apiCollectionCatalog().catch(() => {
+      catalogPromise = null;
+      return null;
+    });
+    void catalogPromise.then((c) => alive && setCatalog(c));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return catalog;
+}
+
+/** Contenu réduit d'un facteur `scale` (le visuel est dessiné en grand puis rétréci) */
+const Scaled: React.FC<{ size: number; scale: number; children: React.ReactNode }> = ({ size, scale, children }) => (
+  <div className="absolute left-1/2 top-1/2" style={{ width: size, height: size, transform: `translate(-50%, -50%) scale(${scale})` }}>
+    {children}
+  </div>
+);
+
+export const PrizeVisual: React.FC<{
+  seg: WheelSegmentConfig;
+  /** Image de repli (ou image du lot) */
+  src: string;
+  fallback: string;
+  /** Hauteur du cadre en pixels (le visuel remplit son parent, positionné) */
+  height: number;
+  thumb?: boolean;
+}> = ({ seg, src, fallback, height, thumb = false }) => {
+  const catalog = useCollectionCatalog();
+
+  if (seg.type === 'voucher') {
+    const cover = seg.voucherGame === 'wanted' ? <WantedCover /> : <DogHouseCover />;
+    // Les couvertures sont dessinées pour ~260 px : on les réduit pour la vignette
+    return thumb ? <Scaled size={160} scale={height / 160}>{cover}</Scaled> : cover;
+  }
+
+  if (seg.type === 'pack' && catalog) {
+    const set = catalog.sets.find((s) => s.id === seg.packSet) ?? (seg.packSet ? undefined : catalog.sets[0]);
+    if (set) {
+      const drawW = thumb ? 60 : Math.round((height * 0.95) / 1.62);
+      const pack = (
+        <BoosterPack
+          pack={{ ...packLookFor(set), cover: <PackFan cards={packFanCards(catalog, set.id)} width={drawW} setName={set.name} /> }}
+          width={drawW}
+          interactive={false}
+        />
+      );
+      return (
+        <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 45%, ${set.accent_color}55, #0b0716 70%)` }}>
+          {thumb ? (
+            <Scaled size={drawW * 1.62} scale={(height * 0.9) / (drawW * 1.62)}>
+              <div className="flex justify-center">{pack}</div>
+            </Scaled>
+          ) : (
+            <div className="absolute inset-0 flex items-start justify-center pt-2">{pack}</div>
+          )}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      className="absolute inset-0 w-full h-full object-cover"
+      onError={(e) => {
+        e.currentTarget.src = fallback;
+      }}
+    />
+  );
+};

@@ -7,6 +7,7 @@ import { useCasinoAdmin, type WheelSegmentConfig } from '../context/CasinoAdminC
 import { MachineClosedBanner, useMachineClosed } from './MachineClosedBanner';
 import { apiRecentWheelWins, CasinoApiError, type WheelWin } from '../lib/supabase';
 import { Wheel } from './wheel/Wheel';
+import { PrizeVisual } from './wheel/PrizeVisual';
 import { WheelAudio } from './wheel/wheelAudio';
 import { SampleBank } from './slots/sampleBank';
 import { GameVolumeButton, GameVolumeModalRow } from './VolumeControl';
@@ -822,15 +823,9 @@ const PrizeBoard: React.FC<{
               }`}
             >
               <span className="absolute left-0 inset-y-0 w-[3px]" style={{ background: rare.color }} />
-              <img
-                src={prizeImage(seg, podiumImage)}
-                alt=""
-                loading="lazy"
-                className="w-6 h-6 shrink-0 rounded object-cover border border-black/40"
-                onError={(e) => {
-                  e.currentTarget.src = PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg';
-                }}
-              />
+              <span className="relative w-6 h-6 shrink-0 rounded overflow-hidden border border-black/40 bg-black">
+                <PrizeVisual seg={seg} src={prizeImage(seg, podiumImage)} fallback={PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg'} height={24} thumb />
+              </span>
               <span className="flex-1 min-w-0">
                 <span className="block truncate font-semibold leading-tight">
                   {seg.type === 'chips' && typeof seg.value === 'number' ? fmt(seg.value) : seg.label}
@@ -864,15 +859,8 @@ const PrizePreview: React.FC<{ item: { seg: WheelSegmentConfig; chance: number }
       style={{ top, boxShadow: `0 6px 0 #140c22, 0 0 32px ${rare.glow}, 0 24px 50px rgba(0,0,0,0.65)` }}
     >
       <div className="relative h-[150px] bg-black">
-        <img
-          src={prizeImage(seg, podiumImage)}
-          alt=""
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.src = PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg';
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#140c22] via-transparent to-transparent" />
+        <PrizeVisual seg={seg} src={prizeImage(seg, podiumImage)} fallback={PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg'} height={150} />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#140c22] via-transparent to-transparent pointer-events-none" />
         <span
           className="absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider text-[#140c22] border-2 border-[#140c22]"
           style={{ background: rare.color }}
@@ -1187,15 +1175,8 @@ const PrizeOverlay: React.FC<{ result: SpinResult; podiumImage: string; onClose:
           <X size={16} />
         </button>
         <div className="relative h-48 bg-black border-b-4 border-[#140c22]">
-          <img
-            src={seg.imageUrl || (seg.type === 'vehicle' ? podiumImage : fallback)}
-            alt=""
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.src = fallback;
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#140c22] via-transparent to-transparent" />
+          <PrizeVisual seg={seg} src={seg.imageUrl || (seg.type === 'vehicle' ? podiumImage : fallback)} fallback={fallback} height={192} />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#140c22] via-transparent to-transparent pointer-events-none" />
         </div>
         <div className="p-5 text-center">
           <div

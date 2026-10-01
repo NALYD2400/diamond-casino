@@ -185,7 +185,7 @@ export const VipSubscriptions: React.FC = () => {
   const [submittingTier, setSubmittingTier] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [confirmTier, setConfirmTier] = useState<TierData | null>(null);
-  const { vipConfig } = useCasinoAdmin();
+  const { vipConfig, gamesConfig } = useCasinoAdmin();
 
   // Prix, dotation et délai de roue viennent des réglages (console → VIP)
   const tiers = useMemo<TierData[]>(
@@ -193,6 +193,9 @@ export const VipSubscriptions: React.FC = () => {
       TIERS.map((t) => {
         const cfg = vipConfig[t.id];
         const fmtN = (n: number) => n.toLocaleString('fr-FR');
+        // Bonus de revente des doublons de collection (Machines → Collections)
+        const col = gamesConfig.collections;
+        const sellBonus = t.id === 'GOLD' ? col.sellBonusGold : t.id === 'DIAMOND' ? col.sellBonusDiamond : col.sellBonusSilver;
         return {
           ...t,
           priceChips: cfg.price,
@@ -202,11 +205,12 @@ export const VipSubscriptions: React.FC = () => {
           perks: [
             t.perks[0],
             `${fmtN(cfg.bonus)} jetons offerts à l'activation`,
+            ...(sellBonus > 0 ? [`+${fmtN(sellBonus)} % sur la revente des doublons de collection (${fmtN(col.sellRate + sellBonus)} %)`] : []),
             `Carte valable ${vipConfig.durationDays} jours`,
           ],
         };
       }),
-    [vipConfig],
+    [vipConfig, gamesConfig],
   );
 
   const showToast = (msg: string) => {

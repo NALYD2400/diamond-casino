@@ -188,7 +188,7 @@ export const BrandCardFace: React.FC<BrandCardProps> = ({ card, width = 240, int
           draggable={false}
           loading={lite ? 'lazy' : undefined}
           decoding="async"
-          className="absolute inset-[3px] w-[calc(100%-6px)] h-[calc(100%-6px)] rounded-[11px] object-cover pointer-events-none"
+          className="absolute inset-[3px] w-[calc(100%-6px)] h-[calc(100%-6px)] rounded-[11px] object-cover pointer-events-none z-[5]"
         />
       )}
 

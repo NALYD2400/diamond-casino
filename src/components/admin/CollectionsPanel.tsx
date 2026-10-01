@@ -22,6 +22,8 @@ import {
 import { BrandCardFace } from '../collections/BrandCard';
 import { FONT_LABELS, fmtPct, logoPath, rarityMap, resolveBrandCard, setOdds } from '../collections/collectionUtils';
 import { DealershipSection } from './DealershipSection';
+import { VehiclePicker } from './VehiclePicker';
+import { vehicleDisplayName } from '../../lib/rewards';
 import { Badge, Button, Card, EmptyState, Field, HelpBox, Modal, NumberInput, PageHeader, Segmented, Toggle, cx, fmt, fmtChips, inputClass } from './ui';
 
 type Toast = (m: string, error?: boolean) => void;
@@ -133,8 +135,82 @@ const SetsSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Pro
     {catalog.sets.map((s) => (
       <SetEditor key={s.id} set={s} catalog={catalog} reload={reload} showToast={showToast} />
     ))}
+    <NewSetCard catalog={catalog} reload={reload} showToast={showToast} />
   </>
 );
+
+/** « Super Voitures » → « super-voitures » (identifiant d'album) */
+const slugify = (name: string) =>
+  name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 30);
+
+/**
+ * Création d'un nouvel album. Il est créé caché : on y ajoute ses cartes
+ * (onglet Cartes), puis on le met en vente depuis sa fiche ci-dessus.
+ */
+const NewSetCard: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Promise<void>; showToast: Toast }> = ({ catalog, reload, showToast }) => {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const id = slugify(name);
+  const taken = catalog.sets.some((s) => s.id === id);
+
+  const create = async () => {
+    if (id.length < 2) {
+      showToast('Donnez un nom à l’album.', true);
+      return;
+    }
+    if (taken) {
+      showToast('Un album porte déjà ce nom.', true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiAdminSaveCollectionSet({
+        id,
+        name: name.trim().slice(0, 40),
+        subtitle: null,
+        description: null,
+        accent_color: '#38bdf8',
+        pack_price: 25000,
+        cards_per_pack: 5,
+        reward: 1000000,
+        rarity_weights: { COMMUNE: 57, RARE: 27, EPIQUE: 10, LEGENDAIRE: 4.9, MYTHIQUE: 1, SECRETE: 0.1 },
+        active: false,
+        sort_order: catalog.sets.length,
+      });
+      showToast('Album créé (caché). Ajoutez ses cartes dans l’onglet Cartes, puis mettez-le en vente.');
+      setName('');
+      await reload();
+    } catch (e) {
+      showToast((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Nouvel album" icon={<Plus size={15} />}>
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+        <Field label="Nom de l'album" className="flex-1" hint={id ? `Identifiant : ${id}${taken ? ' (déjà pris)' : ''}` : 'Ex. « Supercars », « Motos de Los Santos »…'}>
+          <input className={inputClass} value={name} maxLength={40} placeholder="Supercars" onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Button variant="primary" loading={busy} disabled={id.length < 2 || taken} onClick={() => void create()}>
+          <Plus size={13} /> Créer l'album
+        </Button>
+      </div>
+      <p className="mt-3 text-[11px] text-neutral-500 leading-relaxed">
+        L'album est créé <b>caché</b>, avec les réglages par défaut (booster 25 000, 5 cartes, récompense 1 000 000). Ajoutez ensuite ses cartes dans{' '}
+        <b>Cartes</b> — une marque, un véhicule du catalogue (photo comprise) ou n'importe quoi d'autre — au moins une par rareté utilisée, puis réglez
+        les chances et cochez « Album en vente ». Le serveur refuse la mise en vente tant que l'album n'est pas complet et rentable.
+      </p>
+    </Card>
+  );
+};
 
 const SetEditor: React.FC<{ set: CollectionSetData; catalog: AdminCollectionCatalog; reload: () => Promise<void>; showToast: Toast }> = ({ set, catalog, reload, showToast }) => {
   const [draft, setDraft] = useState(set);
@@ -378,6 +454,7 @@ const CardEditor: React.FC<{
   const [d, setD] = useState(initial);
   const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pickVehicle, setPickVehicle] = useState(false);
   const preview = resolveBrandCard(
     { id: d.id ?? 'preview', set_id: set.id, number: d.number ?? 0, rarity: d.rarity ?? 'COMMUNE', active: true, hidden: false, ...d, name: d.name || 'Marque' },
     rarityMap(rarities),
@@ -418,7 +495,31 @@ const CardEditor: React.FC<{
     <Modal title={d.id ? `Modifier · ${initial.name}` : 'Nouvelle carte'} onClose={onClose} width="max-w-3xl">
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-6">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Nom de la marque" className="col-span-2">
+          <div className="col-span-2">
+            <button type="button" onClick={() => setPickVehicle((v) => !v)} className="text-xs text-sky-300 hover:text-sky-200 underline underline-offset-4 cursor-pointer">
+              {pickVehicle ? 'Fermer le catalogue' : 'Remplir depuis un véhicule du catalogue (nom + photo)'}
+            </button>
+            {pickVehicle && (
+              <div className="mt-2">
+                <VehiclePicker
+                  className="max-h-56"
+                  onSelect={(v) => {
+                    const brand = (v.manufacturer || '').trim();
+                    const label = vehicleDisplayName(v.manufacturer, v.model.charAt(0).toUpperCase() + v.model.slice(1));
+                    setD({
+                      ...d,
+                      name: label.slice(0, 40),
+                      tagline: (v.class || '').replace(/_/g, ' ').toLowerCase().replace(/^./, (x) => x.toUpperCase()) || d.tagline,
+                      image_url: v.photo_full_url || v.photo_url || d.image_url,
+                      emblem: (brand.charAt(0) || v.model.charAt(0)).toUpperCase(),
+                    });
+                    setPickVehicle(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          <Field label="Nom (marque, véhicule…)" className="col-span-2">
             <input className={inputClass} value={d.name ?? ''} maxLength={40} onChange={(e) => setD({ ...d, name: e.target.value })} />
           </Field>
           <Field label="Slogan" className="col-span-2">

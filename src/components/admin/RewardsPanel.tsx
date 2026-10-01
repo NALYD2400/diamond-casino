@@ -316,6 +316,28 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
         </button>
       </div>
 
+      {/* Mode d'emploi */}
+      <section className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 text-[13px] leading-relaxed text-neutral-300 flex flex-col gap-2">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-white">Comment ça marche ?</h2>
+        <p>
+          Chaque lot gagné par un joueur (véhicule ou objet de la roue, ancien booster véhicule, cadeau de la direction) arrive dans{' '}
+          <b>son inventaire</b> (Espace Client). Le joueur choisit alors :
+        </p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            <b>le revendre</b> contre des jetons : rien à faire de votre côté, le lot passe en « Revendu » ;
+          </li>
+          <li>
+            <b>le réclamer</b> pour le recevoir en ville : il apparaît dans <b>« Réclamations à livrer »</b> ci-dessous. Donnez-le au joueur en jeu,
+            puis cliquez <b>« Marquer livré »</b>.
+          </li>
+        </ul>
+        <p className="text-neutral-400">
+          <b>Retirer</b> annule un lot (erreur, triche…). <b>Marquer livré</b> sur un lot encore « Dans l'inventaire » sert si vous l'avez déjà remis en
+          jeu sans que le joueur l'ait réclamé. Les boosters de collection offerts et les bons de bonus s'utilisent directement par le joueur : rien à livrer.
+        </p>
+      </section>
+
       {/* Claims to handle */}
       <section className="p-5 rounded-2xl bg-sky-500/[0.04] border border-sky-500/20 flex flex-col gap-3">
         <h2 className="text-xs font-bold uppercase tracking-wider text-sky-300 flex items-center gap-2">

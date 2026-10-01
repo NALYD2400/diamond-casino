@@ -259,6 +259,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   GIFT_NOT_FOUND: 'Ce booster offert a déjà été ouvert.',
   GIFT_WRONG_SET: 'Ce booster offert appartient à l’autre collection.',
   COLLECTION_UNPROFITABLE: 'Collection perdante pour le casino : la revente moyenne d’un booster ou le retour sur un album complet dépasse la limite. Baissez les prix de revente / la récompense, montez le prix du booster ou rendez les cartes rares plus rares.',
+  SET_IN_USE: 'Des joueurs ont déjà ouvert des boosters de cet album : il ne peut plus être supprimé. Décochez « Album en vente » pour le cacher.',
+  SET_ON_WHEEL: 'Un lot de la Roue de la Fortune donne un booster de cet album : retirez-le de la roue avant de supprimer l’album.',
   COLLECTION_UNREACHABLE: 'Une carte de l’album ne peut jamais sortir (rareté à 0 % dans ce booster) : l’album serait impossible à compléter.',
 };
 
@@ -868,6 +870,7 @@ export const apiAdminSaveCollectionSet = (set: Omit<CollectionSetData, 'stats' |
 export const apiAdminSaveCollectionCard = (card: Partial<CollectionCardData> & { set_id: string; name: string; rarity: string }) =>
   rpc<CollectionCardData>('admin_save_collection_card', { p_card: card });
 export const apiAdminDeleteCollectionCard = (id: string) => rpc<null>('admin_delete_collection_card', { p_id: id });
+export const apiAdminDeleteCollectionSet = (id: string) => rpc<null>('admin_delete_collection_set', { p_id: id });
 export const apiAdminSaveCollectionRarities = (rows: CollectionRarity[]) =>
   rpc<null>('admin_save_collection_rarities', { p_rows: rows });
 export const apiAdminGrantCollectionPack = (profileId: string, setId: string, qty: number, note?: string) =>

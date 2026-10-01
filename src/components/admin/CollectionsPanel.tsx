@@ -9,6 +9,7 @@ import { Gem, Layers, Pencil, Plus, RefreshCw, Sparkles, Trash2, TriangleAlert }
 import {
   apiAdminCollectionCatalog,
   apiAdminDeleteCollectionCard,
+  apiAdminDeleteCollectionSet,
   apiAdminSaveCollectionCard,
   apiAdminSaveCollectionRarities,
   apiAdminSaveCollectionSet,
@@ -62,6 +63,8 @@ const EFFECTS: { value: BoosterEffect; label: string }[] = [
 
 export const CollectionsPanel: React.FC<{ showToast: Toast }> = ({ showToast }) => {
   const [section, setSection] = useState<Section>('sets');
+  // Album affiché dans l'onglet Cartes (choisi depuis la fiche d'un album)
+  const [cardsSetId, setCardsSetId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<AdminCollectionCatalog | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -105,9 +108,17 @@ export const CollectionsPanel: React.FC<{ showToast: Toast }> = ({ showToast }) 
       ) : !catalog ? (
         <EmptyState title="Chargement…" />
       ) : section === 'sets' ? (
-        <SetsSection catalog={catalog} reload={reload} showToast={showToast} />
+        <SetsSection
+          catalog={catalog}
+          reload={reload}
+          showToast={showToast}
+          onManageCards={(id) => {
+            setCardsSetId(id);
+            setSection('cards');
+          }}
+        />
       ) : section === 'cards' ? (
-        <CardsSection catalog={catalog} reload={reload} showToast={showToast} />
+        <CardsSection catalog={catalog} reload={reload} showToast={showToast} setId={cardsSetId ?? catalog.sets[0]?.id ?? ''} onSetChange={setCardsSetId} />
       ) : (
         <RaritiesSection catalog={catalog} reload={reload} showToast={showToast} />
       )}
@@ -119,7 +130,12 @@ export const CollectionsPanel: React.FC<{ showToast: Toast }> = ({ showToast }) 
 // Albums
 // ---------------------------------------------------------------------------
 
-const SetsSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Promise<void>; showToast: Toast }> = ({ catalog, reload, showToast }) => (
+const SetsSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Promise<void>; showToast: Toast; onManageCards: (id: string) => void }> = ({
+  catalog,
+  reload,
+  showToast,
+  onManageCards,
+}) => (
   <>
     <HelpBox title="Comment marche l'économie d'un album ?">
       <p>
@@ -133,7 +149,7 @@ const SetsSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Pro
       </p>
     </HelpBox>
     {catalog.sets.map((s) => (
-      <SetEditor key={s.id} set={s} catalog={catalog} reload={reload} showToast={showToast} />
+      <SetEditor key={s.id} set={s} catalog={catalog} reload={reload} showToast={showToast} onManageCards={() => onManageCards(s.id)} />
     ))}
     <NewSetCard catalog={catalog} reload={reload} showToast={showToast} />
   </>
@@ -212,9 +228,32 @@ const NewSetCard: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Prom
   );
 };
 
-const SetEditor: React.FC<{ set: CollectionSetData; catalog: AdminCollectionCatalog; reload: () => Promise<void>; showToast: Toast }> = ({ set, catalog, reload, showToast }) => {
+const SetEditor: React.FC<{
+  set: CollectionSetData;
+  catalog: AdminCollectionCatalog;
+  reload: () => Promise<void>;
+  showToast: Toast;
+  onManageCards: () => void;
+}> = ({ set, catalog, reload, showToast, onManageCards }) => {
+  const cardCount = catalog.cards.filter((c) => c.set_id === set.id).length;
   const [draft, setDraft] = useState(set);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      await apiAdminDeleteCollectionSet(set.id);
+      showToast(`Album « ${set.name} » supprimé.`);
+      await reload();
+    } catch (e) {
+      showToast((e as Error).message, true);
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
   useEffect(() => setDraft(set), [set]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(set);
   const odds = setOdds(draft, catalog.cards, catalog.rarities);
@@ -254,6 +293,9 @@ const SetEditor: React.FC<{ set: CollectionSetData; catalog: AdminCollectionCata
           {set.ok ? <Badge tone="good">En vente</Badge> : <Badge tone="bad">Caché aux joueurs</Badge>}
           <Badge>{fmt(set.players ?? 0)} joueurs</Badge>
           <Badge tone="gold">{fmt(set.completions ?? 0)} album(s) complété(s)</Badge>
+          <Button variant="primary" size="sm" onClick={onManageCards}>
+            <Layers size={12} /> Gérer les cartes ({cardCount})
+          </Button>
         </div>
       }
     >
@@ -321,7 +363,22 @@ const SetEditor: React.FC<{ set: CollectionSetData; catalog: AdminCollectionCata
         <div className="w-64">
           <Toggle checked={draft.active !== false} onChange={(v) => setDraft({ ...draft, active: v })} label="Album en vente" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {confirmDelete ? (
+            <>
+              <span className="text-xs text-rose-300">Supprimer « {set.name} » et toutes ses cartes ?</span>
+              <Button variant="danger" size="sm" loading={deleting} onClick={() => void remove()}>
+                Confirmer
+              </Button>
+              <Button variant="subtle" size="sm" onClick={() => setConfirmDelete(false)}>
+                Non
+              </Button>
+            </>
+          ) : (
+            <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)} disabled={saving}>
+              <Trash2 size={12} /> Supprimer l'album
+            </Button>
+          )}
           <Button variant="subtle" onClick={() => setDraft(set)} disabled={!dirty || saving}>
             Annuler
           </Button>
@@ -345,8 +402,13 @@ const MiniStat: React.FC<{ label: string; value: React.ReactNode; bad?: boolean 
 // Cartes
 // ---------------------------------------------------------------------------
 
-const CardsSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Promise<void>; showToast: Toast }> = ({ catalog, reload, showToast }) => {
-  const [setId, setSetId] = useState(catalog.sets[0]?.id ?? '');
+const CardsSection: React.FC<{
+  catalog: AdminCollectionCatalog;
+  reload: () => Promise<void>;
+  showToast: Toast;
+  setId: string;
+  onSetChange: (id: string) => void;
+}> = ({ catalog, reload, showToast, setId, onSetChange: setSetId }) => {
   const [editing, setEditing] = useState<Partial<AdminCollectionCard> | null>(null);
   const rarities = useMemo(() => rarityMap(catalog.rarities), [catalog]);
   const set = catalog.sets.find((s) => s.id === setId);
@@ -378,6 +440,16 @@ const CardsSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Pr
           </Button>
         }
       >
+        {cards.length === 0 && (
+          <div className="px-5 py-6 text-sm text-neutral-300 border-b border-white/10">
+            <b>Cet album n'a encore aucune carte.</b>
+            <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+              Cliquez sur <b>« Nouvelle carte »</b> pour chaque carte à mettre dedans : donnez-lui un nom et une rareté, ou utilisez{' '}
+              <b>« Remplir depuis un véhicule du catalogue »</b> pour prendre un véhicule avec sa photo. Mettez au moins une carte dans chaque rareté
+              utilisée (Commune → Mythique), puis revenez dans <b>Albums</b> pour le mettre en vente.
+            </p>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
             <thead>

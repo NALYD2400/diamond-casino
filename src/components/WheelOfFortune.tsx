@@ -413,6 +413,7 @@ export const WheelOfFortune: React.FC = () => {
       .sort((a, b) => a.chance - b.chance);
   }, [segments]);
   const topChips = Math.max(0, ...segments.map(chipsOf));
+  const [hoveredPrize, setHoveredPrize] = useState<number | null>(null);
 
   const spinning = phase !== 'idle';
   const mood: Mood = spinning ? 'spin' : result && (result.segment.type !== 'chips' || result.chipsWon >= result.price) ? 'win' : 'idle';
@@ -469,7 +470,14 @@ export const WheelOfFortune: React.FC = () => {
 
         {/* Plateau */}
         <div className="absolute inset-x-0 top-[52px] sm:top-[48px] bottom-[140px] sm:bottom-[104px] flex items-center justify-center gap-5 px-2 sm:px-6">
-          <PrizeBoard className="hidden lg:flex" board={board} highlight={spinning ? null : (result?.index ?? null)} />
+          <PrizeBoard
+            className="hidden lg:flex"
+            board={board}
+            highlight={spinning ? null : (result?.index ?? null)}
+            hovered={spinning ? null : hoveredPrize}
+            onHover={setHoveredPrize}
+            podiumImage={podiumVehicle.imageUrl}
+          />
 
           <div className="relative flex-1 h-full min-w-0 max-w-[680px] flex items-center justify-center" style={{ containerType: 'size' }}>
             <div className="relative flex flex-col items-center" style={{ width: 'min(100cqw, calc(100cqh * 0.92))' }}>
@@ -480,7 +488,7 @@ export const WheelOfFortune: React.FC = () => {
                   pointerRef={pointerRef}
                   segments={segments}
                   mode={spinning ? 'spinning' : result ? 'won' : 'idle'}
-                  highlightIndex={!spinning && result ? result.index : null}
+                  highlightIndex={spinning ? null : (hoveredPrize ?? result?.index ?? null)}
                   className="w-full drop-shadow-[0_24px_40px_rgba(0,0,0,0.75)]"
                 />
                 {plaque && result && <ResultPlaque result={result} />}
@@ -488,10 +496,15 @@ export const WheelOfFortune: React.FC = () => {
             </div>
           </div>
 
-          <div className="hidden lg:flex w-[190px] shrink-0 flex-col gap-2">
-            <InfoCard title="PRIX DU TOUR" value={fmt(price)} sub="Jetons, sans limite de tirages" />
-            <JackpotCard name={podiumVehicle.name} image={podiumVehicle.imageUrl} />
-            <InfoCard title="MEILLEUR LOT JETONS" value={fmt(topChips)} sub={`Soit x${(topChips / Math.max(1, price)).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} la mise`} />
+          <div className="hidden lg:flex w-[220px] shrink-0 max-h-full flex-col gap-2.5">
+            <InfoCard icon="🪙" title="PRIX DU TOUR" value={fmt(price)} sub="Jetons, sans limite de tirages" />
+            <JackpotCard name={podiumVehicle.name} image={podiumVehicle.imageUrl} value={podiumVehicle.value} />
+            <InfoCard
+              icon="💰"
+              title="MEILLEUR LOT JETONS"
+              value={fmt(topChips)}
+              sub={`Soit x${(topChips / Math.max(1, price)).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} la mise`}
+            />
             <RecentWinsCard wins={recentWins} />
           </div>
         </div>
@@ -740,75 +753,224 @@ const WheelLogo: React.FC<{ className?: string }> = ({ className = '' }) => (
 // Panneaux
 // =============================================================================
 
+/** Rareté d'un lot selon sa chance de sortie (couleur du liseré et de l'aperçu) */
+const rarityOf = (chance: number) =>
+  chance < 2
+    ? { label: 'LÉGENDAIRE', color: '#ffd84a', glow: 'rgba(255,216,74,0.45)' }
+    : chance < 4
+      ? { label: 'ÉPIQUE', color: '#ff7ae0', glow: 'rgba(255,122,224,0.4)' }
+      : chance < 7
+        ? { label: 'RARE', color: '#5ee8ff', glow: 'rgba(94,232,255,0.35)' }
+        : { label: 'COMMUN', color: '#a99bc9', glow: 'rgba(169,155,201,0.25)' };
+
+const prizeImage = (seg: WheelSegmentConfig, podiumImage: string) =>
+  seg.imageUrl || (seg.type === 'vehicle' ? podiumImage : PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg');
+
+const prizeName = (seg: WheelSegmentConfig) => (seg.type === 'chips' && typeof seg.value === 'number' ? `${fmt(seg.value)} jetons` : seg.label);
+
+const formatChance = (chance: number) => chance.toLocaleString('fr-FR', { maximumFractionDigits: chance < 1 ? 2 : 1 });
+
 const PrizeBoard: React.FC<{
   className?: string;
   board: { seg: WheelSegmentConfig; i: number; chance: number }[];
   highlight: number | null;
-}> = ({ className = '', board, highlight }) => (
-  <div className={`${className} w-[190px] shrink-0 max-h-full flex-col gap-2 rounded-xl bg-black/50 backdrop-blur border border-white/10 p-3`}>
-    <div className="flex items-center gap-2 font-['Oswald'] font-bold text-white text-sm tracking-wider">
-      <Trophy size={15} /> LOTS EN JEU
+  hovered: number | null;
+  onHover: (i: number | null) => void;
+  podiumImage: string;
+}> = ({ className = '', board, highlight, hovered, onHover, podiumImage }) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState(0);
+  const preview = hovered === null ? null : board.find((b) => b.i === hovered);
+  const maxChance = Math.max(1, ...board.map((b) => b.chance));
+
+  const place = (row: HTMLElement) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const r = root.getBoundingClientRect();
+    const b = row.getBoundingClientRect();
+    // L'aperçu (≈ 300 px) reste dans la hauteur du panneau
+    const half = Math.min(150, r.height / 2);
+    setAnchor(Math.min(Math.max(b.top - r.top + b.height / 2, half), r.height - half));
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={`${className} relative ${preview ? 'z-40' : 'z-10'} w-[220px] shrink-0 max-h-full flex-col gap-2 rounded-xl bg-[linear-gradient(180deg,rgba(46,34,80,0.75),rgba(10,6,20,0.8))] backdrop-blur border border-white/10 shadow-[0_12px_30px_rgba(0,0,0,0.45)] p-3`}
+      onMouseLeave={() => onHover(null)}
+    >
+      <div className="flex items-center justify-between font-['Oswald'] font-bold text-white text-sm tracking-wider">
+        <span className="flex items-center gap-2">
+          <Trophy size={15} className="text-[#ffd84a]" /> LOTS EN JEU
+        </span>
+        <span className="text-[10px] text-white/40 font-semibold">{board.length} lots</span>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-1" onScroll={() => onHover(null)}>
+        {board.map(({ seg, i, chance }) => {
+          const rare = rarityOf(chance);
+          const active = highlight === i;
+          const focus = hovered === i;
+          return (
+            <div
+              key={i}
+              onMouseEnter={(e) => {
+                place(e.currentTarget);
+                onHover(i);
+              }}
+              className={`relative flex items-center gap-2 rounded-md pl-2.5 pr-2 py-1 text-[11px] cursor-default overflow-hidden transition-all duration-150 ${
+                active ? 'bg-[#ffd84a] text-[#140c22]' : focus ? 'bg-white/15 text-white translate-x-1' : 'bg-black/35 text-white/85 hover:bg-white/10'
+              }`}
+            >
+              <span className="absolute left-0 inset-y-0 w-[3px]" style={{ background: rare.color }} />
+              <img
+                src={prizeImage(seg, podiumImage)}
+                alt=""
+                loading="lazy"
+                className="w-6 h-6 shrink-0 rounded object-cover border border-black/40"
+                onError={(e) => {
+                  e.currentTarget.src = PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg';
+                }}
+              />
+              <span className="flex-1 min-w-0">
+                <span className="block truncate font-semibold leading-tight">
+                  {seg.type === 'chips' && typeof seg.value === 'number' ? fmt(seg.value) : seg.label}
+                </span>
+                <span className="mt-0.5 block h-[3px] rounded-full bg-white/10 overflow-hidden">
+                  <span
+                    className="block h-full rounded-full"
+                    style={{ width: `${Math.max(6, (chance / maxChance) * 100)}%`, background: active ? '#140c22' : rare.color }}
+                  />
+                </span>
+              </span>
+              <span className={`shrink-0 font-['Oswald'] font-bold ${active ? '' : 'text-[#5ee8ff]'}`}>{formatChance(chance)}%</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {preview && <PrizePreview item={preview} podiumImage={podiumImage} top={anchor} />}
     </div>
-    <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-1">
-      {board.map(({ seg, i, chance }) => (
-        <div
-          key={i}
-          className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] transition-colors ${
-            highlight === i ? 'bg-[#ffd84a] text-[#140c22]' : 'bg-black/35 text-white/85'
-          }`}
+  );
+};
+
+/** Grand aperçu d'un lot, affiché à droite du panneau au survol */
+const PrizePreview: React.FC<{ item: { seg: WheelSegmentConfig; chance: number }; podiumImage: string; top: number }> = ({ item, podiumImage, top }) => {
+  const { seg, chance } = item;
+  const rare = rarityOf(chance);
+  const odds = chance > 0 ? Math.round(100 / chance) : 0;
+  return (
+    <div
+      className="wd-pop pointer-events-none absolute left-full ml-3 z-50 w-[260px] -translate-y-1/2 rounded-2xl border-[3px] border-[#140c22] bg-[linear-gradient(180deg,#2e2250,#140c22)] overflow-hidden"
+      style={{ top, boxShadow: `0 6px 0 #140c22, 0 0 32px ${rare.glow}, 0 24px 50px rgba(0,0,0,0.65)` }}
+    >
+      <div className="relative h-[150px] bg-black">
+        <img
+          src={prizeImage(seg, podiumImage)}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.src = PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#140c22] via-transparent to-transparent" />
+        <span
+          className="absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider text-[#140c22] border-2 border-[#140c22]"
+          style={{ background: rare.color }}
         >
-          <span className="truncate font-semibold">
-            {TYPE_EMOJI[seg.type]} {seg.type === 'chips' && typeof seg.value === 'number' ? fmt(seg.value) : seg.label}
-          </span>
-          <span className={`shrink-0 font-['Oswald'] font-bold ${highlight === i ? '' : 'text-[#5ee8ff]'}`}>
-            {chance.toLocaleString('fr-FR', { maximumFractionDigits: chance < 1 ? 2 : 1 })}%
-          </span>
+          {rare.label}
+        </span>
+        <span className="absolute top-2 right-2 text-xl drop-shadow">{TYPE_EMOJI[seg.type]}</span>
+      </div>
+      <div className="px-4 pb-4 -mt-3 relative">
+        <div className="font-['Oswald'] font-bold text-white text-lg leading-tight">{prizeName(seg)}</div>
+        {seg.type === 'vehicle' && seg.vehicleValue ? (
+          <div className="text-[11px] text-white/60">Valeur catalogue {fmt(seg.vehicleValue)} $</div>
+        ) : seg.type !== 'chips' && String(seg.value) !== seg.label ? (
+          <div className="text-[11px] text-white/60 truncate">{String(seg.value)}</div>
+        ) : null}
+        <div className="mt-3 flex items-end justify-between">
+          <div>
+            <div className="text-[10px] font-bold tracking-wider text-white/45">CHANCE</div>
+            <div className="font-['Oswald'] font-bold text-2xl leading-none" style={{ color: rare.color }}>
+              {formatChance(chance)} %
+            </div>
+          </div>
+          {odds > 1 && <div className="text-[11px] text-white/55 text-right">environ 1 tour sur {fmt(odds)}</div>}
         </div>
-      ))}
+        <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(4, chance * 5))}%`, background: rare.color }} />
+        </div>
+        <div className="mt-2 text-[10px] text-white/40">Sa case s'allume sur la roue.</div>
+      </div>
     </div>
+  );
+};
+
+const InfoCard: React.FC<{ icon?: string; title: string; value: string; sub?: string }> = ({ icon, title, value, sub }) => (
+  <div className="relative rounded-xl bg-[linear-gradient(180deg,rgba(46,34,80,0.75),rgba(10,6,20,0.8))] backdrop-blur px-3 py-2.5 text-center border border-white/10 shadow-[0_10px_24px_rgba(0,0,0,0.4)] overflow-hidden">
+    <span className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#ffd84a]/70 to-transparent" />
+    <div className="flex items-center justify-center gap-1.5 font-['Oswald'] font-bold text-white/60 text-[11px] tracking-widest">
+      {icon && <span className="text-sm">{icon}</span>}
+      {title}
+    </div>
+    <div
+      className="font-['Luckiest_Guy'] text-[26px] leading-none mt-1 tracking-wide"
+      style={{
+        background: 'linear-gradient(180deg, #ffffff 0%, #fff4b0 45%, #ffd84a 75%, #d48a0c 100%)',
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        color: 'transparent',
+        filter: 'drop-shadow(0 2px 0 #140c22)',
+      }}
+    >
+      {value}
+    </div>
+    {sub && <div className="text-[10px] text-white/55 leading-tight mt-1 truncate">{sub}</div>}
   </div>
 );
 
-const InfoCard: React.FC<{ title: string; value: string; sub?: string }> = ({ title, value, sub }) => (
-  <div className="rounded-lg bg-black/50 backdrop-blur p-3 text-center border border-white/10">
-    <div className="font-['Oswald'] font-bold text-neutral-300 text-xs tracking-wider">{title}</div>
-    <div className="font-['Oswald'] font-bold text-xl text-white">{value}</div>
-    {sub && <div className="text-[10px] text-white/60 leading-tight mt-0.5 truncate">{sub}</div>}
-  </div>
-);
-
-const JackpotCard: React.FC<{ name: string; image: string }> = ({ name, image }) => (
-  <div className="relative rounded-lg overflow-hidden border border-white/10 h-[92px] bg-black/50">
+const JackpotCard: React.FC<{ name: string; image: string; value?: number }> = ({ name, image, value }) => (
+  <div className="group relative rounded-xl overflow-hidden h-[124px] bg-black/50 border-2 border-[#ffd84a]/60 shadow-[0_0_24px_rgba(255,216,74,0.25),0_10px_24px_rgba(0,0,0,0.45)]">
     <img
       src={image}
       alt=""
-      className="absolute inset-0 w-full h-full object-cover"
+      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
       onError={(e) => {
         e.currentTarget.src = PRIZE_IMAGES.vehicle;
       }}
     />
-    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
-    <div className="absolute top-1.5 inset-x-0 text-center font-['Luckiest_Guy'] text-[#ffd84a] text-sm tracking-wide [-webkit-text-stroke:1px_#140c22]">
+    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-black/20" />
+    <div className="absolute top-1.5 inset-x-0 text-center font-['Luckiest_Guy'] text-[#ffd84a] text-base tracking-wide [-webkit-text-stroke:1px_#140c22] drop-shadow-[0_2px_0_#140c22]">
       JACKPOT
     </div>
-    <div className="absolute bottom-1.5 inset-x-2 text-center font-['Oswald'] font-bold text-white text-sm leading-tight truncate capitalize">{name}</div>
+    <div className="absolute bottom-1.5 inset-x-2 text-center">
+      <div className="font-['Oswald'] font-bold text-white text-sm leading-tight truncate capitalize">{name}</div>
+      {!!value && <div className="text-[10px] text-[#ffd84a]/90 font-semibold">Valeur {fmt(value)} $</div>}
+    </div>
   </div>
 );
 
 const RecentWinsCard: React.FC<{ wins: WheelWin[] }> = ({ wins }) => (
-  <div className="rounded-lg bg-black/50 backdrop-blur p-3 border border-white/10 min-h-0">
-    <div className="font-['Oswald'] font-bold text-neutral-300 text-xs tracking-wider text-center mb-1.5">EN VILLE</div>
+  <div className="rounded-xl bg-[linear-gradient(180deg,rgba(46,34,80,0.75),rgba(10,6,20,0.8))] backdrop-blur p-3 border border-white/10 shadow-[0_10px_24px_rgba(0,0,0,0.4)] min-h-0 overflow-hidden">
+    <div className="flex items-center justify-center gap-1.5 font-['Oswald'] font-bold text-white/60 text-[11px] tracking-widest mb-2">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#2fd08a] shadow-[0_0_6px_#2fd08a] animate-pulse" /> EN VILLE
+    </div>
     {wins.length === 0 ? (
       <div className="text-[10px] text-white/50 text-center">Aucun gagnant récent</div>
     ) : (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {wins.slice(0, 4).map((w, i) => (
-          <div key={`${w.won_at}-${i}`} className="text-[10px] leading-tight">
-            <div className="flex justify-between gap-1 text-white/85">
-              <span className="truncate font-semibold">{w.winner}</span>
-              <span className="shrink-0 text-white/40">{timeAgo(w.won_at)}</span>
-            </div>
-            <div className="truncate text-[#ffd84a]">{w.prize}</div>
+          <div key={`${w.won_at}-${i}`} className="flex items-center gap-2 rounded-md bg-black/30 px-2 py-1.5 text-[10px] leading-tight">
+            <span className="w-6 h-6 shrink-0 rounded-full bg-[linear-gradient(180deg,#fff4b0,#d48a0c)] text-[#140c22] font-black text-[11px] flex items-center justify-center">
+              {(w.winner || '?').trim().charAt(0).toUpperCase()}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="flex justify-between gap-1 text-white/85">
+                <span className="truncate font-semibold">{w.winner}</span>
+                <span className="shrink-0 text-white/40">{timeAgo(w.won_at)}</span>
+              </span>
+              <span className="block truncate text-[#ffd84a] font-semibold">{w.prize}</span>
+            </span>
           </div>
         ))}
       </div>

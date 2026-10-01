@@ -257,6 +257,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMPTY_FILTER: 'Choisissez au moins une classe, une marque ou un véhicule.',
   SET_NOT_FOUND: 'Cette collection n’est pas disponible.',
   GIFT_NOT_FOUND: 'Ce booster offert a déjà été ouvert.',
+  COLLECTION_DAILY_LIMIT: 'Limite de boosters achetés aujourd’hui atteinte pour cet album. Revenez demain !',
   GIFT_WRONG_SET: 'Ce booster offert appartient à l’autre collection.',
   COLLECTION_UNPROFITABLE: 'Collection perdante pour le casino : la revente moyenne d’un booster ou le retour sur un album complet dépasse la limite. Baissez les prix de revente / la récompense, montez le prix du booster ou rendez les cartes rares plus rares.',
   SET_IN_USE: 'Des joueurs ont déjà ouvert des boosters de cet album : il ne peut plus être supprimé. Décochez « Album en vente » pour le cacher.',
@@ -810,6 +811,8 @@ export interface CollectionsConfig {
   maxRtp: number;
   /** Revente moyenne max d'un booster (% du prix) */
   packMaxRtp: number;
+  /** Boosters achetables par album et par jour (0 = illimité) */
+  dailyPackLimit: number;
   /** Taux de revente des doublons (% de la valeur) et bonus par carte VIP (points) */
   sellRate: number;
   sellBonusSilver: number;
@@ -830,6 +833,8 @@ export interface MyCollections {
   completions: { set_id: string; reward: number; packs_opened: number; completed_at: string }[];
   gifts: { id: string; set_id: string | null; label: string; source: string; created_at: string }[];
   openings: number;
+  /** Boosters achetés aujourd'hui, par album */
+  bought_today?: Record<string, number>;
   /** Taux de revente des doublons du joueur (%, bonus VIP compris) */
   sell_rate: number;
 }

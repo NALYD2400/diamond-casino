@@ -982,6 +982,12 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
             >
               <NumberInput value={draft.collections.packMaxRtp} min={0} max={100} onChange={(v) => set('collections', { packMaxRtp: Math.min(100, Math.max(0, v)) })} suffix="%" />
             </Field>
+            <Field
+              label="Boosters achetables par jour"
+              hint="Par joueur et par album, remis à zéro à minuit (heure de Paris). Les boosters offerts ne comptent pas. 0 = illimité."
+            >
+              <NumberInput value={draft.collections.dailyPackLimit} min={0} max={1000} onChange={(v) => set('collections', { dailyPackLimit: Math.min(1000, Math.max(0, Math.round(v))) })} />
+            </Field>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <Field label="Revente des doublons" hint="% de la valeur de la carte">
                 <NumberInput value={draft.collections.sellRate} min={0} max={100} onChange={(v) => set('collections', { sellRate: Math.min(100, Math.max(0, v)) })} suffix="%" />

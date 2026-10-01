@@ -1,7 +1,7 @@
 /**
  * COLLECTIONS — albums de cartes « marques » de GTA V (autos & mode).
  *
- * 1. Choix de l'album, progression, récompense à la clé (1 000 000 jetons)
+ * 1. Choix de l'album, progression, récompense à la clé (réglée par album)
  * 2. Achat d'un booster (ou ouverture d'un booster gagné à la roue)
  * 3. Ouverture : glisser le long du haut du paquet pour le déchirer
  * 4. Révélation carte par carte (NOUVELLE ! / doublon)
@@ -224,6 +224,10 @@ export const CollectionsGame: React.FC = () => {
 
   const balance = user?.chips ?? 0;
   const canAfford = !!set && balance >= set.pack_price;
+  // Limite d'achat du jour (les boosters offerts n'y sont pas soumis)
+  const dailyLimit = catalog?.config.dailyPackLimit ?? 0;
+  const boughtToday = (set && mine?.bought_today?.[set.id]) || 0;
+  const limitReached = dailyLimit > 0 && boughtToday >= dailyLimit;
   const drawn = useMemo(() => (result ? result.cards.map((c) => ({ card: resolveBrandCard(c, rarities), isNew: c.is_new, count: c.count })) : []), [result, rarities]);
 
   // Dimensions
@@ -473,15 +477,21 @@ export const CollectionsGame: React.FC = () => {
                 </div>
               )}
               {error && <p className="text-sm text-rose-300">{error}</p>}
+              {isAuthenticated && dailyLimit > 0 && (
+                <p className={`text-xs ${limitReached ? 'text-amber-200' : 'text-neutral-400'}`}>
+                  Boosters achetés aujourd'hui : {Math.min(boughtToday, dailyLimit)} / {dailyLimit}
+                  {limitReached ? ' — revenez demain' : ''}
+                </p>
+              )}
               <div className="flex flex-wrap items-center justify-center gap-3 mt-1">
                 {isAuthenticated ? (
                   <button
                     type="button"
                     onClick={() => void open()}
-                    disabled={closed || !canAfford}
+                    disabled={closed || !canAfford || limitReached}
                     className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.35)] disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed"
                   >
-                    {closed ? 'Collections fermées' : !canAfford ? `Solde insuffisant · ${fmtChips(set.pack_price)}` : `Ouvrir · ${fmtChips(set.pack_price)}`}
+                    {closed ? 'Collections fermées' : limitReached ? 'Limite du jour atteinte' : !canAfford ? `Solde insuffisant · ${fmtChips(set.pack_price)}` : `Ouvrir · ${fmtChips(set.pack_price)}`}
                   </button>
                 ) : (
                   <Link to="/espace-membre" className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 shadow-[0_0_30px_rgba(255,255,255,0.35)]">
@@ -675,10 +685,10 @@ export const CollectionsGame: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => void open()}
-                          disabled={closed || balance < set.pack_price}
+                          disabled={closed || balance < set.pack_price || limitReached}
                           className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 py-4 transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.35)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
                         >
-                          Encore un · {fmtChips(set.pack_price)}
+                          {limitReached ? 'Limite du jour atteinte' : `Encore un · ${fmtChips(set.pack_price)}`}
                         </button>
                         {gifts.length > 0 && (
                           <button type="button" onClick={() => void open(gifts[0].id)} disabled={closed} className="flex items-center gap-2 rounded-full border border-amber-300/50 bg-amber-300/10 hover:bg-amber-300/20 text-amber-100 font-bold text-xs sm:text-sm uppercase px-6 py-4 disabled:opacity-40">

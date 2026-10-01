@@ -344,6 +344,22 @@ const GameRow: React.FC<{
 }> = ({ title, icon, games, onSeeAll }) => {
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.8, behavior: 'smooth' });
+  // Jeux cachés à gauche / à droite : fondu sur le bord concerné (pas de carte coupée net)
+  const [edges, setEdges] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [games.length]);
+  const fade = `linear-gradient(to right, ${edges.left ? 'transparent, black 56px' : 'black'}, ${edges.right ? 'black calc(100% - 72px), transparent' : 'black'})`;
   if (games.length === 0) return null;
   return (
     <section className="mt-8">
@@ -361,23 +377,33 @@ const GameRow: React.FC<{
               Voir tout
             </button>
           )}
+          {(edges.left || edges.right) && (
+          <>
           <button
             onClick={() => scroll(-1)}
+            disabled={!edges.left}
             aria-label="Précédent"
-            className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-neutral-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-neutral-300 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:hover:bg-white/5 disabled:cursor-default"
           >
             <ChevronLeft size={16} />
           </button>
           <button
             onClick={() => scroll(1)}
+            disabled={!edges.right}
             aria-label="Suivant"
-            className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-neutral-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-neutral-300 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:hover:bg-white/5 disabled:cursor-default"
           >
             <ChevronRight size={16} />
           </button>
+          </>
+          )}
         </div>
       </div>
-      <div ref={ref} className="-mx-1 flex gap-3 overflow-x-auto px-1 pt-2 pb-1 snap-x [scrollbar-width:none]">
+      <div
+        ref={ref}
+        className="-mx-1 flex gap-3 overflow-x-auto px-1 pt-2 pb-1 snap-x [scrollbar-width:none]"
+        style={{ maskImage: fade, WebkitMaskImage: fade }}
+      >
         {games.map((g, i) => (
           <div key={g.id} className="w-[132px] sm:w-[160px] xl:w-[172px] shrink-0 snap-start">
             {isMachine(g.id) ? <MachineTile game={{ ...g, id: g.id }} index={i} /> : <Tile game={g} index={i} />}

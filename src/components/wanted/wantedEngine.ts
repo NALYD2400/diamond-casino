@@ -96,8 +96,8 @@ const TUNING = {
   gtrWild: 9,
   gtrVs: 3.3,
   duelVs: 0.52,
-  dmhWildChance: 0.0055,
-  dmhTokenChance: 0.04,
+  dmhWildChance: 0.0061,
+  dmhTokenChance: 0.03,
 };
 
 function pickWeighted<T extends string>(w: Partial<Record<T, number>>, rng: () => number): T {

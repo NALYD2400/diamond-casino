@@ -336,16 +336,18 @@ select option {
   100% { opacity: 0; }
 }
 
-.wd-card-roll { animation: wd-card-roll 0.3s linear infinite; }
-@keyframes wd-card-roll {
-  0% { transform: perspective(300px) rotateY(0deg); filter: brightness(1); }
-  50% { transform: perspective(300px) rotateY(90deg) scale(0.92); filter: brightness(1.6) blur(1px); }
-  100% { transform: perspective(300px) rotateY(0deg); filter: brightness(1); }
+/* Dead Man's Hand : rouleaux qui tournent puis se posent (au lieu de retourner les cartes) */
+.wd-reel-spin { animation: wd-reel-spin 0.16s linear infinite; filter: blur(1.5px) brightness(1.15); }
+@keyframes wd-reel-spin {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
 }
-.wd-card-flip { animation: wd-card-flip 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
-@keyframes wd-card-flip {
-  from { transform: perspective(300px) rotateY(90deg) scale(0.8); opacity: 0.4; }
-  to { transform: perspective(300px) rotateY(0deg) scale(1); opacity: 1; }
+/* "backwards" et pas "both" : une fois posé, plus de transform, sinon les symboles qui
+   filent vers les compteurs passeraient sous les rouleaux voisins */
+.wd-reel-stop { animation: wd-reel-stop 0.3s cubic-bezier(0.25, 1.6, 0.5, 1) backwards; }
+@keyframes wd-reel-stop {
+  from { transform: translateY(-7%); filter: blur(2px); }
+  to { transform: translateY(0); filter: blur(0); }
 }
 .wd-card-fly { animation: wd-card-fly 0.45s cubic-bezier(0.55, 0, 0.8, 0.4) forwards; }
 @keyframes wd-card-fly {

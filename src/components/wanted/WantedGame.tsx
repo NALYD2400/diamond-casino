@@ -387,7 +387,7 @@ export const WantedGame: React.FC = () => {
           const fast = turboRef.current;
           audio.current.spinStart();
           setDmhBoard((b) => b && { ...b, revealed: [], stage: 'rolling' });
-          await wait(fast ? 260 : 480);
+          await wait(fast ? 320 : 620);
           if (step.length > 0) {
             setDmhBoard((b) => b && { ...b, revealed: step, stage: 'reveal' });
             audio.current.collect();
@@ -1103,8 +1103,8 @@ const Paylines: React.FC<{ lines: WantedLineWin[] }> = ({ lines }) => (
 // =============================================================================
 
 /** Carte « Dead Man's Hand » face cachée : éventail de cartes sépia et crâne */
-const DeadCard: React.FC<{ rolling?: boolean; delay?: number }> = ({ rolling, delay = 0 }) => (
-  <div className={`w-full h-full ${rolling ? 'wd-card-roll' : ''}`} style={rolling ? { animationDelay: `${delay}ms` } : undefined}>
+const DeadCard: React.FC = () => (
+  <div className="w-full h-full">
     <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_3px_3px_rgba(0,0,0,0.6)]">
       <defs>
         <linearGradient id="dmh-paper" x1="0" y1="0" x2="0" y2="1">
@@ -1131,25 +1131,43 @@ const DeadCard: React.FC<{ rolling?: boolean; delay?: number }> = ({ rolling, de
 const DmhBoard: React.FC<{ board: DmhBoardState }> = ({ board }) => {
   const byCell = new Map(board.revealed.map((l) => [`${l.reel}-${l.row}`, l]));
   const flying = board.stage === 'collect';
+  const rolling = board.stage === 'rolling';
   return (
     <div className="relative bg-[radial-gradient(ellipse_at_center,#2a1420,#12080e)]">
-      <div className="grid grid-cols-5 gap-[2px] p-[2px]">
-        {[0, 1, 2, 3, 4].map((row) =>
-          [0, 1, 2, 3, 4].map((reel) => {
+      <div className="grid grid-cols-5 gap-x-[2px] p-[2px]">
+        {[0, 1, 2, 3, 4].map((reel) =>
+          rolling ? (
+            // Rouleau en train de tourner : une bande de cartes qui défile en boucle
+            <div key={`spin-${reel}`} className="relative overflow-hidden">
+              {[0, 1, 2, 3, 4].map((row) => (
+                <div key={row} className="aspect-square mb-[2px] invisible" />
+              ))}
+              <div className="wd-reel-spin absolute inset-x-0 top-0" style={{ animationDelay: `${-reel * 47}ms` }}>
+                {Array.from({ length: 10 }, (_, i) => (
+                  <div key={i} className="aspect-square mb-[2px] p-[5%]">
+                    <DeadCard />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // Rouleau arrêté : il se pose de gauche à droite avec un petit rebond
+            <div key={`stop-${reel}`} className="wd-reel-stop" style={{ animationDelay: `${reel * 55}ms` }}>
+              {[0, 1, 2, 3, 4].map((row) => {
             const key = `${reel}-${row}`;
             const l = byCell.get(key);
             return (
-              <div key={key} className="relative aspect-square p-[5%]">
+              <div key={key} className="relative aspect-square mb-[2px] p-[5%]">
                 <div
                   className={`w-full h-full transition-opacity duration-200 ${
                     l && !flying ? 'opacity-0' : board.stage === 'reveal' ? 'opacity-40' : ''
                   }`}
                 >
-                  <DeadCard rolling={board.stage === 'rolling'} delay={(reel * 5 + row) * 17} />
+                  <DeadCard />
                 </div>
                 {l && (
                   <div
-                    className={`absolute inset-0 z-10 p-[5%] ${flying ? 'wd-card-fly' : 'wd-card-flip'}`}
+                    className={`absolute inset-0 z-10 p-[5%] ${flying ? 'wd-card-fly' : ''}`}
                     style={
                       {
                         // les wilds filent vers le compteur de gauche, les multiplicateurs vers la droite
@@ -1171,7 +1189,9 @@ const DmhBoard: React.FC<{ board: DmhBoardState }> = ({ board }) => {
                 )}
               </div>
             );
-          }),
+              })}
+            </div>
+          ),
         )}
       </div>
     </div>

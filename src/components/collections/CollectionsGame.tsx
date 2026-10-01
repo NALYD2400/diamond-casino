@@ -343,7 +343,7 @@ export const CollectionsGame: React.FC = () => {
   const accent = set?.accent_color ?? '#d9b25f';
 
   return (
-    <div className="relative min-h-screen bg-black pt-[80px] sm:pt-[90px] pb-16">
+    <div data-fullscreen-root className="relative min-h-screen bg-black pt-[80px] sm:pt-[90px] pb-16 [&:fullscreen]:overflow-y-auto">
       <MachineClosedBanner state={closedState} demo={false} />
 
       {/* Fond */}
@@ -362,6 +362,7 @@ export const CollectionsGame: React.FC = () => {
             >
               <ArrowLeft size={16} /> Lobby
             </Link>
+            <FullscreenButton />
             <div className="hidden sm:flex rounded-full bg-black/80 border border-white/20 backdrop-blur-md px-2 h-9 items-center">
               <GameVolumeButton muted={muted} volume={volume} onMute={() => setMuted((m) => !m)} onVolumeChange={(v) => { setVolume(v); setMuted(false); }} accentClass="accent-white" />
             </div>

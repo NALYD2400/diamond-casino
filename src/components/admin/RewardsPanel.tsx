@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Car, Check, Download, Gift, Layers, Loader2, PackageCheck, RefreshCw, Search, Undo2, Upload, X } from 'lucide-react';
+import { Car, Check, Download, Gift, Layers, Loader2, Lock, PackageCheck, PencilLine, RefreshCw, Search, Undo2, Upload, X } from 'lucide-react';
 import { useCasinoAdmin, type MockCitizen } from '../../context/CasinoAdminContext';
 import {
   apiAdminGrantReward,
@@ -7,6 +7,7 @@ import {
   apiAdminGrantVoucher,
   apiCollectionCatalog,
   apiAdminImportVehicles,
+  apiAdminSetVehiclePrice,
   apiAdminUpdateReward,
   dbCountVehicles,
   dbFetchRewards,
@@ -55,6 +56,11 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
   const [catalogCount, setCatalogCount] = useState<number | null>(null);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Correction du prix d'un véhicule
+  const [priceVehicle, setPriceVehicle] = useState<VehicleCatalogEntry | null>(null);
+  const [priceValue, setPriceValue] = useState('');
+  const [priceUpdateInventory, setPriceUpdateInventory] = useState(true);
+  const [pickerReload, setPickerReload] = useState(0);
 
   const citizenById = useMemo(() => new Map(citizens.map((c) => [c.profileId, c])), [citizens]);
 
@@ -211,6 +217,35 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
     showToast(`${count.toLocaleString('fr-FR')} véhicules importés / mis à jour.`);
     setCatalogCount(await dbCountVehicles());
     await refreshLogs();
+  };
+
+  const selectPriceVehicle = (v: VehicleCatalogEntry) => {
+    setPriceVehicle(v);
+    setPriceValue(String(v.price ?? 0));
+  };
+
+  const handleSetPrice = async () => {
+    if (!priceVehicle) return;
+    const price = Number(priceValue.replace(/[\s .,]/g, ''));
+    if (!Number.isFinite(price) || price < 0) {
+      showToast('Prix invalide.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await apiAdminSetVehiclePrice(priceVehicle.model, price, priceUpdateInventory);
+      showToast(
+        `${vehicleDisplayName(priceVehicle.manufacturer, priceVehicle.model)} : ${res.old_price.toLocaleString('fr-FR')} → ${res.price.toLocaleString('fr-FR')}` +
+          (priceUpdateInventory ? ` (${res.updated_rewards} lot(s) en inventaire mis à jour)` : ''),
+      );
+      setPriceVehicle({ ...priceVehicle, price: res.price, price_locked: true });
+      setPickerReload((k) => k + 1);
+      await Promise.all([load(), refreshLogs()]);
+    } catch (err) {
+      showToast((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleImportBundled = async () => {
@@ -582,6 +617,63 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
                 if (f) void handleImportFile(f);
               }}
             />
+          </div>
+        </section>
+
+        {/* Prix d'un véhicule */}
+        <section className="lg:col-span-2 p-5 rounded-2xl bg-neutral-950 border border-white/10 flex flex-col gap-4">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <PencilLine size={14} /> Corriger le prix d’un véhicule
+          </h2>
+          <p className="text-xs text-neutral-400">
+            Le nouveau prix s’applique partout : valeur des cartes de booster, lots de la roue, collections. Un prix corrigé
+            ici est protégé : les prochains imports ne l’écrasent plus.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <VehiclePicker selectedModel={priceVehicle?.model} onSelect={selectPriceVehicle} className="max-h-56" reloadKey={pickerReload} />
+            {priceVehicle ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm font-semibold text-white flex items-center gap-2">
+                  {vehicleDisplayName(priceVehicle.manufacturer, priceVehicle.model)}
+                  <span className="text-[11px] font-mono text-neutral-500">{priceVehicle.model}</span>
+                  {priceVehicle.price_locked && (
+                    <span className="text-[10px] text-amber-300 flex items-center gap-1" title="Prix corrigé à la main, ignoré par l’import">
+                      <Lock size={10} /> corrigé
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-neutral-400">
+                  Prix actuel : <span className="font-mono text-white">{(priceVehicle.price ?? 0).toLocaleString('fr-FR')}</span>
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={priceValue}
+                  onChange={(e) => setPriceValue(e.target.value)}
+                  placeholder="Nouveau prix"
+                  className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm font-mono text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
+                />
+                <label className="flex items-start gap-2 text-xs text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={priceUpdateInventory}
+                    onChange={(e) => setPriceUpdateInventory(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  Appliquer aussi aux exemplaires déjà gagnés encore dans les inventaires (valeur de revente)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSetPrice}
+                  disabled={busy || priceValue.trim() === ''}
+                  className="h-11 rounded-xl bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-200 disabled:opacity-50 cursor-pointer"
+                >
+                  Enregistrer le prix
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500 self-center">Choisis un véhicule dans la liste pour modifier son prix.</p>
+            )}
           </div>
         </section>
       </div>

@@ -484,6 +484,8 @@ export interface VehicleCatalogEntry {
   screenshot_url: string | null;
   /** Vendu en concession (seuls ces véhicules peuvent devenir des cartes de booster) */
   in_dealership?: boolean | null;
+  /** Prix corrigé à la main dans la console : l'import ne l'écrase plus */
+  price_locked?: boolean | null;
 }
 
 export type RewardStatus = 'IN_INVENTORY' | 'CLAIMED' | 'DELIVERED' | 'REVOKED' | 'SOLD' | 'USED';
@@ -961,6 +963,15 @@ export function normalizeVehicleImport(raw: unknown): VehicleCatalogEntry[] {
       screenshot_url: abs(r.screenshot_url ?? r.screenshotUrl),
     }))
     .filter((r) => r.model);
+}
+
+/** Corrige le prix d'un véhicule partout ; option : lots encore en inventaire */
+export async function apiAdminSetVehiclePrice(
+  model: string,
+  price: number,
+  updateInventory: boolean,
+): Promise<{ old_price: number; price: number; updated_rewards: number }> {
+  return rpc('admin_set_vehicle_price', { p_model: model, p_price: Math.round(price), p_update_inventory: updateInventory });
 }
 
 export async function apiAdminImportVehicles(rows: VehicleCatalogEntry[], onProgress?: (done: number) => void): Promise<number> {

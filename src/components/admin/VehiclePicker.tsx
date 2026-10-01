@@ -12,10 +12,12 @@ interface VehiclePickerProps {
   className?: string;
   /** Only vehicles sold at the dealership (booster cards) */
   dealershipOnly?: boolean;
+  /** Change this value to reload the results (after an edit) */
+  reloadKey?: number;
 }
 
 /** Searchable picker over the vehicle catalogue (model / brand, class filter) */
-export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onSelect, className = 'max-h-72', dealershipOnly = false }) => {
+export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onSelect, className = 'max-h-72', dealershipOnly = false, reloadKey = 0 }) => {
   const [query, setQuery] = useState('');
   const [vehicleClass, setVehicleClass] = useState('');
   const [results, setResults] = useState<VehicleCatalogEntry[]>([]);
@@ -40,7 +42,7 @@ export const VehiclePicker: React.FC<VehiclePickerProps> = ({ selectedModel, onS
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [query, vehicleClass, dealershipOnly]);
+  }, [query, vehicleClass, dealershipOnly, reloadKey]);
 
   return (
     <div className="flex flex-col gap-2">

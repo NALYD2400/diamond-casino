@@ -29,6 +29,27 @@ type Section = 'sets' | 'cards' | 'rarities' | 'dealership';
 
 const selectClass = inputClass.replace('w-full ', '') + ' w-auto bg-neutral-900 text-white cursor-pointer [color-scheme:dark]';
 
+/**
+ * Pastille de la liste des cartes : logo de la marque (URL saisie ou fichier
+ * public/logos/<album>/<marque>.png), sinon monogramme aux couleurs de la marque.
+ */
+const LogoBadge: React.FC<{ card: AdminCollectionCard }> = ({ card }) => {
+  const src = card.image_url?.trim() || (card.name ? logoPath(card.set_id, card.name) : null);
+  const [failed, setFailed] = useState<string | null>(null);
+  if (src && failed !== src) {
+    return (
+      <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-white/10" style={{ background: card.color }}>
+        <img src={src} alt="" loading="lazy" onError={() => setFailed(src)} className="max-w-[85%] max-h-[85%] object-contain" />
+      </span>
+    );
+  }
+  return (
+    <span className="w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0" style={{ background: card.color, color: card.color2 }}>
+      {card.emblem || card.name?.charAt(0)}
+    </span>
+  );
+};
+
 const EFFECTS: { value: BoosterEffect; label: string }[] = [
   { value: 'none', label: 'Aucun' },
   { value: 'glow', label: 'Lueur' },
@@ -302,9 +323,7 @@ const CardsSection: React.FC<{ catalog: AdminCollectionCatalog; reload: () => Pr
                     <td className="px-5 py-2 font-mono text-neutral-400">{String(c.number).padStart(2, '0')}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ background: c.color, color: c.color2 }}>
-                          {c.emblem || c.name?.charAt(0)}
-                        </span>
+                        <LogoBadge card={c} />
                         <div className="min-w-0">
                           <div className="text-white font-medium truncate">{c.name}</div>
                           <div className="text-[11px] text-neutral-500 truncate">{c.tagline}</div>

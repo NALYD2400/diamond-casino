@@ -19,6 +19,7 @@ const TYPE_LABEL: Record<RewardType, string> = {
   clothing: 'Vêtement',
   voucher: 'Bonus offert (machine)',
   pack: 'Booster de collection',
+  vip: 'Carte VIP',
 };
 
 /** Albums de collection (id, nom, prix du booster) pour les lots « booster » */
@@ -31,6 +32,7 @@ const DEFAULT_PACK_SETS: PackSet[] = [
 export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
   const {
     segments,
+    vipConfig,
     podiumVehicle,
     gamesConfig,
     saveGamesConfig,
@@ -52,6 +54,8 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
       .catch(() => {});
   }, []);
   const packPrice = (s: WheelSegmentConfig) => packSets.find((p) => p.id === s.packSet)?.price ?? Math.max(...packSets.map((p) => p.price));
+  // Carte VIP comptée à son prix d'achat, comme le fait le serveur
+  const vipPrice = (s: WheelSegmentConfig) => vipConfig[s.vipTier ?? 'SILVER']?.price ?? 0;
 
   useEffect(() => setDraft(segments), [segments]);
   useEffect(() => setPodiumDraft(podiumVehicle), [podiumVehicle]);
@@ -67,9 +71,9 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
   );
   // Véhicules comptés à leur valeur catalogue (1 jeton = 1 $), comme le fait le serveur
   const expectedVehicles = useMemo(
-    () => draft.reduce((a, s) => a + (s.type === 'vehicle' ? (Number(s.vehicleValue) || 0) * (chance(s) / 100) : s.type === 'voucher' ? (Number(s.voucherValue) || 0) * (chance(s) / 100) : s.type === 'pack' ? packPrice(s) * (chance(s) / 100) : 0), 0),
+    () => draft.reduce((a, s) => a + (s.type === 'vehicle' ? (Number(s.vehicleValue) || 0) * (chance(s) / 100) : s.type === 'voucher' ? (Number(s.voucherValue) || 0) * (chance(s) / 100) : s.type === 'pack' ? packPrice(s) * (chance(s) / 100) : s.type === 'vip' ? vipPrice(s) * (chance(s) / 100) : 0), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, totalWeight, packSets],
+    [draft, totalWeight, packSets, vipConfig],
   );
   const maxRtp = gamesConfig.wheel.maxRtp;
   const expectedTotal = expectedChips + expectedVehicles;
@@ -269,6 +273,10 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                     <td className="px-3 py-2.5 text-neutral-300 text-[13px]">
                       {seg.type === 'chips' ? <span className="font-mono text-white">{fmt(Number(seg.value))} jetons</span> : seg.type === 'voucher' ? (
                         <span className="font-mono text-white">{seg.voucherGame === 'wanted' ? 'Wanted' : 'Dog House'} · bonus de {fmt(Number(seg.voucherValue) || 0)}</span>
+                      ) : seg.type === 'vip' ? (
+                        <span className="font-mono text-white">
+                          Carte {seg.vipTier ?? 'SILVER'} · {vipConfig.durationDays} jours · valeur {fmt(vipPrice(seg))}
+                        </span>
                       ) : seg.type === 'pack' ? (
                         <span className="font-mono text-white">
                           {packSets.find((p) => p.id === seg.packSet)?.name ?? 'Collection'} · valeur {fmt(packPrice(seg))}
@@ -390,6 +398,7 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; packSets: PackSet[]; on
                   voucherBuy: type === 'voucher' ? seg.voucherBuy ?? 'buy' : undefined,
                   voucherValue: type === 'voucher' ? seg.voucherValue ?? 20000 : undefined,
                   packSet: type === 'pack' ? seg.packSet ?? packSets[0]?.id : undefined,
+                  vipTier: type === 'vip' ? seg.vipTier ?? 'SILVER' : undefined,
                 });
               }}
             >
@@ -407,6 +416,21 @@ const SegmentEditor: React.FC<{ seg: WheelSegmentConfig; packSets: PackSet[]; on
         {seg.type === 'chips' ? (
           <Field label="Nombre de jetons gagnés">
             <NumberInput value={Number(seg.value) || 0} min={0} onChange={(v) => setSeg({ ...seg, value: Math.max(0, v) })} suffix="⛁" />
+          </Field>
+        ) : seg.type === 'vip' ? (
+          <Field
+            label="Carte VIP offerte"
+            hint="Activée tout de suite pour la durée d'un abonnement, avec sa dotation de jetons. Tant que le joueur a cette carte (ou mieux), la case ne peut pas sortir pour lui. Compte dans le retour de la roue au prix de la carte."
+          >
+            <select
+              className={cx(inputClass, 'cursor-pointer')}
+              value={seg.vipTier ?? 'SILVER'}
+              onChange={(e) => setSeg({ ...seg, vipTier: e.target.value as 'SILVER' | 'GOLD' | 'DIAMOND' })}
+            >
+              <option value="SILVER" className="bg-black">Silver</option>
+              <option value="GOLD" className="bg-black">Gold</option>
+              <option value="DIAMOND" className="bg-black">Diamond</option>
+            </select>
           </Field>
         ) : seg.type === 'pack' ? (
           <Field label="Album du booster" hint="Le joueur reçoit un booster à ouvrir gratuitement sur la page Collections. Compte dans le retour de la roue au prix du booster.">

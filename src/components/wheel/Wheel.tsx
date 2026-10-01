@@ -34,6 +34,7 @@ const PALETTES: Record<RewardType | 'chipsA' | 'chipsB' | 'chipsC', { light: str
   clothing: { light: '#6ff0ff', dark: '#10789f', text: '#ffffff', sub: '#d2fbff' },
   voucher: { light: '#7dff9a', dark: '#12803a', text: '#ffffff', sub: '#d3ffe0' },
   pack: { light: '#ffc46b', dark: '#9a4d0a', text: '#ffffff', sub: '#ffe7c2' },
+  vip: { light: '#e6fbff', dark: '#1f6f8b', text: '#ffffff', sub: '#d8f7ff' },
 };
 
 function polar(radius: number, angleDeg: number): [number, number] {
@@ -52,6 +53,7 @@ function wedgeText(seg: WheelSegmentConfig): { primary: string; secondary: strin
   if (seg.type === 'vehicle') return { primary: 'VÉHICULE', secondary: 'JACKPOT', emoji: '🏎️' };
   if (seg.type === 'clothing') return { primary: 'VÊTEMENT', secondary: 'VIP', emoji: '👔' };
   if (seg.type === 'pack') return { primary: 'BOOSTER', secondary: seg.packSet === 'mode' ? 'MODE' : 'AUTOS', emoji: '🃏' };
+  if (seg.type === 'vip') return { primary: 'CARTE', secondary: seg.vipTier ?? 'VIP', emoji: seg.vipTier === 'DIAMOND' ? '💎' : seg.vipTier === 'GOLD' ? '👑' : '🥈' };
   if (seg.type === 'voucher') return { primary: 'BONUS', secondary: seg.voucherGame === 'wanted' ? 'WANTED' : 'DOG HOUSE', emoji: '🎰' };
   const words = seg.label.trim().split(/\s+/);
   return {

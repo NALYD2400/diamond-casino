@@ -20,7 +20,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useCasinoAdmin, type WheelSegmentConfig } from '../../context/CasinoAdminContext';
-import type { GamesConfig } from '../../lib/gamesConfig';
+import { DEFAULT_VIP_CONFIG, type GamesConfig } from '../../lib/gamesConfig';
 import { apiAdminGameStats, type AdminGameStats, type StatsGameId } from '../../lib/supabase';
 import { calculateMultiplier } from '../mines/minesMath';
 import { MAX_WIN_X_BET, maxBuyBet } from '../doghouse/dogHouseEngine';
@@ -87,7 +87,9 @@ function wheelExpected(segments: WheelSegmentConfig[]) {
           ? Number(s.voucherValue) || 0
           : s.type === 'pack'
             ? WHEEL_PACK_VALUE
-            : 0;
+            : s.type === 'vip'
+              ? DEFAULT_VIP_CONFIG[s.vipTier ?? 'SILVER'].price
+              : 0;
   return segments.reduce((a, s) => a + value(s) * (Math.max(0, s.dropRate) / total), 0);
 }
 

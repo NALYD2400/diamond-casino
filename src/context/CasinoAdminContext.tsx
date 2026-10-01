@@ -33,7 +33,7 @@ import {
 import { hasAdminPermissions } from '../lib/discord';
 import { useCasinoUser, type CasinoTransaction } from './CasinoUserContext';
 
-export type RewardType = 'vehicle' | 'chips' | 'mystery' | 'clothing' | 'voucher' | 'pack';
+export type RewardType = 'vehicle' | 'chips' | 'mystery' | 'clothing' | 'voucher' | 'pack' | 'vip';
 
 export interface WheelSegmentConfig {
   id: number;
@@ -57,6 +57,8 @@ export interface WheelSegmentConfig {
   voucherValue?: number;
   /** type 'pack' : booster de collection offert (id de l'album : 'autos', 'mode') */
   packSet?: string;
+  /** type 'vip' : carte VIP offerte (activée tout de suite, retirée du tirage tant que le joueur l'a) */
+  vipTier?: 'SILVER' | 'GOLD' | 'DIAMOND';
 }
 
 export interface PodiumVehicleConfig {

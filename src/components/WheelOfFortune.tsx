@@ -45,8 +45,10 @@ const PRIZE_IMAGES: Record<WheelSegmentConfig['type'], string> = {
   clothing: '/diamond_vip_couture.jpg',
   voucher: '/diamond_chips_jackpot.jpg',
   pack: '/diamond_vip_couture.jpg',
+  vip: '/diamond_vip_couture.jpg',
 };
-const TYPE_EMOJI: Record<WheelSegmentConfig['type'], string> = { vehicle: '🏎️', chips: '🪙', mystery: '🎁', clothing: '👔', voucher: '🎰', pack: '🃏' };
+const VIP_RANK: Record<string, number> = { SILVER: 1, GOLD: 2, DIAMOND: 3 };
+const TYPE_EMOJI: Record<WheelSegmentConfig['type'], string> = { vehicle: '🏎️', chips: '🪙', mystery: '🎁', clothing: '👔', voucher: '🎰', pack: '🃏', vip: '💎' };
 
 type Phase = 'idle' | 'requesting' | 'spinning';
 type Mood = 'idle' | 'spin' | 'win';
@@ -407,12 +409,15 @@ export const WheelOfFortune: React.FC = () => {
   // ---------------------------------------------------------------------------
   // Affichage
   // ---------------------------------------------------------------------------
+  // Carte VIP active du joueur : les cases VIP de ce niveau et en dessous ne peuvent pas sortir pour lui
+  const vipRank = user?.vipTier && (user.vipExpiresAt ?? 0) > Date.now() ? VIP_RANK[user.vipTier] ?? 0 : 0;
   const board = useMemo(() => {
-    const total = segments.reduce((a, s) => a + Math.max(0, s.dropRate || 0), 0) || 1;
+    const weight = (s: WheelSegmentConfig) => (s.type === 'vip' && (VIP_RANK[s.vipTier ?? 'SILVER'] ?? 0) <= vipRank ? 0 : Math.max(0, s.dropRate || 0));
+    const total = segments.reduce((a, s) => a + weight(s), 0) || 1;
     return segments
-      .map((seg, i) => ({ seg, i, chance: (Math.max(0, seg.dropRate || 0) / total) * 100 }))
-      .sort((a, b) => a.chance - b.chance);
-  }, [segments]);
+      .map((seg, i) => ({ seg, i, chance: (weight(seg) / total) * 100, owned: seg.type === 'vip' && weight(seg) === 0 && vipRank > 0 }))
+      .sort((a, b) => Number(a.owned) - Number(b.owned) || a.chance - b.chance);
+  }, [segments, vipRank]);
   const topChips = Math.max(0, ...segments.map(chipsOf));
   const [hoveredPrize, setHoveredPrize] = useState<number | null>(null);
 
@@ -617,13 +622,13 @@ export const WheelOfFortune: React.FC = () => {
                 </div>
               </div>
               <div className="max-h-64 overflow-y-auto pr-1 space-y-1">
-                {board.map(({ seg, i, chance }) => (
-                  <div key={i} className="flex items-center justify-between gap-2 rounded-md bg-black/30 px-3 py-1.5 text-xs">
+                {board.map(({ seg, i, chance, owned }) => (
+                  <div key={i} className={`flex items-center justify-between gap-2 rounded-md bg-black/30 px-3 py-1.5 text-xs ${owned ? 'opacity-50' : ''}`}>
                     <span className="truncate text-white/85">
                       {TYPE_EMOJI[seg.type]} {seg.label}
                     </span>
                     <span className="shrink-0 font-['Oswald'] font-bold text-[#5ee8ff]">
-                      {chance.toLocaleString('fr-FR', { maximumFractionDigits: chance < 1 ? 2 : 1 })} %
+                      {owned ? 'Déjà obtenue' : `${chance.toLocaleString('fr-FR', { maximumFractionDigits: chance < 1 ? 2 : 1 })} %`}
                     </span>
                   </div>
                 ))}
@@ -773,7 +778,7 @@ const formatChance = (chance: number) => chance.toLocaleString('fr-FR', { maximu
 
 const PrizeBoard: React.FC<{
   className?: string;
-  board: { seg: WheelSegmentConfig; i: number; chance: number }[];
+  board: { seg: WheelSegmentConfig; i: number; chance: number; owned: boolean }[];
   highlight: number | null;
   hovered: number | null;
   onHover: (i: number | null) => void;
@@ -807,7 +812,7 @@ const PrizeBoard: React.FC<{
         <span className="text-[10px] text-white/40 font-semibold">{board.length} lots</span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-1" onScroll={() => onHover(null)}>
-        {board.map(({ seg, i, chance }) => {
+        {board.map(({ seg, i, chance, owned }) => {
           const rare = rarityOf(chance);
           const active = highlight === i;
           const focus = hovered === i;
@@ -837,7 +842,7 @@ const PrizeBoard: React.FC<{
                   />
                 </span>
               </span>
-              <span className={`shrink-0 font-['Oswald'] font-bold ${active ? '' : 'text-[#5ee8ff]'}`}>{formatChance(chance)}%</span>
+              <span className={`shrink-0 font-['Oswald'] font-bold ${active ? '' : owned ? 'text-white/50' : 'text-[#5ee8ff]'}`}>{owned ? 'Obtenue' : `${formatChance(chance)}%`}</span>
             </div>
           );
         })}
@@ -849,8 +854,8 @@ const PrizeBoard: React.FC<{
 };
 
 /** Grand aperçu d'un lot, affiché à droite du panneau au survol */
-const PrizePreview: React.FC<{ item: { seg: WheelSegmentConfig; chance: number }; podiumImage: string; top: number }> = ({ item, podiumImage, top }) => {
-  const { seg, chance } = item;
+const PrizePreview: React.FC<{ item: { seg: WheelSegmentConfig; chance: number; owned: boolean }; podiumImage: string; top: number }> = ({ item, podiumImage, top }) => {
+  const { seg, chance, owned } = item;
   const rare = rarityOf(chance);
   const odds = chance > 0 ? Math.round(100 / chance) : 0;
   return (
@@ -888,7 +893,9 @@ const PrizePreview: React.FC<{ item: { seg: WheelSegmentConfig; chance: number }
         <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
           <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(4, chance * 5))}%`, background: rare.color }} />
         </div>
-        <div className="mt-2 text-[10px] text-white/40">Sa case s'allume sur la roue.</div>
+        <div className="mt-2 text-[10px] text-white/40">
+          {owned ? 'Vous avez déjà cette carte (ou mieux) : ce lot ne peut pas sortir pour vous tant qu’elle est active.' : "Sa case s'allume sur la roue."}
+        </div>
       </div>
     </div>
   );
@@ -1157,7 +1164,7 @@ const BigWinOverlay: React.FC<{ amount: number; ratio: number; onClick: () => vo
 const PrizeOverlay: React.FC<{ result: SpinResult; podiumImage: string; onClose: () => void }> = ({ result, podiumImage, onClose }) => {
   const seg = result.segment;
   const fallback = PRIZE_IMAGES[seg.type] || '/mystery_vault.jpg';
-  const title = seg.type === 'vehicle' ? 'JACKPOT !' : seg.type === 'clothing' ? 'LOT VIP !' : seg.type === 'voucher' ? 'BONUS OFFERT !' : seg.type === 'pack' ? 'BOOSTER OFFERT !' : 'LOT MYSTÈRE !';
+  const title = seg.type === 'vehicle' ? 'JACKPOT !' : seg.type === 'clothing' ? 'LOT VIP !' : seg.type === 'voucher' ? 'BONUS OFFERT !' : seg.type === 'pack' ? 'BOOSTER OFFERT !' : seg.type === 'vip' ? 'CARTE VIP !' : 'LOT MYSTÈRE !';
   return (
     <div
       onClick={onClose}

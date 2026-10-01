@@ -202,7 +202,7 @@ export const DEFAULT_ECONOMY: CasinoEconomyConfig = {
 };
 
 const PUBLIC_SETTING_KEYS = ['wheel_segments', 'podium_vehicle', 'wheel_cooldown', 'economy_config', 'games_config', 'vip_config'];
-const REWARD_TYPES: string[] = ['vehicle', 'chips', 'cash', 'mystery', 'clothing', 'voucher', 'pack'];
+const REWARD_TYPES: string[] = ['vehicle', 'chips', 'cash', 'mystery', 'clothing', 'voucher', 'pack', 'vip'];
 
 function isValidSegments(value: unknown): value is WheelSegmentConfig[] {
   return (

@@ -61,8 +61,10 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [rows, count] = await Promise.all([dbFetchRewards(undefined, 300), dbCountVehicles()]);
-      setRewards(rows);
+      // Les réclamations en attente sont toujours chargées, même si elles sont plus anciennes que les 300 derniers lots
+      const [rows, claimed, count] = await Promise.all([dbFetchRewards(undefined, 300), dbFetchRewards('CLAIMED', 500), dbCountVehicles()]);
+      const seen = new Set(rows.map((r) => r.id));
+      setRewards([...rows, ...claimed.filter((r) => !seen.has(r.id))]);
       setCatalogCount(count);
     } catch (err) {
       showToast((err as Error).message);

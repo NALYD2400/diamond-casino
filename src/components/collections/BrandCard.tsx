@@ -202,6 +202,13 @@ export const BrandCardFace: React.FC<BrandCardProps> = ({ card, width = 240, int
       {holo && !fx && (
         <div className="absolute inset-[3px] rounded-[11px] pointer-events-none opacity-[0.12]" style={{ background: 'linear-gradient(115deg, #ff0084, #ffc400, #00ffaa, #00a0ff, #aa00ff)' }} />
       )}
+      {/* Brillance mythique : toujours animée, même en grille */}
+      {tier >= 4 && (
+        <>
+          <div className="absolute inset-[3px] rounded-[11px] bst-mythic-shine pointer-events-none" />
+          <div className="absolute inset-[3px] rounded-[11px] bst-mythic-aura pointer-events-none" />
+        </>
+      )}
       {fx && <div className="absolute inset-0 rounded-[14px] bst-glare pointer-events-none" />}
     </div>
   );

@@ -46,6 +46,8 @@ export const BrandCardFace: React.FC<BrandCardProps> = ({ card, width = 240, int
   // Logo absent (pas encore déposé) : logo typographique aux couleurs de la marque
   const [failed, setFailed] = useState<string | null>(null);
   const image = card.image && failed !== card.image ? card.image : null;
+  // Cartes secrètes des marques auto : le visuel est une carte complète (plein cadre)
+  const fullArt = !!image && card.secret && card.setId === 'autos';
 
   return (
     <div
@@ -176,6 +178,19 @@ export const BrandCardFace: React.FC<BrandCardProps> = ({ card, width = 240, int
           </div>
         </div>
       </div>
+
+      {/* Carte secrète : visuel plein cadre par-dessus le corps */}
+      {fullArt && (
+        <img
+          src={image!}
+          onError={() => setFailed(image)}
+          alt={card.name}
+          draggable={false}
+          loading={lite ? 'lazy' : undefined}
+          decoding="async"
+          className="absolute inset-[3px] w-[calc(100%-6px)] h-[calc(100%-6px)] rounded-[11px] object-cover pointer-events-none"
+        />
+      )}
 
       {/* Effets de surface */}
       {holo && fx && (

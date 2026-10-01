@@ -101,7 +101,7 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
   },
   wheel: { enabled: true, spinPrice: 25000, maxRtp: 95 },
   boosters: { enabled: false, maxRtp: 90, sellRate: 70 },
-  collections: { enabled: true, maxRtp: 90, packMaxRtp: 60, dailyPackLimit: 3, sellRate: 70, sellBonusSilver: 0, sellBonusGold: 5, sellBonusDiamond: 10 },
+  collections: { enabled: true, maxRtp: 90, packMaxRtp: 60, dailyPackLimit: 0, sellRate: 70, sellBonusSilver: 0, sellBonusGold: 5, sellBonusDiamond: 10 },
 };
 
 export interface VipTierConfig {

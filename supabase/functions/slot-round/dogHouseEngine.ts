@@ -11,7 +11,7 @@
  * - Tours Gratuits : une grille 3x3 de valeurs 1 à 3 est tirée, la somme donne le nombre
  *   de tours (9 à 27). Pendant les tours, chaque WILD qui tombe devient COLLANT (sticky)
  *   avec son multiplicateur jusqu'à la fin du bonus. Pas de SCATTER pendant les tours.
- * - Gain maximum plafonné à 2 000x la mise.
+ * - Gain maximum plafonné selon la mise (voir maxWinFor).
  */
 
 export type DogSymbolId =

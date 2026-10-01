@@ -115,8 +115,13 @@ Deno.serve(async (req) => {
       vround = playDogHouseRound({ bet: vbet, mode: 'buy', buyPriceX: vcfg.buyPrice, maxPayout: vcfg.maxPayout, rng: secureRandom });
       vdetail = { mode: 'voucher', bonus: vround.freeSpins ? 'free_spins' : null };
     } else {
-      const vbuy = (['gtr', 'duel', 'dmh'].includes(v.buy ?? '') ? v.buy : 'gtr') as WantedBonus;
-      const vbet = Math.max(vcfg.minBet, Math.min(Number(v.bet), wantedMaxBuyBet(vcfg.buyPrices[vbuy], vcfg.maxPayout)));
+      // Duel at Dawn et Dead Man's Hand ne s'achètent plus (gain max selon la mise) : un ancien bon
+      // de ces bonus est joué en Great Train Robbery, pour une valeur de bon équivalente (dans la limite de mise).
+      const vbuy0 = (['gtr', 'duel', 'dmh'].includes(v.buy ?? '') ? v.buy : 'gtr') as WantedBonus;
+      const vbuy: WantedBonus = 'gtr';
+      const faceValue = Number(v.bet) * (vcfg.buyPrices[vbuy0] ?? vcfg.buyPrices.gtr);
+      const wantedBet = Math.floor(faceValue / vcfg.buyPrices.gtr);
+      const vbet = Math.max(vcfg.minBet, Math.min(wantedBet, wantedMaxBuyBet(vcfg.buyPrices.gtr, vcfg.maxPayout)));
       vbetUsed = vbet;
       vround = playWantedRound({ bet: vbet, buy: vbuy, buyPrices: vcfg.buyPrices, maxPayout: vcfg.maxPayout, rng: secureRandom });
       vdetail = { mode: 'voucher', bonus: vround.bonus?.bonus ?? null };

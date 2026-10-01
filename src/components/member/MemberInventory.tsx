@@ -9,7 +9,9 @@ import { Check, Coins, Gift, Layers, Loader2, PackageCheck, Play, Search, Shirt,
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { apiMyInventory, apiSellRewards, type BoosterRarity, type Inventory, type InventoryItem } from '../../lib/supabase';
 import { REWARD_STATUS, formatRewardDate } from '../../lib/rewards';
-import { apiBoosterCatalog } from '../../lib/supabase';
+import { apiBoosterCatalog, apiCollectionCatalog, type CollectionCatalog } from '../../lib/supabase';
+import { BoosterPack } from '../boosters/BoosterPack';
+import { PackFan, packFanCards, packLookFor } from '../collections/PackFan';
 import { BoosterCardFace } from '../boosters/BoosterCard';
 import { fmtChips, fmtMoney, modelName, rarityMap, resolveCard, type ResolvedCard } from '../boosters/boosterUtils';
 import { useIncremental } from '../boosters/useIncremental';
@@ -83,28 +85,39 @@ function ItemCard({ item, width, dim }: { item: InventoryItem; width: number; di
 }
 
 /** Booster de collection offert (roue, direction) : à ouvrir sur la page Collections */
-function PackCard({ item, width }: { item: InventoryItem; width: number }) {
-  const color = '#d9b25f';
+function PackCard({ item, width, collections }: { item: InventoryItem; width: number; collections: CollectionCatalog | null }) {
+  // Album du booster ; un booster sans album précis prend le visuel du premier album
+  const set = collections?.sets.find((s) => s.id === item.pack_set) ?? (item.pack_set ? undefined : collections?.sets[0]);
+  const color = set?.accent_color || '#d9b25f';
+  const packW = Math.round(width * 0.5);
   return (
     <div
-      className="relative overflow-hidden rounded-[14px] border flex flex-col items-center justify-between text-center p-4"
-      style={{ width, height: width * 1.4, borderColor: `${color}80`, background: `radial-gradient(circle at 50% 38%, ${color}30, #0a0a0d 65%)` }}
+      className="relative overflow-hidden rounded-[14px] border flex flex-col items-center justify-between text-center p-3"
+      style={{ width, height: width * 1.4, borderColor: `${color}80`, background: `radial-gradient(circle at 50% 42%, ${color}30, #0a0a0d 65%)` }}
     >
       <span className="text-[9px] uppercase tracking-[0.18em] font-bold px-2.5 py-1 rounded-full bg-amber-300 text-black">Booster offert</span>
-      <div className="relative w-[46%] aspect-[5/7]">
-        {[-10, 0, 10].map((r, i) => (
-          <div
-            key={r}
-            className="absolute inset-0 rounded-[8px] border"
-            style={{ transform: `rotate(${r}deg) translateY(${Math.abs(r) / 3}px)`, zIndex: i === 1 ? 2 : 1, borderColor: `${color}aa`, background: `linear-gradient(145deg, #2a2110, #0b0906)` }}
-          >
-            {i === 1 && <Layers size={22} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ color }} />}
-          </div>
-        ))}
-      </div>
+      {set && collections ? (
+        <BoosterPack
+          pack={{ ...packLookFor(set), cover: <PackFan cards={packFanCards(collections, set.id)} width={packW} setName={set.name} /> }}
+          width={packW}
+          interactive={false}
+        />
+      ) : (
+        <div className="relative w-[46%] aspect-[5/7]">
+          {[-10, 0, 10].map((r, i) => (
+            <div
+              key={r}
+              className="absolute inset-0 rounded-[8px] border"
+              style={{ transform: `rotate(${r}deg) translateY(${Math.abs(r) / 3}px)`, zIndex: i === 1 ? 2 : 1, borderColor: `${color}aa`, background: `linear-gradient(145deg, #2a2110, #0b0906)` }}
+            >
+              {i === 1 && <Layers size={22} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ color }} />}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col items-center gap-0.5">
         <span className="text-[13px] font-bold text-white leading-tight">{item.label}</span>
-        <span className="text-[10px] text-neutral-500">Collection de marques · 5 cartes</span>
+        <span className="text-[10px] text-neutral-500">Collection de marques · {set?.cards_per_pack ?? 5} cartes</span>
       </div>
     </div>
   );
@@ -155,6 +168,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
   const { applyServerProfile, refreshProfile, claimReward } = useCasinoUser();
   const [inv, setInv] = useState<Inventory | null>(null);
   const [rarities, setRarities] = useState<Record<string, BoosterRarity>>({});
+  const [collections, setCollections] = useState<CollectionCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<SourceFilter>('all');
   const [status, setStatus] = useState<StatusFilter>('available');
@@ -167,9 +181,10 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
 
   const load = useCallback(async () => {
     try {
-      const [i, cat] = await Promise.all([apiMyInventory(), apiBoosterCatalog(false).catch(() => null)]);
+      const [i, cat, col] = await Promise.all([apiMyInventory(), apiBoosterCatalog(false).catch(() => null), apiCollectionCatalog().catch(() => null)]);
       setInv(i);
       if (cat) setRarities(rarityMap(cat.rarities));
+      if (col) setCollections(col);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -391,7 +406,7 @@ export const MemberInventory: React.FC<{ showToast: (msg: string) => void }> = (
                       {item.kind === 'vehicle' || item.card ? (
                         <BoosterCardFace card={card} width={grid.cardW} lite />
                       ) : item.kind === 'pack' ? (
-                        <PackCard item={item} width={grid.cardW} />
+                        <PackCard item={item} width={grid.cardW} collections={collections} />
                       ) : item.kind === 'voucher' ? (
                         <VoucherCard item={item} width={grid.cardW} dim={false} />
                       ) : (

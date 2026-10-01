@@ -32,6 +32,7 @@ import { BoosterPack } from '../boosters/BoosterPack';
 import { BoosterAudio } from '../boosters/boosterAudio';
 import { rgba } from '../boosters/boosterUtils';
 import { BrandCardFace } from './BrandCard';
+import { PackFan, packFanCards, packLookFor } from './PackFan';
 import { readStoredSet, setIcon, storeSet } from './CollectionAlbum';
 import { fmtChips, fmtPct, rarityMap, rarityTier, resolveBrandCard, setOdds, type BrandCard } from './collectionUtils';
 
@@ -76,23 +77,6 @@ const Burst: React.FC<{ color: string; count: number; spread: number }> = ({ col
           transition={{ duration: p.dur, delay: p.delay, ease: [0.1, 0.8, 0.3, 1] }}
         />
       ))}
-    </div>
-  );
-};
-
-/** Éventail de cartes affiché dans la fenêtre du paquet */
-const PackFan: React.FC<{ cards: BrandCard[]; width: number; setName: string }> = ({ cards, width, setName }) => {
-  const w = width * 0.42;
-  return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      {cards.slice(0, 3).map((c, i) => {
-        const off = i - (Math.min(3, cards.length) - 1) / 2;
-        return (
-          <div key={c.id} className="absolute" style={{ transform: `translateX(${off * w * 0.55}px) translateY(${Math.abs(off) * 6}px) rotate(${off * 12}deg)`, zIndex: 3 - Math.abs(off) }}>
-            <BrandCardFace card={c} width={w} interactive={false} lite setName={setName} />
-          </div>
-        );
-      })}
     </div>
   );
 };
@@ -197,29 +181,9 @@ export const CollectionsGame: React.FC = () => {
   const completion = mine?.completions.find((c) => c.set_id === set?.id);
   const gifts = (mine?.gifts ?? []).filter((g) => !g.set_id || g.set_id === set?.id || !sets.some((s) => s.id === g.set_id));
 
-  /** Trois plus belles cartes d'un album (éventail sur le paquet) */
-  const fanFor = useCallback(
-    (id: string) =>
-      (catalog?.cards ?? [])
-        .filter((c) => c.set_id === id && !c.hidden)
-        .map((c) => resolveBrandCard(c, rarities))
-        .filter((c) => !c.secret)
-        .sort((a, b) => b.rarity.sort - a.rarity.sort || a.number - b.number)
-        .slice(0, 3)
-        .reverse(),
-    [catalog, rarities],
-  );
+  const fanFor = useCallback((id: string) => (catalog ? packFanCards(catalog, id) : []), [catalog]);
   const fanCards = useMemo(() => (set ? fanFor(set.id) : []), [set, fanFor]);
-  const lookFor = (x: CollectionSetData) => ({
-    id: x.id,
-    name: x.name,
-    cover_image_url: null,
-    accent_color: x.accent_color,
-    cards_per_pack: x.cards_per_pack,
-    kicker: 'Collection de marques',
-    backTitle: `Contient ${x.cards_per_pack} cartes de marques tirées au hasard`,
-    backText: `Complétez l'album pour gagner ${fmtChips(x.reward)}. Les doublons se revendent en jetons.`,
-  });
+  const lookFor = packLookFor;
   const packLook = set ? lookFor(set) : null;
 
   const balance = user?.chips ?? 0;

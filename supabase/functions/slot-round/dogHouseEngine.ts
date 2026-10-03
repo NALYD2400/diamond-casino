@@ -123,6 +123,25 @@ export function payoutScale(bet: number): number {
   return t[t.length - 1][1];
 }
 
+/**
+ * Coefficient supplémentaire en mode Boost : les scatters y sont plus fréquents, donc une plus grosse part
+ * du retour vient des tours gratuits, que le plafond de gain coupe davantage aux grosses mises.
+ * Même interpolation que payoutScale. Table calibrée par simulation.
+ */
+const BOOST_SCALE_TABLE: readonly (readonly [number, number])[] = [[20, 1.326], [29, 1.288], [65, 1.207], [110, 1.149], [200, 1.103], [500, 1.04], [1000, 1.04]];
+export function boostPayoutScale(bet: number): number {
+  const x = Math.min(1000, Math.max(1, maxWinMultiplier(bet)));
+  const t = BOOST_SCALE_TABLE;
+  if (x <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) {
+    if (x <= t[i][0]) {
+      const f = (Math.log(x) - Math.log(t[i - 1][0])) / (Math.log(t[i][0]) - Math.log(t[i - 1][0]));
+      return t[i - 1][1] + f * (t[i][1] - t[i - 1][1]);
+    }
+  }
+  return t[t.length - 1][1];
+}
+
 
 /**
  * Achat de bonus : le gain maximum d'une manche (maxPayout) doit rester au moins
@@ -257,6 +276,8 @@ export function evaluateDogHouseSpin(params: {
   stickyWilds?: StickyWild[];
   forceScatters?: boolean;
   isBoost?: boolean;
+  /** Coefficient appliqué en plus de payoutScale (Boost) */
+  extraScale?: number;
   rng?: () => number;
 }): DogSpinResult {
   const {
@@ -265,6 +286,7 @@ export function evaluateDogHouseSpin(params: {
     stickyWilds = [],
     forceScatters = false,
     isBoost = false,
+    extraScale = 1,
     rng = Math.random,
   } = params;
   const weights = isFreeSpin ? FREE_WEIGHTS : isBoost ? BOOST_WEIGHTS : BASE_WEIGHTS;
@@ -337,7 +359,7 @@ export function evaluateDogHouseSpin(params: {
     if (count < 3) return;
     const base = DOG_SYMBOLS[target].pays[count - 3];
     const wildMultiplier = multSum > 0 ? multSum : 1;
-    const win = Math.round(lineBet * base * payoutScale(bet) * wildMultiplier * 100) / 100;
+    const win = Math.round(lineBet * base * payoutScale(bet) * extraScale * wildMultiplier * 100) / 100;
     if (win > 0) {
       wins.push({ lineIndex, symbol: target, count, positions, wildMultiplier, win });
     }
@@ -466,11 +488,14 @@ export function playDogHouseRound(params: {
   buyPriceX?: number;
   /** Plafond absolu du gain de la manche (en jetons) */
   maxPayout?: number;
+  /** Coefficient de gains en plus de payoutScale (par défaut : boostPayoutScale en mode Boost) */
+  extraScale?: number;
   rng?: () => number;
 }): DogHouseRound {
   const { bet, mode, buyPriceX = BONUS_BUY_X_BET, maxPayout = Infinity, rng = Math.random } = params;
+  const extraScale = params.extraScale ?? (mode === 'boost' ? boostPayoutScale(bet) : 1);
   const cap = Math.min(maxWinFor(bet), maxPayout);
-  const base = evaluateDogHouseSpin({ bet, forceScatters: mode === 'buy', isBoost: mode === 'boost', rng });
+  const base = evaluateDogHouseSpin({ bet, forceScatters: mode === 'buy', isBoost: mode === 'boost', extraScale, rng });
   base.totalWin = Math.min(base.totalWin, cap);
 
   let freeSpins: DogFreeSpinsRound | null = null;
@@ -481,7 +506,7 @@ export function playDogHouseRound(params: {
     let sticky: StickyWild[] = [];
     let win = 0;
     for (let i = 0; i < total; i++) {
-      const res = evaluateDogHouseSpin({ bet, isFreeSpin: true, stickyWilds: sticky, rng });
+      const res = evaluateDogHouseSpin({ bet, isFreeSpin: true, stickyWilds: sticky, extraScale, rng });
       res.totalWin = Math.min(res.totalWin, Math.max(0, cap - base.totalWin - win));
       sticky = res.stickyWilds;
       win = Math.round((win + res.totalWin) * 100) / 100;

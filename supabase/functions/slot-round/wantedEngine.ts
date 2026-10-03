@@ -90,6 +90,25 @@ export function payoutScale(bet: number): number {
   return t[t.length - 1][1];
 }
 
+/**
+ * Coefficient appliqué à TOUS les gains (jeu de base et bonus) selon le plafond de la mise : aux grosses mises
+ * le plafond coupe les bonus et payoutScale (jeu de base seulement, max ×2) ne suffit plus à garder ≈ 90 %.
+ * Vaut 1 tant que le plafond reste ≥ ×200 (mises où l'achat de bonus est permis). Table calibrée par simulation.
+ */
+const CAP_SCALE_TABLE: readonly (readonly [number, number])[] = [[20, 2.025], [29, 1.65], [38, 1.404], [56, 1.166], [80, 1.026], [110, 0.956], [150, 0.965], [200, 1], [1000, 1]];
+export function capPayoutScale(bet: number): number {
+  const x = Math.min(1000, Math.max(1, maxWinMultiplier(bet)));
+  const t = CAP_SCALE_TABLE;
+  if (x <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) {
+    if (x <= t[i][0]) {
+      const f = (Math.log(x) - Math.log(t[i - 1][0])) / (Math.log(t[i][0]) - Math.log(t[i - 1][0]));
+      return t[i - 1][1] + f * (t[i][1] - t[i - 1][1]);
+    }
+  }
+  return t[t.length - 1][1];
+}
+
 export const PAYING: WantedSymbolId[] = ['skull', 'bag', 'whiskey', 'revolver', 'A', 'K', 'Q', 'J', '10'];
 
 export const PAYLINES: readonly (readonly number[])[] = [
@@ -275,6 +294,8 @@ export function evaluateWantedSpin(params: {
   /** multiplicateur global (Showdown de Dead Man's Hand) */
   globalMultiplier?: number;
   forceBonus?: WantedBonus;
+  /** Coefficient appliqué à tous les gains de lignes (voir capPayoutScale) */
+  extraScale?: number;
   rng?: () => number;
 }): WantedSpinResult {
   const {
@@ -284,6 +305,7 @@ export function evaluateWantedSpin(params: {
     stickyVs = [],
     globalMultiplier = 1,
     forceBonus,
+    extraScale = 1,
     rng = Math.random,
   } = params;
 
@@ -359,7 +381,7 @@ export function evaluateWantedSpin(params: {
   });
 
   // 3. Évaluation finale
-  const wins = evaluateLines(grid, reelMult, bet, mode === 'base' && !forceBonus ? payoutScale(bet) : 1);
+  const wins = evaluateLines(grid, reelMult, bet, (mode === 'base' && !forceBonus ? payoutScale(bet) : 1) * extraScale);
   if (globalMultiplier > 1) wins.forEach((w) => (w.win = Math.round(w.win * globalMultiplier * 100) / 100));
   let totalWin = Math.round(wins.reduce((a, w) => a + w.win, 0) * 100) / 100;
   totalWin = Math.min(totalWin, maxWinFor(bet));
@@ -566,11 +588,14 @@ export function playWantedRound(params: {
   /** Prix d'achat des bonus (x la mise) */
   buyPrices?: Partial<Record<WantedBonus, number>>;
   maxPayout?: number;
+  /** Coefficient de gains (par défaut capPayoutScale, sauf bonus acheté) */
+  extraScale?: number;
   rng?: () => number;
 }): WantedRound {
   const { bet, buy = null, buyPrices = {}, maxPayout = Infinity, rng = Math.random } = params;
+  const extraScale = params.extraScale ?? (buy ? 1 : capPayoutScale(bet));
   const cap = Math.min(maxWinFor(bet), maxPayout);
-  const base = evaluateWantedSpin({ bet, forceBonus: buy ?? undefined, rng });
+  const base = evaluateWantedSpin({ bet, forceBonus: buy ?? undefined, extraScale, rng });
   base.totalWin = Math.min(base.totalWin, cap);
 
   let bonus: WantedBonusRound | null = null;
@@ -588,7 +613,7 @@ export function playWantedRound(params: {
     let win = 0;
     for (let i = 0; i < BONUS_INFO[kind].spins; i++) {
       if (collect) sticky = placeShowdownWilds(collect.wilds, rng);
-      const res = evaluateWantedSpin({ bet, mode: kind, stickyWilds: sticky, stickyVs, globalMultiplier: multiplier, rng });
+      const res = evaluateWantedSpin({ bet, mode: kind, stickyWilds: sticky, stickyVs, globalMultiplier: multiplier, extraScale, rng });
       res.totalWin = Math.min(res.totalWin, Math.max(0, cap - base.totalWin - win));
       if (kind === 'gtr') sticky = res.stickyWilds;
       if (kind === 'duel') stickyVs = res.vsReels.map((v) => ({ ...v, sticky: true }));

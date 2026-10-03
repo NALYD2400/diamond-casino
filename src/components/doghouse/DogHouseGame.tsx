@@ -33,6 +33,7 @@ import {
   PAYING_SYMBOLS,
   SCATTER_PAY_X_BET,
   payoutScale,
+  boostPayoutScale,
   maxWinMultiplier,
   dogRoundCost,
   getWinTier,
@@ -884,7 +885,7 @@ export const DogHouseGame: React.FC = () => {
             </div>
           </Modal>
         )}
-        {infoOpen && <PaytableModal bet={bet} onClose={() => setInfoOpen(false)} />}
+        {infoOpen && <PaytableModal bet={bet} boost={boost} onClose={() => setInfoOpen(false)} />}
       </div>
     </div>
   );
@@ -1587,8 +1588,9 @@ const SettingRow: React.FC<{ label: string; value: boolean; onToggle: () => void
   </button>
 );
 
-const PaytableModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, onClose }) => {
+const PaytableModal: React.FC<{ bet: number; boost: boolean; onClose: () => void }> = ({ bet, boost, onClose }) => {
   const lineBet = bet / DOG_PAYLINES.length;
+  const scale = payoutScale(bet) * (boost ? boostPayoutScale(bet) : 1);
   return (
     <Modal title="TABLE DES GAINS" onClose={onClose} wide>
       <p className="text-center text-white/60 text-xs mb-4">Valeurs affichées pour une mise de {fmt(bet)}</p>
@@ -1602,7 +1604,7 @@ const PaytableModal: React.FC<{ bet: number; onClose: () => void }> = ({ bet, on
               {[5, 4, 3].map((n) => (
                 <div key={n}>
                   <span className="text-[#ffe14a]">{n} </span>
-                  <span className="text-white">{fmt(Math.round(lineBet * DOG_SYMBOLS[id].pays[n - 3] * payoutScale(bet) * 100) / 100)}</span>
+                  <span className="text-white">{fmt(Math.round(lineBet * DOG_SYMBOLS[id].pays[n - 3] * scale * 100) / 100)}</span>
                 </div>
               ))}
             </div>

@@ -20,6 +20,7 @@ import {
   PAYLINES,
   PAYTABLE,
   payoutScale,
+  capPayoutScale,
   maxWinMultiplier,
   REELS,
   ROWS,
@@ -1646,7 +1647,7 @@ const RulesModal: React.FC<{ bet: number; prices: Record<WantedBonus, number>; o
             {[5, 4, 3].map((n) => (
               <div key={n}>
                 <span className="text-[#e0b040]">{n} </span>
-                <span className="text-white">{fmt(Math.round(bet * PAYTABLE[id]![n - 3] * payoutScale(bet) * 100) / 100)}</span>
+                <span className="text-white">{fmt(Math.round(bet * PAYTABLE[id]![n - 3] * payoutScale(bet) * capPayoutScale(bet) * 100) / 100)}</span>
               </div>
             ))}
           </div>

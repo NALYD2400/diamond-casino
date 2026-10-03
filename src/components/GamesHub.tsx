@@ -21,7 +21,6 @@ import {
   Play,
   Search,
   ShieldCheck,
-  Sparkles,
   Star,
   Trophy,
   User,
@@ -162,7 +161,6 @@ const CollectionsCover: React.FC = () => {
         })}
       <div className="absolute inset-x-0 bottom-[6%] flex flex-col items-center text-center px-2">
         <div className="flex items-center gap-1 text-[9px] font-mono tracking-[0.25em] text-amber-300/90 font-bold uppercase mb-0.5">
-          <Sparkles size={10} className="text-amber-400" />
           AUTOS & MODE
         </div>
         <div

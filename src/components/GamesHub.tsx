@@ -30,14 +30,14 @@ import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
 import { useMachineClosed } from './MachineClosedBanner';
 import { GAME_LABELS, SLOT_RTP, formatRtp, type GamesConfig } from '../lib/gamesConfig';
-import { apiRecentWheelWins, dbFetchBetsHistory, type SupabaseBetEntry, type WheelWin } from '../lib/supabase';
+import { apiCollectionCatalog, apiRecentWheelWins, dbFetchBetsHistory, type SupabaseBetEntry, type WheelWin } from '../lib/supabase';
 import { Wheel } from './wheel/Wheel';
 import { BombArt, GemArt } from './mines/MinesArt';
 import { DogHouseCover, WantedCover } from './slots/GameCovers';
 import { DogSymbol } from './doghouse/DogSymbols';
 import { CrashCover } from './originals/OriginalsCovers';
 import { BrandCardFace } from './collections/BrandCard';
-import type { BrandCard } from './collections/collectionUtils';
+import { rarityMap, resolveBrandCard, type BrandCard } from './collections/collectionUtils';
 
 type Category = 'all' | 'slots' | 'originals' | 'rewards';
 
@@ -97,9 +97,31 @@ const COVER_CARDS: BrandCard[] = [
   { id: 'c3', setId: 'autos', number: 43, name: 'Grotti', tagline: 'Sportives de légende', rarity: COVER_RARITY('LEGENDAIRE', 'Légendaire', '#f59e0b', 'rays'), color: '#d11a2a', color2: '#f7d046', font: 'serif-italic', emblem: 'G', image: null, hidden: false, secret: false },
 ];
 
+/** Vraies cartes du catalogue (logos compris), chargées une fois pour la vignette */
+let coverCardsCache: Promise<BrandCard[] | null> | null = null;
+function loadCoverCards(): Promise<BrandCard[] | null> {
+  coverCardsCache ??= apiCollectionCatalog()
+    .then((cat) => {
+      const rarities = rarityMap(cat.rarities);
+      const hasLogo = (c: { image_url?: string | null }) => Number(!!c.image_url?.trim());
+      const best = cat.cards
+        .filter((c) => c.active !== false && !c.hidden)
+        .map((c) => ({ raw: c, card: resolveBrandCard(c, rarities) }))
+        .filter(({ card }) => !card.secret)
+        .sort((a, b) => hasLogo(b.raw) - hasLogo(a.raw) || b.card.rarity.sort - a.card.rarity.sort || a.card.number - b.card.number)
+        .slice(0, 3)
+        .map(({ card }) => card);
+      // Cartes avec un vrai logo d'abord, la plus rare au centre de l'éventail
+      return best.length === 3 ? [best[1], best[0], best[2]] : null;
+    })
+    .catch(() => null);
+  return coverCardsCache;
+}
+
 const CollectionsCover: React.FC = () => {
   const ref = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
+  const [cards, setCards] = useState<BrandCard[]>(COVER_CARDS);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -107,7 +129,14 @@ const CollectionsCover: React.FC = () => {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const cw = Math.max(40, w * 0.42);
+  useEffect(() => {
+    let alive = true;
+    loadCoverCards().then((c) => alive && c && setCards(c));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const cw = Math.max(40, w * 0.4);
   return (
     <div ref={ref} className="absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_50%_35%,#3a2a0c_0%,#140f06_45%,#050507_100%)] select-none">
       <div
@@ -115,7 +144,7 @@ const CollectionsCover: React.FC = () => {
         style={{ background: 'repeating-conic-gradient(from 0deg at 50% 50%, rgba(245, 158, 11, 0.07) 0deg 8deg, transparent 8deg 24deg)' }}
       />
       {w > 0 &&
-        COVER_CARDS.map((c, i) => {
+        cards.map((c, i) => {
           const off = i - 1;
           return (
             <div
@@ -124,7 +153,7 @@ const CollectionsCover: React.FC = () => {
               style={{
                 marginLeft: -cw / 2,
                 zIndex: off === 0 ? 3 : 1,
-                transform: `translateX(${off * cw * 0.5}px) translateY(${Math.abs(off) * 8}px) rotate(${off * 13}deg) scale(${off === 0 ? 1 : 0.9})`,
+                transform: `translateX(${off * cw * 0.48}px) translateY(${Math.abs(off) * 8}px) rotate(${off * 13}deg) scale(${off === 0 ? 1 : 0.9})`,
               }}
             >
               <BrandCardFace card={c} width={cw} lite interactive={false} setName={c.setId === 'mode' ? 'Marques de mode' : 'Marques automobiles'} />
@@ -137,8 +166,9 @@ const CollectionsCover: React.FC = () => {
           AUTOS & MODE
         </div>
         <div
-          className="font-['Oswald'] text-[clamp(22px,2.6vw,32px)] font-bold tracking-[0.06em] leading-none uppercase"
+          className="font-['Oswald'] font-bold tracking-[0.04em] leading-none uppercase max-w-full"
           style={{
+            fontSize: Math.max(16, Math.min(32, w * 0.15)),
             background: 'linear-gradient(180deg, #ffffff 0%, #fff1c2 35%, #f5c24a 70%, #b77a10 100%)',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',

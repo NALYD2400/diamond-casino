@@ -25,3 +25,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase CLI (fichiers locaux)
+supabase/.temp/
+
+# Vidéos sources (trop lourdes, le site utilise les versions de public/)
+*.mkv

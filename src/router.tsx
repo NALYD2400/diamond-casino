@@ -285,12 +285,6 @@ const luckyWheelRoute = createRoute({
   component: LuckyWheelPage,
 });
 
-const boostRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/boost',
-  component: LuckyWheelPage,
-});
-
 const minesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/mines',
@@ -363,7 +357,6 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   memberPortalRoute,
   luckyWheelRoute,
-  boostRoute,
   minesRoute,
   slotsRoute,
   wantedRoute,

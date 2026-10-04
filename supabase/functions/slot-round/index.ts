@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
   } else {
     const buy = (['gtr', 'duel', 'dmh'].includes(body.buy ?? '') ? body.buy : null) as WantedBonus | null;
     if (buy && !cfg.buyEnabled) return json({ error: 'BUY_DISABLED' }, 403);
-    if (buy && bet > wantedMaxBuyBet(cfg.buyPrices[buy], cfg.maxPayout)) return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
+    if (buy && bet > wantedMaxBuyBet(cfg.buyPrices[buy], cfg.maxPayout, buy)) return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
     round = playWantedRound({ bet, buy, buyPrices: cfg.buyPrices, maxPayout: cfg.maxPayout, rng: secureRandom });
     detail = { mode: buy ? 'buy' : 'spin', bonus: round.bonus?.bonus ?? null };
   }

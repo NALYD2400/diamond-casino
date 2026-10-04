@@ -12,7 +12,7 @@
  *     un DEAD parmi les 3    → Dead Man's Hand (collecte de wilds et multiplicateurs,
  *                              puis 3 tours « Showdown » : les wilds collectés sont
  *                              replacés au hasard à chaque tour, gains x multiplicateur)
- * - Achat de bonus : 80x / 204x / 406x. Gain max : selon la mise (voir maxWinFor).
+ * - Achat de bonus : 80x / 134x / 219x. Gain max : selon la mise (voir maxWinFor).
  */
 
 export type WantedSymbolId =
@@ -40,8 +40,8 @@ export const MAX_WIN_X = 1000;
 
 export const BONUS_INFO: Record<WantedBonus, { name: string; price: number; spins: number; tagline: string }> = {
   gtr: { name: 'The Great Train Robbery', price: 80, spins: 10, tagline: 'Wilds collants pendant 10 tours' },
-  duel: { name: 'Duel at Dawn', price: 204, spins: 10, tagline: 'VS fréquents, rouleaux VS collants' },
-  dmh: { name: "Dead Man's Hand", price: 406, spins: 3, tagline: 'Collecte puis 3 tours Showdown' },
+  duel: { name: 'Duel at Dawn', price: 134, spins: 10, tagline: 'VS fréquents, rouleaux VS collants' },
+  dmh: { name: "Dead Man's Hand", price: 219, spins: 3, tagline: 'Collecte puis 3 tours Showdown' },
 };
 
 /** Paiements en multiples de la MISE TOTALE pour 3, 4, 5 symboles */
@@ -565,22 +565,24 @@ export interface WantedRound {
  * (Même fonction dans dogHouseEngine.ts et wantedEngine.ts : copiées côté serveur.)
  */
 export const BUY_CAP_RATIO = 5;
-export function maxBuyBet(buyPriceX: number, maxPayout: number): number {
-  // Duel at Dawn (×204) et Dead Man's Hand (×406) tirent leur valeur de gains énormes que le
-  // plafond de gain coupe : leur achat est retiré (ils restent possibles en jeu normal).
-  if (buyPriceX >= BUY_DISABLED_FROM_PRICE) return 0;
+/**
+ * Plafond de gain minimum (× la mise) pour acheter chaque bonus. Duel at Dawn et Dead Man's Hand tirent
+ * leur valeur de gains énormes que le plafond coupe vite : achat réservé aux mises où il reste à ×1 000
+ * (mise ≤ 100). Prix ×134 et ×219 calibrés par simulation pour un retour ≈ 80 % à ces mises.
+ * Great Train Robbery : retour correct tant que le plafond de la mise reste ≥ ×200 (mise ≤ 500).
+ */
+const BUY_MIN_MAX_WIN_X: Record<WantedBonus, number> = { gtr: 200, duel: 1000, dmh: 1000 };
+export function maxBuyBet(buyPriceX: number, maxPayout: number, bonus: WantedBonus = 'gtr'): number {
   const byPayout = Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
-  // Great Train Robbery : retour correct tant que le plafond de la mise reste ≥ ×200
   let lo = 1;
   let hi = 100000;
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
-    if (maxWinMultiplier(mid) >= 200) lo = mid;
+    if (maxWinMultiplier(mid) >= BUY_MIN_MAX_WIN_X[bonus]) lo = mid;
     else hi = mid - 1;
   }
   return Math.min(byPayout, lo);
 }
-const BUY_DISABLED_FROM_PRICE = 150;
 
 export function playWantedRound(params: {
   bet: number;

@@ -24,7 +24,7 @@ import { DEFAULT_VIP_CONFIG, type GamesConfig } from '../../lib/gamesConfig';
 import { apiAdminGameStats, type AdminGameStats, type StatsGameId } from '../../lib/supabase';
 import { calculateMultiplier } from '../mines/minesMath';
 import { MAX_WIN_X_BET, maxBuyBet } from '../doghouse/dogHouseEngine';
-import { MAX_WIN_X } from '../wanted/wantedEngine';
+import { MAX_WIN_X, maxBuyBet as wantedMaxBuyBet, type WantedBonus } from '../wanted/wantedEngine';
 import type { AdminTab } from '../AdminConsole';
 import {
   Badge,
@@ -63,7 +63,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 
 /** Valeur moyenne des bonus achetés (en × la mise), mesurée sur les moteurs */
 const DOG_BONUS_VALUE = 104;
-const WANTED_BONUS_VALUE = { gtr: 73, duel: 184, dmh: 366 } as const;
+const WANTED_BONUS_VALUE = { gtr: 73, duel: 107, dmh: 175 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
 const MIN_ROUNDS = 200;
@@ -94,7 +94,7 @@ function wheelExpected(segments: WheelSegmentConfig[]) {
 }
 
 /** Planchers imposés par le serveur (normalize_games_config) : en dessous, l'achat de bonus fait perdre le casino */
-const MIN_BUY_PRICE = { doghouse: 115, gtr: 80, duel: 204, dmh: 406 } as const;
+const MIN_BUY_PRICE = { doghouse: 115, gtr: 80, duel: 134, dmh: 219 } as const;
 
 /** RTP visé (%) pour une ligne de la répartition, ou null si non applicable */
 function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: WheelSegmentConfig[]): number | null {
@@ -1062,14 +1062,14 @@ const CapCheck: React.FC<{ game: 'mines' | 'doghouse' | 'wanted' | 'crash'; cfg:
   const effective = theoretical === null ? capX : Math.min(theoretical, capX);
   const cut = theoretical !== null && capX < theoretical;
 
-  const buys: { name: string; priceX: number }[] =
+  const buys: { name: string; priceX: number; bonus?: WantedBonus }[] =
     game === 'doghouse' && cfg.doghouse.buyEnabled
       ? [{ name: 'Achat du bonus', priceX: cfg.doghouse.buyPrice }]
       : game === 'wanted' && cfg.wanted.buyEnabled
         ? [
-            { name: 'Great Train Robbery', priceX: cfg.wanted.buyPrices.gtr },
-            { name: 'Duel at Dawn', priceX: cfg.wanted.buyPrices.duel },
-            { name: "Dead Man's Hand", priceX: cfg.wanted.buyPrices.dmh },
+            { name: 'Great Train Robbery', priceX: cfg.wanted.buyPrices.gtr, bonus: 'gtr' },
+            { name: 'Duel at Dawn', priceX: cfg.wanted.buyPrices.duel, bonus: 'duel' },
+            { name: "Dead Man's Hand", priceX: cfg.wanted.buyPrices.dmh, bonus: 'dmh' },
           ]
         : [];
 
@@ -1082,7 +1082,7 @@ const CapCheck: React.FC<{ game: 'mines' | 'doghouse' | 'wanted' | 'crash'; cfg:
           {cut && <span className="text-amber-300"> Le plafond de gain coupe les plus gros gains à cette mise.</span>}
         </div>
         {buys.map((b) => {
-          const limit = maxBuyBet(b.priceX, c.maxPayout);
+          const limit = b.bonus ? wantedMaxBuyBet(b.priceX, c.maxPayout, b.bonus) : maxBuyBet(b.priceX, c.maxPayout);
           const impossible = limit < c.minBet;
           const limited = limit < c.maxBet;
           return (
@@ -1093,7 +1093,7 @@ const CapCheck: React.FC<{ game: 'mines' | 'doghouse' | 'wanted' | 'crash'; cfg:
                 {impossible ? (
                   <span className="text-rose-300">achat impossible, même à la mise minimum. Augmentez le gain max. par manche.</span>
                 ) : limited ? (
-                  <span className="text-amber-300">achat limité aux mises jusqu'à {fmt(limit)} ⛁ (le gain max. doit rester au moins 5× le prix payé).</span>
+                  <span className="text-amber-300">achat limité aux mises jusqu'à {fmt(limit)} ⛁ (au-delà, le plafond de gain rendrait le bonus perdant pour le joueur).</span>
                 ) : (
                   <span className="text-emerald-300">autorisé à toutes les mises.</span>
                 )}

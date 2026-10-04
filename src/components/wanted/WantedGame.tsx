@@ -795,7 +795,7 @@ export const WantedGame: React.FC = () => {
             <div className="grid sm:grid-cols-3 gap-3">
               {(Object.keys(BONUS_INFO) as WantedBonus[]).map((b) => {
                 const price = bet * buyPrices[b];
-                const tooHigh = bet > maxBuyBet(buyPrices[b], cfg.maxPayout);
+                const tooHigh = bet > maxBuyBet(buyPrices[b], cfg.maxPayout, b);
                 return (
                   <button
                     key={b}
@@ -815,7 +815,7 @@ export const WantedGame: React.FC = () => {
                     <div className="text-center text-[11px] opacity-70">{buyPrices[b]}x la mise</div>
                     {tooHigh && (
                       <div className="mt-1 text-center text-[11px] font-bold text-[#8a1c10]">
-                        {maxBuyBet(buyPrices[b], cfg.maxPayout) === 0 ? 'Achat indisponible' : `Mise max : ${fmt(maxBuyBet(buyPrices[b], cfg.maxPayout))}`}
+                        {maxBuyBet(buyPrices[b], cfg.maxPayout, b) === 0 ? 'Achat indisponible' : `Mise max : ${fmt(maxBuyBet(buyPrices[b], cfg.maxPayout, b))}`}
                       </div>
                     )}
                   </button>

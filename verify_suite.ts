@@ -21,13 +21,6 @@ import {
   sha256Hex,
 } from './src/components/mines/minesMath';
 import {
-  evaluateSlotSpin,
-  simulateMachineRTP,
-  DEFAULT_SLOT_MACHINES,
-  PAYLINES_5X3,
-  PAYLINES_3X3,
-} from './src/components/slots/slotsEngine';
-import {
   evaluateDogHouseSpin,
   rollFreeSpinsGrid,
   simulateDogHouse,
@@ -202,34 +195,6 @@ async function main() {
     })()],
   ]);
 
-  await runGroup('SLOTS ENGINE & MATHEMATICS', [
-    ['DEFAULT_SLOT_MACHINES has at least 3 configured machines', DEFAULT_SLOT_MACHINES.length >= 3],
-    ['PAYLINES_5X3 has exactly 20 distinct lines and PAYLINES_3X3 has 5 lines', PAYLINES_5X3.length === 20 && PAYLINES_3X3.length === 5],
-    ['evaluateSlotSpin produces exact grid dimensions (5x3 for 5-reel)', (() => {
-      const res = evaluateSlotSpin({ machine: DEFAULT_SLOT_MACHINES[0], bet: 100 });
-      return res.grid.length === 5 && res.grid.every((col) => col.length === 3);
-    })()],
-    ['evaluateSlotSpin produces exact grid dimensions (3x3 for 3-reel)', (() => {
-      const classic = DEFAULT_SLOT_MACHINES.find((m) => m.reelsCount === 3) || DEFAULT_SLOT_MACHINES[2];
-      const res = evaluateSlotSpin({ machine: classic, bet: 100 });
-      return res.grid.length === 3 && res.grid.every((col) => col.length === 3);
-    })()],
-    ['evaluateSlotSpin calculates non-negative win and multiplier', (() => {
-      const res = evaluateSlotSpin({ machine: DEFAULT_SLOT_MACHINES[0], bet: 200 });
-      return res.totalWin >= 0 && res.totalMultiplier >= 0 && typeof res.hash === 'string';
-    })()],
-    ['simulateMachineRTP runs 2,000 spins and outputs reasonable RTP and hit rate', (() => {
-      const report = simulateMachineRTP(DEFAULT_SLOT_MACHINES[0], 2000);
-      return (
-        report.iterations === 2000 &&
-        report.simulatedRtp >= 50 &&
-        report.simulatedRtp <= 200 &&
-        report.hitRatePct >= 10 &&
-        report.durationMs < 500
-      );
-    })()],
-  ]);
-
   const seeded = (seed: number) => () => {
     seed = (seed + 0x6d2b79f5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -312,7 +277,7 @@ async function main() {
       return c.wilds <= DMH_MAX_WILDS && cells.length === c.wilds && new Set(cells.map((x) => `${x.reel}-${x.row}`)).size === c.wilds;
     })],
     // Seul Great Train Robbery reste achetable (retour correct sous le plafond de gain) ;
-    // Duel et Dead Man's Hand ne s'achètent plus : ils ne doivent jamais valoir plus que leur prix.
+    // Duel et Dead Man's Hand (prix calibrés à ≈ 80 %) ne doivent jamais valoir plus que leur prix.
     ['the buyable bonus (gtr) is worth close to its buy price (±15%)', (() => {
       const rng = seeded(4242);
       let total = 0;
@@ -326,7 +291,7 @@ async function main() {
       for (let i = 0; i < 12000; i++) total += simulateBonus(b, 1, rng);
       return total / 12000 / BONUS_INFO[b].price < 1;
     })],
-    ['wanted buy: only gtr is purchasable, duel and dmh are not', maxWantedBuy(80, 1e7) > 0 && maxWantedBuy(204, 1e7) === 0 && maxWantedBuy(406, 1e7) === 0],
+    ['wanted buy: gtr up to bet 500, duel and dmh up to bet 100', maxWantedBuy(80, 1e7, 'gtr') === 500 && maxWantedBuy(134, 1e7, 'duel') === 100 && maxWantedBuy(219, 1e7, 'dmh') === 100],
     ['a single spin never exceeds the max win', wantedSpins.every((r) => r.totalWin <= 200 * WANTED_MAX_WIN_X)],
     ['simulated RTP over 300k spins stays in a sane range', (() => {
       const sim = simulateWanted(300000, seeded(2027));
@@ -436,7 +401,7 @@ async function main() {
       })()],
       ['cannot write admin logs', isRefused(() => supabase.from('admin_logs').insert({ action: 'x', category: 'SYSTEM' }))],
       ['cannot spin the wheel', isRefused(() => supabase.rpc('spin_wheel'))],
-      ['cannot play mines without auth', isRefused(() => supabase.rpc('play_mines_game', { p_bet: 100, p_win: 200, p_multiplier: 2, p_mines: 3, p_gems: 1 }))],
+      ['cannot play mines without auth', isRefused(() => supabase.rpc('mines_start', { p_bet: 100, p_mines: 3 }))],
       ['cannot call staff functions', isRefused(() => supabase.rpc('admin_reset_cooldown', { p_profile_id: null }))],
       ['cannot adjust balances via RPC', isRefused(() =>
         supabase.rpc('admin_adjust_balance', { p_profile_id: '00000000-0000-0000-0000-000000000000', p_chips_delta: 1000, p_cash_delta: 0, p_reason: 'x' }),

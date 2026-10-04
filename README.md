@@ -20,7 +20,7 @@ casino gta/
 ├── public/                      # Logo, visuels des lots, photos du casino
 ├── src/
 │   ├── components/
-│   │   ├── Hero, Discovery, Mission, Architecture, Gallery, CtaStream, Footer, Navbar
+│   │   ├── Hero, Footer, Navbar
 │   │   ├── WheelOfFortune.tsx   # Page /roue-de-la-fortune
 │   │   ├── wheel/Wheel.tsx      # Roue SVG
 │   │   ├── GamesCatalog.tsx     # Page /jeux
@@ -36,8 +36,7 @@ casino gta/
 │   │   ├── discord.ts           # OAuth Discord, avatars
 │   │   └── security.ts          # Validation / nettoyage des saisies
 │   └── router.tsx
-├── supabase/migrations/         # Migrations appliquées au projet Supabase
-├── supabase_schema.sql          # Schéma complet pour un projet Supabase neuf
+├── supabase/migrations/         # Schéma complet : migrations appliquées dans l'ordre
 └── verify_suite.ts              # Tests (npm test)
 ```
 
@@ -91,7 +90,7 @@ Les tests vérifient la validation des saisies et, en direct contre Supabase, qu
 
 ### Nouveau projet Supabase
 
-1. Exécuter `supabase_schema.sql` dans le SQL Editor.
+1. Appliquer les migrations de `supabase/migrations/` dans l'ordre (`npx supabase db push`, ou une à une dans le SQL Editor).
 2. Activer le provider **Discord** (Authentication > Providers) et ajouter `https://<votre-domaine>/espace-membre` aux URL de redirection.
 
 ---

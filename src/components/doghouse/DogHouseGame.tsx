@@ -18,11 +18,12 @@ import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { apiPlaySlotRound, CasinoApiError, type PlayerReward } from '../../lib/supabase';
-import { clampBetLevels, SLOT_RTP, formatRtp } from '../../lib/gamesConfig';
+import { buyBetLimit, clampBetLevels, spinScale } from '../../lib/gamesConfig';
 import { DogHouseAudio } from './dogHouseAudio';
 import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
+import { SlotRtpText } from '../slots/SlotRtpText';
 import { useVouchers } from '../slots/useVouchers';
 import { DogSymbol } from './DogSymbols';
 import {
@@ -143,7 +144,7 @@ export const DogHouseGame: React.FC = () => {
   });
   const bet = betLevels[Math.min(betIdx, betLevels.length - 1)];
   // Le gain d'une manche est plafonné : au-delà de cette mise, le bonus coûterait plus que le gain possible
-  const buyMaxBet = maxBuyBet(buyPriceX, cfg.maxPayout);
+  const buyMaxBet = buyBetLimit(maxBuyBet(buyPriceX, cfg.maxPayout), cfg);
   const buyBetTooHigh = bet > buyMaxBet;
   // Gain maximum réellement possible à cette mise (plafond de la machine ou de la manche)
   const maxWinX = Math.floor(Math.min(maxWinMultiplier(bet), cfg.maxPayout / bet));
@@ -251,12 +252,14 @@ export const DogHouseGame: React.FC = () => {
           return null;
         }
       }
-      const round = playDogHouseRound({ bet, mode: roundMode, buyPriceX });
+      // Démo : même coefficient que le serveur sur les tours normaux et boostés
+      const extraScale = roundMode === 'buy' ? undefined : (roundMode === 'boost' ? boostPayoutScale(bet) : 1) * spinScale('doghouse', cfg);
+      const round = playDogHouseRound({ bet, mode: roundMode, buyPriceX, extraScale });
       setHiddenWin(round.totalWin);
       setDemoChips((prev) => Math.max(0, Math.round((prev - round.cost + round.totalWin) * 100) / 100));
       return round;
     },
-    [mode, bet, buyPriceX, applyServerProfile],
+    [mode, bet, buyPriceX, cfg, applyServerProfile],
   );
 
   // ---------------------------------------------------------------------------
@@ -1227,7 +1230,7 @@ const ControlBar: React.FC<ControlBarProps> = (p) => (
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-white/60">RTP théorique</span>
-                  <span className="text-[#7dff5a] font-bold">{formatRtp(SLOT_RTP.doghouse)}</span>
+                  <span className="text-[#7dff5a] font-bold"><SlotRtpText game="doghouse" /></span>
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-white/60">Volatilité</span>
@@ -1656,7 +1659,7 @@ const PaytableModal: React.FC<{ bet: number; boost: boolean; onClose: () => void
       </div>
       <p className="text-white/50 text-[11px] text-center mt-4">
         Gains de gauche à droite sur lignes adjacentes. Seul le gain le plus élevé par ligne est payé. Gain maximum :{' '}
-        {fmt(MAX_WIN_X_BET)}x la mise (il baisse quand la mise monte : {fmt(MAX_WIN_X_BET)}x jusqu'à 100, 100 000 jetons jusqu'à 500…). RTP théorique {formatRtp(SLOT_RTP.doghouse)} (tirages effectués par le serveur).
+        {fmt(MAX_WIN_X_BET)}x la mise (il baisse quand la mise monte : {fmt(MAX_WIN_X_BET)}x jusqu'à 100, 100 000 jetons jusqu'à 500…). RTP théorique <SlotRtpText game="doghouse" /> (tirages effectués par le serveur).
       </p>
     </Modal>
   );
@@ -1670,7 +1673,7 @@ const GameInfoStrip: React.FC = () => (
         <div className="text-[#b1bad3] text-xs">Diamond Originals · Machine à sous</div>
       </div>
       {[
-        { l: 'RTP', v: formatRtp(SLOT_RTP.doghouse) },
+        { l: 'RTP', v: <SlotRtpText game="doghouse" /> },
         { l: 'Volatilité', v: 'Élevée' },
         { l: 'Gain max', v: `≤ ${fmt(MAX_WIN_X_BET)}x` },
         { l: 'Lignes', v: '20 fixes' },

@@ -20,7 +20,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
-import { type GamesConfig } from '../../lib/gamesConfig';
+import { buyBetLimit, slotSpinRtp, spinScale, type GamesConfig } from '../../lib/gamesConfig';
 import { usePackSets, wheelExpected as wheelExpectedFor } from '../../lib/wheelEconomy';
 import { apiAdminGameStats, type AdminGameStats, type StatsGameId } from '../../lib/supabase';
 import { calculateMultiplier } from '../mines/minesMath';
@@ -83,15 +83,15 @@ const MIN_BUY_PRICE = { doghouse: 115, gtr: 80, duel: 134, dmh: 219 } as const;
 function targetFor(machine: MachineId, key: string, cfg: GamesConfig, wheelEv: number): number | null {
   switch (machine) {
     case 'doghouse':
-      if (key === 'boost') return 93;
+      if (key === 'boost') return 93 * spinScale('doghouse', cfg.doghouse);
       if (key === 'buy') return (DOG_BONUS_VALUE / Math.max(1, cfg.doghouse.buyPrice)) * 100;
-      return 95;
+      return slotSpinRtp('doghouse', cfg.doghouse);
     case 'wanted': {
       if (key.startsWith('buy_')) {
         const b = key.slice(4) as keyof typeof WANTED_BONUS_VALUE;
         return b in WANTED_BONUS_VALUE ? (WANTED_BONUS_VALUE[b] / Math.max(1, cfg.wanted.buyPrices[b])) * 100 : null;
       }
-      return 96;
+      return slotSpinRtp('wanted', cfg.wanted);
     }
     case 'mines':
       return cfg.mines.rtp;
@@ -857,6 +857,13 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
       {id === 'doghouse' && (
         <>
           {betFields('doghouse')}
+          <SlotRtpCard
+            rtp={draft.doghouse.spinRtp}
+            onRtp={(v) => set('doghouse', { spinRtp: v })}
+            maxBuyBet={draft.doghouse.maxBuyBet}
+            onMaxBuyBet={(v) => set('doghouse', { maxBuyBet: v })}
+            buyCost={(bet) => bet * draft.doghouse.buyPrice}
+          />
           <Card title="Options de jeu">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <div className="flex flex-col gap-3 rounded-xl bg-white/[0.03] border border-white/10 p-4">
@@ -884,6 +891,13 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
       {id === 'wanted' && (
         <>
           {betFields('wanted')}
+          <SlotRtpCard
+            rtp={draft.wanted.spinRtp}
+            onRtp={(v) => set('wanted', { spinRtp: v })}
+            maxBuyBet={draft.wanted.maxBuyBet}
+            onMaxBuyBet={(v) => set('wanted', { maxBuyBet: v })}
+            buyCost={(bet) => bet * draft.wanted.buyPrices.gtr}
+          />
           <Card title="Achat de bonus">
             <div className="flex flex-col gap-4">
               <Toggle checked={draft.wanted.buyEnabled} onChange={(v) => set('wanted', { buyEnabled: v })} label="Achat de bonus autorisé" />
@@ -1045,7 +1059,7 @@ const CapCheck: React.FC<{ game: 'mines' | 'doghouse' | 'wanted' | 'crash'; cfg:
           {cut && <span className="text-amber-300"> Le plafond de gain coupe les plus gros gains à cette mise.</span>}
         </div>
         {buys.map((b) => {
-          const limit = b.bonus ? wantedMaxBuyBet(b.priceX, c.maxPayout, b.bonus) : maxBuyBet(b.priceX, c.maxPayout);
+          const limit = buyBetLimit(b.bonus ? wantedMaxBuyBet(b.priceX, c.maxPayout, b.bonus) : maxBuyBet(b.priceX, c.maxPayout), c as { maxBuyBet?: number });
           const impossible = limit < c.minBet;
           const limited = limit < c.maxBet;
           return (
@@ -1086,4 +1100,36 @@ const MiniStat: React.FC<{ label: string; value: React.ReactNode; hint?: React.R
     <div className={cx('font-mono text-[15px] font-semibold truncate', valueClass ?? 'text-white')}>{value}</div>
     {hint && <div className="text-[10px] text-neutral-500 truncate">{hint}</div>}
   </div>
+);
+
+/** Réglages de rentabilité d'une machine à sous : RTP des tours normaux et mise max d'achat de bonus */
+const SlotRtpCard: React.FC<{
+  rtp: number;
+  onRtp: (v: number) => void;
+  maxBuyBet: number;
+  onMaxBuyBet: (v: number) => void;
+  /** Coût de l'achat (le moins cher) pour une mise donnée */
+  buyCost: (bet: number) => number;
+}> = ({ rtp, onRtp, maxBuyBet, onMaxBuyBet, buyCost }) => (
+  <Card title="Rentabilité">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <Field
+        label="RTP des tours normaux"
+        hint={
+          <>
+            Sur 100 jetons misés en tours normaux (et boostés), le joueur en récupère {fmt(rtp)} en moyenne : le casino garde {fmt(100 - rtp)}.
+            De 60 à 90 %. Affiché aux joueurs sur la machine.
+          </>
+        }
+      >
+        <NumberInput value={rtp} min={60} max={90} onChange={(v) => onRtp(Math.min(90, Math.max(60, v)))} suffix="%" />
+      </Field>
+      <Field
+        label="Mise max. pour acheter un bonus"
+        hint={<>À cette mise, l'achat coûte {fmt(buyCost(maxBuyBet))} ⛁. Au-delà, le bouton d'achat est bloqué (le serveur refuse aussi).</>}
+      >
+        <NumberInput value={maxBuyBet} min={1} onChange={(v) => onMaxBuyBet(Math.max(1, Math.round(v)))} suffix="⛁" />
+      </Field>
+    </div>
+  </Card>
 );

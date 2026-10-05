@@ -28,7 +28,7 @@ import {
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
 import { useMachineClosed } from './MachineClosedBanner';
-import { GAME_LABELS, SLOT_RTP, formatRtp, type GamesConfig } from '../lib/gamesConfig';
+import { GAME_LABELS, SLOT_RTP, formatRtp, slotSpinRtp, type GamesConfig } from '../lib/gamesConfig';
 import { apiCollectionCatalog, apiRecentWheelWins, dbFetchBetsHistory, type SupabaseBetEntry, type WheelWin } from '../lib/supabase';
 import { Wheel } from './wheel/Wheel';
 import { BombArt, GemArt } from './mines/MinesArt';
@@ -293,7 +293,12 @@ const MachineTile: React.FC<{ game: GameTile & { id: keyof GamesConfig }; index:
   const closed = useMachineClosed(game.id);
   const { gamesConfig } = useCasinoAdmin();
   // Le RTP des Originals se règle dans la console : on affiche la valeur en vigueur
-  const rtp = game.id === 'mines' || game.id === 'crash' ? formatRtp(gamesConfig[game.id].rtp) : game.rtp;
+  const rtp =
+    game.id === 'mines' || game.id === 'crash'
+      ? formatRtp(gamesConfig[game.id].rtp)
+      : game.id === 'doghouse' || game.id === 'wanted'
+        ? formatRtp(slotSpinRtp(game.id, gamesConfig[game.id]))
+        : game.rtp;
   const shown = { ...game, rtp };
   return <Tile game={shown} index={index} closed={closed} />;
 };

@@ -13,8 +13,13 @@
  * src/components/** — lancer `npm run sync:edge` après toute modification.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { playDogHouseRound, maxBuyBet as dogMaxBuyBet, type DogRoundMode } from './dogHouseEngine.ts';
-import { playWantedRound, maxBuyBet as wantedMaxBuyBet, type WantedBonus } from './wantedEngine.ts';
+import { boostPayoutScale, playDogHouseRound, maxBuyBet as dogMaxBuyBet, type DogRoundMode } from './dogHouseEngine.ts';
+import { capPayoutScale, playWantedRound, maxBuyBet as wantedMaxBuyBet, type WantedBonus } from './wantedEngine.ts';
+
+/** RTP des moteurs sur les tours normaux (même valeur que SLOT_RTP dans src/lib/gamesConfig.ts) */
+const ENGINE_RTP = 90;
+/** Coefficient des gains des tours normaux : RTP réglé (games_config.<jeu>.spinRtp) ÷ RTP du moteur */
+const spinScale = (cfg: { spinRtp?: number }) => Math.min(1, Math.max(0.5, (Number(cfg.spinRtp) || ENGINE_RTP) / ENGINE_RTP));
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -157,15 +162,22 @@ Deno.serve(async (req) => {
   if (game === 'doghouse') {
     const mode = (['spin', 'boost', 'buy'].includes(body.mode ?? '') ? body.mode : 'spin') as DogRoundMode;
     if (mode === 'buy' && !cfg.buyEnabled) return json({ error: 'BUY_DISABLED' }, 403);
-    if (mode === 'buy' && bet > dogMaxBuyBet(cfg.buyPrice, cfg.maxPayout)) return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
+    if (mode === 'buy' && bet > Math.min(dogMaxBuyBet(cfg.buyPrice, cfg.maxPayout), Number(cfg.maxBuyBet) || Infinity)) {
+      return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
+    }
     if (mode === 'boost' && !cfg.boostEnabled) return json({ error: 'BOOST_DISABLED' }, 403);
-    round = playDogHouseRound({ bet, mode, buyPriceX: cfg.buyPrice, maxPayout: cfg.maxPayout, rng: secureRandom });
+    // Achat de bonus : retour réglé par son prix ; tours normaux et boostés : par spinRtp
+    const extraScale = mode === 'buy' ? undefined : (mode === 'boost' ? boostPayoutScale(bet) : 1) * spinScale(cfg);
+    round = playDogHouseRound({ bet, mode, buyPriceX: cfg.buyPrice, maxPayout: cfg.maxPayout, extraScale, rng: secureRandom });
     detail = { mode, bonus: round.freeSpins ? 'free_spins' : null };
   } else {
     const buy = (['gtr', 'duel', 'dmh'].includes(body.buy ?? '') ? body.buy : null) as WantedBonus | null;
     if (buy && !cfg.buyEnabled) return json({ error: 'BUY_DISABLED' }, 403);
-    if (buy && bet > wantedMaxBuyBet(cfg.buyPrices[buy], cfg.maxPayout, buy)) return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
-    round = playWantedRound({ bet, buy, buyPrices: cfg.buyPrices, maxPayout: cfg.maxPayout, rng: secureRandom });
+    if (buy && bet > Math.min(wantedMaxBuyBet(cfg.buyPrices[buy], cfg.maxPayout, buy), Number(cfg.maxBuyBet) || Infinity)) {
+      return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
+    }
+    const extraScale = buy ? undefined : capPayoutScale(bet) * spinScale(cfg);
+    round = playWantedRound({ bet, buy, buyPrices: cfg.buyPrices, maxPayout: cfg.maxPayout, extraScale, rng: secureRandom });
     detail = { mode: buy ? 'buy' : 'spin', bonus: round.bonus?.bonus ?? null };
   }
 

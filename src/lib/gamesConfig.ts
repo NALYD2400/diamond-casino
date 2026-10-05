@@ -28,6 +28,10 @@ export interface DogHouseConfig {
   buyPrice: number;
   boostEnabled: boolean;
   maxPayout: number;
+  /** RTP visé des tours normaux et boostés (60 à 90 %), appliqué par le serveur */
+  spinRtp: number;
+  /** Mise maximum pour acheter le bonus (en plus de la limite liée au gain max) */
+  maxBuyBet: number;
 }
 
 export interface WantedConfig {
@@ -37,6 +41,10 @@ export interface WantedConfig {
   buyEnabled: boolean;
   buyPrices: { gtr: number; duel: number; dmh: number };
   maxPayout: number;
+  /** RTP visé des tours normaux (60 à 90 %), appliqué par le serveur */
+  spinRtp: number;
+  /** Mise maximum pour acheter un bonus (en plus de la limite liée au gain max) */
+  maxBuyBet: number;
 }
 
 export interface CrashConfig {
@@ -90,7 +98,7 @@ export interface GamesConfig {
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
   mines: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxPayout: 5000000 },
   crash: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxMultiplier: 1000, maxPayout: 5000000 },
-  doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 115, boostEnabled: true, maxPayout: 10000000 },
+  doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 115, boostEnabled: true, maxPayout: 10000000, spinRtp: 90, maxBuyBet: 100000 },
   wanted: {
     enabled: true,
     minBet: 10,
@@ -98,6 +106,8 @@ export const DEFAULT_GAMES_CONFIG: GamesConfig = {
     buyEnabled: true,
     buyPrices: { gtr: 80, duel: 134, dmh: 219 },
     maxPayout: 10000000,
+    spinRtp: 90,
+    maxBuyBet: 100000,
   },
   wheel: { enabled: true, spinPrice: 25000, maxRtp: 90 },
   boosters: { enabled: false, maxRtp: 90, sellRate: 70 },
@@ -166,6 +176,19 @@ export const GAME_LABELS: Record<string, string> = {
  * Vérification : npm run check:rtp (simulation des moteurs, ~2 min).
  */
 export const SLOT_RTP = { doghouse: 90, wanted: 90 } as const;
+
+/**
+ * Coefficient des gains des tours normaux : RTP réglé ÷ RTP du moteur.
+ * Même calcul que spinScale() dans supabase/functions/slot-round/index.ts.
+ */
+export const spinScale = (game: keyof typeof SLOT_RTP, cfg: { spinRtp?: number }) =>
+  Math.min(1, Math.max(0.5, (Number(cfg.spinRtp) || SLOT_RTP[game]) / SLOT_RTP[game]));
+
+/** Mise maximum d'achat de bonus : limite du moteur (gain max) et réglage de la console, la plus basse des deux */
+export const buyBetLimit = (engineLimit: number, cfg: { maxBuyBet?: number }) => Math.min(engineLimit, Number(cfg.maxBuyBet) || Infinity);
+
+/** RTP réellement appliqué aux tours normaux d'une machine */
+export const slotSpinRtp = (game: keyof typeof SLOT_RTP, cfg: { spinRtp?: number }) => SLOT_RTP[game] * spinScale(game, cfg);
 
 /** 96.5 -> "96,5 %", 97 -> "97 %" */
 export const formatRtp = (rtp: number): string =>

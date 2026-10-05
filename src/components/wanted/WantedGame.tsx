@@ -6,9 +6,10 @@ import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { apiPlaySlotRound, CasinoApiError, type PlayerReward } from '../../lib/supabase';
-import { clampBetLevels, SLOT_RTP, formatRtp } from '../../lib/gamesConfig';
+import { buyBetLimit, clampBetLevels, formatRtp, slotSpinRtp, spinScale } from '../../lib/gamesConfig';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
+import { SlotRtpText } from '../slots/SlotRtpText';
 import { useVouchers } from '../slots/useVouchers';
 import { WantedAudio } from './wantedAudio';
 import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
@@ -242,7 +243,8 @@ export const WantedGame: React.FC = () => {
           return null;
         }
       }
-      const round = playWantedRound({ bet, buy, buyPrices });
+      // Démo : même coefficient que le serveur sur les tours normaux
+      const round = playWantedRound({ bet, buy, buyPrices, extraScale: buy ? undefined : capPayoutScale(bet) * spinScale('wanted', cfg) });
       setHiddenWin(round.totalWin);
       setDemoChips((prev) => Math.max(0, Math.round((prev - round.cost + round.totalWin) * 100) / 100));
       return round;
@@ -706,7 +708,7 @@ export const WantedGame: React.FC = () => {
           <div className="hidden lg:flex w-[170px] shrink-0 flex-col gap-2">
             <InfoCard title="GAIN MAX" value={`${fmt(Math.floor(Math.min(maxWinMultiplier(bet), cfg.maxPayout / bet)))}x`} />
             <InfoCard title="VS" value="x2 → x100" sub="Multiplicateurs additionnés sur la ligne" />
-            <InfoCard title="RTP" value={formatRtp(SLOT_RTP.wanted)} />
+            <InfoCard title="RTP" value={formatRtp(slotSpinRtp('wanted', cfg))} />
           </div>
         </div>
 
@@ -795,7 +797,8 @@ export const WantedGame: React.FC = () => {
             <div className="grid sm:grid-cols-3 gap-3">
               {(Object.keys(BONUS_INFO) as WantedBonus[]).map((b) => {
                 const price = bet * buyPrices[b];
-                const tooHigh = bet > maxBuyBet(buyPrices[b], cfg.maxPayout, b);
+                const limit = buyBetLimit(maxBuyBet(buyPrices[b], cfg.maxPayout, b), cfg);
+                const tooHigh = bet > limit;
                 return (
                   <button
                     key={b}
@@ -815,7 +818,7 @@ export const WantedGame: React.FC = () => {
                     <div className="text-center text-[11px] opacity-70">{buyPrices[b]}x la mise</div>
                     {tooHigh && (
                       <div className="mt-1 text-center text-[11px] font-bold text-[#8a1c10]">
-                        {maxBuyBet(buyPrices[b], cfg.maxPayout, b) === 0 ? 'Achat indisponible' : `Mise max : ${fmt(maxBuyBet(buyPrices[b], cfg.maxPayout, b))}`}
+                        {limit === 0 ? 'Achat indisponible' : `Mise max : ${fmt(limit)}`}
                       </div>
                     )}
                   </button>
@@ -1697,7 +1700,7 @@ const RulesModal: React.FC<{ bet: number; prices: Record<WantedBonus, number>; o
       ))}
     </div>
     <p className="text-white/50 text-[11px] text-center mt-4">
-      Gain maximum : jusqu'à {fmt(MAX_WIN_X)}x la mise (il baisse quand la mise monte : {fmt(MAX_WIN_X)}x jusqu'à 100, 100 000 jetons jusqu'à 500…), le tour s'arrête dès qu'il est atteint. RTP théorique {formatRtp(SLOT_RTP.wanted)} (tirages effectués par le serveur).
+      Gain maximum : jusqu'à {fmt(MAX_WIN_X)}x la mise (il baisse quand la mise monte : {fmt(MAX_WIN_X)}x jusqu'à 100, 100 000 jetons jusqu'à 500…), le tour s'arrête dès qu'il est atteint. RTP théorique <SlotRtpText game="wanted" /> (tirages effectués par le serveur).
     </p>
   </Modal>
 );

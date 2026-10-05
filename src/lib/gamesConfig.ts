@@ -98,7 +98,7 @@ export interface GamesConfig {
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
   mines: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxPayout: 5000000 },
   crash: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxMultiplier: 1000, maxPayout: 5000000 },
-  doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 115, boostEnabled: true, maxPayout: 10000000, spinRtp: 90, maxBuyBet: 100000 },
+  doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 84, boostEnabled: true, maxPayout: 10000000, spinRtp: 90, maxBuyBet: 100000 },
   wanted: {
     enabled: true,
     minBet: 10,

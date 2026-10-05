@@ -107,9 +107,9 @@ export const maxWinMultiplier = (bet: number): number => maxWinFor(bet) / Math.m
 /**
  * Coefficient de gains selon le plafond de la mise (interpolé sur le logarithme du multiplicateur max).
  * Couper les gros gains fait baisser le retour : ce coefficient le ramène vers ≈ 90 %.
- * Table calibrée par simulation (voir supabase/migrations/20261002100000_audit_house_edge_floors.sql).
+ * Table calibrée par simulation : npx tsx scripts/calibrate-doghouse.ts
  */
-const SCALE_TABLE: readonly (readonly [number, number])[] = [[20, 1.69], [30, 1.493], [50, 1.345], [100, 1.202], [200, 1.085], [300, 1.031], [500, 0.983], [1000, 0.955]];
+const SCALE_TABLE: readonly (readonly [number, number])[] = [[20, 1.658], [30, 1.45], [50, 1.284], [100, 1.126], [200, 1.022], [300, 0.986], [500, 0.963], [1000, 0.955]];
 export function payoutScale(bet: number): number {
   const x = Math.min(1000, Math.max(1, maxWinMultiplier(bet)));
   const t = SCALE_TABLE;
@@ -128,7 +128,7 @@ export function payoutScale(bet: number): number {
  * du retour vient des tours gratuits, que le plafond de gain coupe davantage aux grosses mises.
  * Même interpolation que payoutScale. Table calibrée par simulation.
  */
-const BOOST_SCALE_TABLE: readonly (readonly [number, number])[] = [[20, 1.326], [29, 1.288], [65, 1.207], [110, 1.149], [200, 1.103], [500, 1.04], [1000, 1.04]];
+const BOOST_SCALE_TABLE: readonly (readonly [number, number])[] = [[20, 1.31], [29, 1.244], [65, 1.149], [110, 1.095], [200, 1.045], [500, 1.006], [1000, 1.001]];
 export function boostPayoutScale(bet: number): number {
   const x = Math.min(1000, Math.max(1, maxWinMultiplier(bet)));
   const t = BOOST_SCALE_TABLE;
@@ -152,7 +152,7 @@ export function boostPayoutScale(bet: number): number {
 export const BUY_CAP_RATIO = 5;
 export function maxBuyBet(buyPriceX: number, maxPayout: number): number {
   const byPayout = Math.floor(maxPayout / (BUY_CAP_RATIO * buyPriceX));
-  // Un bonus acheté ne rend un retour correct que si le plafond de la mise reste ≥ ×300
+  // Un bonus acheté ne rend un retour correct que si le plafond de la mise reste ≥ ×250 (mise ≤ 400)
   let lo = 1;
   let hi = 100000;
   while (lo < hi) {
@@ -162,14 +162,14 @@ export function maxBuyBet(buyPriceX: number, maxPayout: number): number {
   }
   return Math.min(byPayout, lo);
 }
-const BUY_MIN_MAX_WIN_X = 300;
+const BUY_MIN_MAX_WIN_X = 250;
 
 /**
  * Prix d'achat du bonus (valeur par défaut, réglable dans la console admin).
- * Le bonus acheté vaut ≈ 110x la mise en moyenne (simulation 150 000 manches) :
- * à 100x le casino perdait ~10 % à chaque achat. 115x ≈ RTP 95 %.
+ * Le bonus acheté vaut ≈ 63x la mise en moyenne (≈ 57x à la mise 400, où le plafond coupe davantage) :
+ * ×84 ≈ retour 75 %. En dessous de ×67 (≈ 95 %), le serveur refuse le réglage.
  */
-export const BONUS_BUY_X_BET = 115;
+export const BONUS_BUY_X_BET = 84;
 /** Ante Bet (Bet Boost) : +25 % de mise, bonus ≈ 1,7x plus fréquent */
 export const BOOST_BET_MULTIPLIER = 1.25;
 /**
@@ -197,7 +197,14 @@ const SYMBOL_WEIGHTS: Weights = {
 };
 
 const BASE_WILD_WEIGHT = 5.4;
-const BASE_SCATTER_WEIGHT = 4.4;
+/** Bonus ≈ 1 tour sur 195 (Boost ≈ 1 sur 115) */
+const BASE_SCATTER_WEIGHT = 5.41;
+/**
+ * Coefficient des gains pendant les tours gratuits : le bonus tombe plus souvent qu'avant
+ * (1 sur 195 au lieu de 1 sur 348), chaque bonus rapporte donc moins (≈ 63x la mise au lieu de ≈ 100x)
+ * pour un retour total inchangé. Calibré avec scripts/calibrate-doghouse.ts.
+ */
+export const FREE_SPIN_PAY_SCALE = 0.584;
 /** Plus rare pendant le bonus car chaque wild y devient collant */
 const FREE_WILD_WEIGHT = 1.75;
 
@@ -206,7 +213,7 @@ const SCATTER_REELS = [0, 2, 4];
 
 /**
  * Poids par rouleau, calibrés par simulation Monte Carlo :
- * RTP ~96.5 % (≈ 64 % jeu de base + ≈ 33 % bonus), bonus ≈ 1 tour sur 340.
+ * retour ≈ 90 % avec SCALE_TABLE et FREE_SPIN_PAY_SCALE, bonus ≈ 1 tour sur 195.
  */
 const BASE_WEIGHTS: Weights[] = [0, 1, 2, 3, 4].map((r) => ({
   ...SYMBOL_WEIGHTS,
@@ -359,7 +366,8 @@ export function evaluateDogHouseSpin(params: {
     if (count < 3) return;
     const base = DOG_SYMBOLS[target].pays[count - 3];
     const wildMultiplier = multSum > 0 ? multSum : 1;
-    const win = Math.round(lineBet * base * payoutScale(bet) * extraScale * wildMultiplier * 100) / 100;
+    const freeScale = isFreeSpin ? FREE_SPIN_PAY_SCALE : 1;
+    const win = Math.round(lineBet * base * payoutScale(bet) * extraScale * freeScale * wildMultiplier * 100) / 100;
     if (win > 0) {
       wins.push({ lineIndex, symbol: target, count, positions, wildMultiplier, win });
     }

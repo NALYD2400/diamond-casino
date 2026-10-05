@@ -63,7 +63,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 // ---------------------------------------------------------------------------
 
 /** Valeur moyenne des bonus achetés (en × la mise), mesurée sur les moteurs */
-const DOG_BONUS_VALUE = 100;
+const DOG_BONUS_VALUE = 63;
 const WANTED_BONUS_VALUE = { gtr: 73, duel: 107, dmh: 175 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
@@ -77,7 +77,7 @@ function useWheelExpected(): number {
 }
 
 /** Planchers imposés par le serveur (normalize_games_config) : en dessous, l'achat de bonus fait perdre le casino */
-const MIN_BUY_PRICE = { doghouse: 115, gtr: 80, duel: 134, dmh: 219 } as const;
+const MIN_BUY_PRICE = { doghouse: 67, gtr: 80, duel: 134, dmh: 219 } as const;
 
 /** RTP visé (%) pour une ligne de la répartition, ou null si non applicable */
 function targetFor(machine: MachineId, key: string, cfg: GamesConfig, wheelEv: number): number | null {

@@ -235,9 +235,9 @@ async function main() {
       (g) => g.length === 9 && g.every((v) => v >= 1 && v <= 3),
     )],
     ['a single spin never exceeds the bet-based max win', dogSpins.every((r) => r.totalWin <= 200 * MAX_WIN_X_BET)],
-    ['simulated RTP over 300k spins stays close to 96.5%', (() => {
+    ['simulated RTP over 300k spins stays close to 90% with a bonus every ~195 spins', (() => {
       const sim = simulateDogHouse(300000, seeded(2026));
-      return sim.rtp > 90 && sim.rtp < 103 && sim.hitRate > 20 && sim.bonusFrequency > 200 && sim.bonusFrequency < 500;
+      return sim.rtp > 85 && sim.rtp < 96 && sim.hitRate > 20 && sim.bonusFrequency > 150 && sim.bonusFrequency < 260;
     })()],
   ]);
 

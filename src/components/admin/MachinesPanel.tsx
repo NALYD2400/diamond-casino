@@ -63,7 +63,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 // ---------------------------------------------------------------------------
 
 /** Valeur moyenne des bonus achetés (en × la mise), mesurée sur les moteurs */
-const DOG_BONUS_VALUE = 104;
+const DOG_BONUS_VALUE = 100;
 const WANTED_BONUS_VALUE = { gtr: 73, duel: 107, dmh: 175 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
@@ -881,7 +881,7 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
                 </Field>
               </div>
               <div className="rounded-xl bg-white/[0.03] border border-white/10 p-4">
-                <Toggle checked={draft.doghouse.boostEnabled} onChange={(v) => set('doghouse', { boostEnabled: v })} label="Boost (Ante Bet)" hint="+25 % de mise pour un bonus environ 1,7× plus fréquent. RTP ≈ 93 %." />
+                <Toggle checked={draft.doghouse.boostEnabled} onChange={(v) => set('doghouse', { boostEnabled: v })} label="Boost (Ante Bet)" hint={`+25 % de mise pour un bonus environ 1,7× plus fréquent. RTP ≈ ${fmt(93 * spinScale('doghouse', draft.doghouse))} % (suit le RTP des tours normaux).`} />
               </div>
             </div>
           </Card>

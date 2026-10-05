@@ -1,17 +1,9 @@
 import React from 'react';
 import { AlertTriangle, Car, Coins, Crown, Gamepad2, RefreshCw, TrendingDown, TrendingUp, Users, Wrench } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
-import { GAME_LABELS } from '../../lib/gamesConfig';
+import { GAME_LABELS, slotSpinRtp } from '../../lib/gamesConfig';
 import type { AdminTab } from '../AdminConsole';
 import { Badge, Button, Card, EmptyState, HelpBox, PageHeader, RoleBadge, Segmented, Stat, cx, fmt, fmtChips } from './ui';
-
-/** RTP visé par jeu (pour comparer au RTP réellement observé) */
-const TARGET_RTP: Record<string, string> = {
-  mines: 'réglable',
-  crash: 'réglable',
-  doghouse: '≈ 90 %',
-  wanted: '≈ 90 %',
-};
 
 export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ goTo }) => {
   const { dashboard, dashboardDays, setDashboardDays, refreshDashboard, economy, gamesConfig } = useCasinoAdmin();
@@ -30,7 +22,10 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   const profit = paidGames.reduce((a, [, g]) => a + Number(g.profit), 0);
   const wagered = paidGames.reduce((a, [, g]) => a + Number(g.wagered), 0);
   const targetRtp: Record<string, string> = {
-    ...TARGET_RTP,
+    mines: `${fmt(gamesConfig.mines.rtp)} %`,
+    crash: `${fmt(gamesConfig.crash.rtp)} %`,
+    doghouse: `≈ ${fmt(slotSpinRtp('doghouse', gamesConfig.doghouse))} %`,
+    wanted: `≈ ${fmt(slotSpinRtp('wanted', gamesConfig.wanted))} %`,
     lucky_wheel: `≤ ${fmt(gamesConfig.wheel.maxRtp)} %`,
     boosters: `≤ ${fmt(gamesConfig.boosters.maxRtp)} %`,
   };

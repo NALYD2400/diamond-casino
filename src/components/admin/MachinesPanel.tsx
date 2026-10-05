@@ -20,7 +20,8 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useCasinoAdmin, type WheelSegmentConfig } from '../../context/CasinoAdminContext';
-import { DEFAULT_VIP_CONFIG, type GamesConfig } from '../../lib/gamesConfig';
+import { type GamesConfig } from '../../lib/gamesConfig';
+import { wheelExpected as wheelExpectedFor } from '../../lib/wheelEconomy';
 import { apiAdminGameStats, type AdminGameStats, type StatsGameId } from '../../lib/supabase';
 import { calculateMultiplier } from '../mines/minesMath';
 import { MAX_WIN_X_BET, maxBuyBet } from '../doghouse/dogHouseEngine';
@@ -68,30 +69,8 @@ const WANTED_BONUS_VALUE = { gtr: 73, duel: 107, dmh: 175 } as const;
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
 const MIN_ROUNDS = 200;
 
-/** Prix d'un booster de collection, pour les lots « booster » de la roue (25 000 par défaut) */
-const WHEEL_PACK_VALUE = 25000;
-
-/**
- * Valeur moyenne d'un tour de roue : jetons + véhicules à leur valeur catalogue + bons de bonus
- * + boosters de collection (comme wheel_ev() côté serveur, à l'arrondi de la mise des bons près)
- */
-function wheelExpected(segments: WheelSegmentConfig[]) {
-  const total = segments.reduce((a, s) => a + Math.max(0, Number(s.dropRate) || 0), 0);
-  if (total <= 0) return 0;
-  const value = (s: WheelSegmentConfig) =>
-    s.type === 'chips'
-      ? Number(s.value) || 0
-      : s.type === 'vehicle'
-        ? Number(s.vehicleValue) || 0
-        : s.type === 'voucher'
-          ? Number(s.voucherValue) || 0
-          : s.type === 'pack'
-            ? WHEEL_PACK_VALUE
-            : s.type === 'vip'
-              ? DEFAULT_VIP_CONFIG[s.vipTier ?? 'SILVER'].price
-              : 0;
-  return segments.reduce((a, s) => a + value(s) * (Math.max(0, s.dropRate) / total), 0);
-}
+/** Valeur moyenne d'un tour de roue (même calcul que l'onglet Roue et que wheel_ev() côté serveur) */
+const wheelExpected = (segments: WheelSegmentConfig[]) => wheelExpectedFor(segments);
 
 /** Planchers imposés par le serveur (normalize_games_config) : en dessous, l'achat de bonus fait perdre le casino */
 const MIN_BUY_PRICE = { doghouse: 115, gtr: 80, duel: 134, dmh: 219 } as const;
@@ -926,40 +905,17 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
       )}
 
       {id === 'wheel' && (
-        <Card title="Prix du tour">
-          <div className="flex flex-col gap-4">
-            <Field
-              label="Prix d'un tour"
-              hint={
-                <>
-                  La roue rend en moyenne {fmt(wheelExpected(segments))} jetons par tour (véhicules comptés à leur valeur catalogue), soit un retour de{' '}
-                  {retour(wheelExpected(segments), draft.wheel.spinPrice)}.
-                </>
-              }
-            >
-              <NumberInput value={draft.wheel.spinPrice} min={1} onChange={(v) => set('wheel', { spinPrice: v })} suffix="⛁" />
-            </Field>
-            <Field
-              label="Retour joueur maximum"
-              hint={
-                <>
-                  Jetons + valeur des véhicules ≤ {fmt(draft.wheel.maxRtp)} % du prix du tour. Au-dessus, le serveur refuse le réglage et bloque les
-                  tours.
-                  {draft.wheel.spinPrice > 0 && (wheelExpected(segments) / draft.wheel.spinPrice) * 100 > draft.wheel.maxRtp && (
-                    <b className="text-rose-300"> Réglage actuel perdant : il sera refusé.</b>
-                  )}
-                </>
-              }
-            >
-              <NumberInput value={draft.wheel.maxRtp} min={10} max={98} onChange={(v) => set('wheel', { maxRtp: Math.min(98, Math.max(10, v)) })} suffix="%" />
-            </Field>
+        <Card title="Prix et lots">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-[13px] text-neutral-400">
-              Les lots et leurs chances se règlent dans{' '}
-              <button type="button" className="text-white underline cursor-pointer" onClick={() => goTo('wheel')}>
-                Roue de la Fortune
-              </button>
-              .
+              Tour à <b className="text-white font-mono">{fmt(gamesConfig.wheel.spinPrice)} ⛁</b> · retour joueur{' '}
+              <b className="text-white font-mono">{retour(wheelExpected(segments), gamesConfig.wheel.spinPrice)}</b> (max {fmt(gamesConfig.wheel.maxRtp)} %).
+              <br />
+              Le prix, le garde-fou et les lots se règlent tous au même endroit.
             </div>
+            <Button variant="primary" onClick={() => goTo('wheel')}>
+              Ouvrir la Roue de la Fortune
+            </Button>
           </div>
         </Card>
       )}

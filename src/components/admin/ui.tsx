@@ -20,6 +20,13 @@ export const fmtDate = (iso?: string | number | null, withTime = true) => {
     : { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
+/** Cellule CSV ; neutralise les formules (=, +, -, @) qu'un nom de joueur pourrait contenir */
+export const csvCell = (v: unknown) => {
+  let s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+};
+
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
 // ---------------------------------------------------------------------------

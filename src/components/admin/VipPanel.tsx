@@ -7,7 +7,7 @@ import { Badge, Button, Card, EmptyState, Field, HelpBox, NumberInput, PageHeade
 const TIERS = ['SILVER', 'GOLD', 'DIAMOND'] as const;
 
 export const VipPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
-  const { vipConfig, saveVipConfig, vipRequests, setCitizenVip, rejectVipRequest, citizens, wheelCooldownHours } = useCasinoAdmin();
+  const { vipConfig, saveVipConfig, vipRequests, setCitizenVip, rejectVipRequest, citizens } = useCasinoAdmin();
   const [draft, setDraft] = useState<VipConfig>(vipConfig);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -97,9 +97,6 @@ export const VipPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToa
                   <Field label="Jetons offerts à l'activation">
                     <NumberInput value={c.bonus} min={0} onChange={(v) => setDraft({ ...draft, [t]: { ...c, bonus: v } })} suffix="⛁" />
                   </Field>
-                  <Field label="Délai de la roue" hint={`Utilisé s'il est plus court que le délai standard (${wheelCooldownHours} h).`}>
-                    <NumberInput value={c.wheelCooldownHours} min={1} max={168} onChange={(v) => setDraft({ ...draft, [t]: { ...c, wheelCooldownHours: v } })} suffix="h" />
-                  </Field>
                   <div className="text-[11px] text-neutral-400">
                     Coût réel pour le joueur :{' '}
                     <b className={net < 0 ? 'text-rose-300' : 'text-white'}>
@@ -151,9 +148,8 @@ export const VipPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToa
           validez une fois le paiement reçu.
         </p>
         <p>
-          Avantages : jetons offerts à l'activation et délai de roue plus court. La carte dure {vipConfig.durationDays} jours puis expire
-          toute seule. Changer de carte ne remet plus le délai de la roue à zéro (c'était une faille : on pouvait tourner la roue en
-          boucle).
+          Avantage : des jetons offerts à l'activation. La carte dure {vipConfig.durationDays} jours puis expire toute seule. Une carte
+          peut aussi se gagner à la Roue de la Fortune.
         </p>
       </HelpBox>
     </div>

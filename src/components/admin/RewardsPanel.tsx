@@ -18,9 +18,10 @@ import {
 } from '../../lib/supabase';
 import { REWARD_SOURCE, REWARD_STATUS, formatRewardDate, vehicleDisplayName } from '../../lib/rewards';
 import { VehiclePicker } from './VehiclePicker';
+import { Button, Card, Field, HelpBox, Modal, NumberInput, PageHeader, cx, fmt, inputClass } from './ui';
 
 interface RewardsPanelProps {
-  showToast: (msg: string) => void;
+  showToast: (msg: string, error?: boolean) => void;
 }
 
 type PendingAction = { reward: PlayerReward; status: 'DELIVERED' | 'REVOKED' | 'IN_INVENTORY' } | null;
@@ -73,7 +74,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       setRewards([...rows, ...claimed.filter((r) => !seen.has(r.id))]);
       setCatalogCount(count);
     } catch (err) {
-      showToast((err as Error).message);
+      showToast((err as Error).message, true);
     } finally {
       setLoading(false);
     }
@@ -117,7 +118,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       setPendingNote('');
       await Promise.all([load(), refreshLogs(), refreshCitizens()]);
     } catch (err) {
-      showToast((err as Error).message);
+      showToast((err as Error).message, true);
     } finally {
       setBusy(false);
     }
@@ -125,11 +126,11 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
 
   const handleGrant = async () => {
     if (!grantCitizenId) {
-      showToast('Choisissez un citoyen.');
+      showToast('Choisissez un joueur.', true);
       return;
     }
     if (!grantVehicle && !grantLabel.trim()) {
-      showToast('Choisissez un véhicule ou saisissez le nom du lot.');
+      showToast('Choisissez un véhicule ou saisissez le nom du lot.', true);
       return;
     }
     setBusy(true);
@@ -145,7 +146,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       setGrantNote('');
       await Promise.all([load(), refreshLogs()]);
     } catch (err) {
-      showToast((err as Error).message);
+      showToast((err as Error).message, true);
     } finally {
       setBusy(false);
     }
@@ -166,7 +167,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
 
   const handleGrantPack = async () => {
     if (!grantCitizenId) {
-      showToast('Choisissez un citoyen.');
+      showToast('Choisissez un joueur.', true);
       return;
     }
     setBusy(true);
@@ -176,7 +177,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       setGrantNote('');
       await Promise.all([load(), refreshLogs()]);
     } catch (err) {
-      showToast((err as Error).message);
+      showToast((err as Error).message, true);
     } finally {
       setBusy(false);
     }
@@ -184,11 +185,11 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
 
   const handleGrantVoucher = async () => {
     if (!grantCitizenId) {
-      showToast('Choisissez un citoyen.');
+      showToast('Choisissez un joueur.', true);
       return;
     }
     if (!Number.isFinite(voucherValue) || voucherValue < 1) {
-      showToast('Saisissez une valeur valide.');
+      showToast('Saisissez une valeur valide.', true);
       return;
     }
     setBusy(true);
@@ -203,7 +204,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       setGrantNote('');
       await Promise.all([load(), refreshLogs()]);
     } catch (err) {
-      showToast((err as Error).message);
+      showToast((err as Error).message, true);
     } finally {
       setBusy(false);
     }
@@ -228,7 +229,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
     if (!priceVehicle) return;
     const price = Number(priceValue.replace(/[\s .,]/g, ''));
     if (!Number.isFinite(price) || price < 0) {
-      showToast('Prix invalide.');
+      showToast('Prix invalide.', true);
       return;
     }
     setBusy(true);
@@ -242,7 +243,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       setPickerReload((k) => k + 1);
       await Promise.all([load(), refreshLogs()]);
     } catch (err) {
-      showToast((err as Error).message);
+      showToast((err as Error).message, true);
     } finally {
       setBusy(false);
     }
@@ -255,7 +256,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       if (!res.ok) throw new Error(`Catalogue introuvable (HTTP ${res.status})`);
       await importRows(await res.json());
     } catch (err) {
-      showToast((err as Error).message);
+      showToast((err as Error).message, true);
     } finally {
       setBusy(false);
       setImportProgress(null);
@@ -268,7 +269,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       if (file.size > 20 * 1024 * 1024) throw new Error('Fichier trop volumineux (20 Mo maximum).');
       await importRows(JSON.parse(await file.text()));
     } catch (err) {
-      showToast(err instanceof SyntaxError ? 'Le fichier n’est pas un JSON valide.' : (err as Error).message);
+      showToast(err instanceof SyntaxError ? 'Le fichier n’est pas un JSON valide.' : (err as Error).message, true);
     } finally {
       setBusy(false);
       setImportProgress(null);
@@ -279,32 +280,19 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
   const actionButtons = (r: PlayerReward) => (
     <div className="flex flex-wrap gap-1.5 justify-end">
       {(r.status === 'CLAIMED' || r.status === 'IN_INVENTORY') && (
-        <button
-          type="button"
-          onClick={() => setPending({ reward: r, status: 'DELIVERED' })}
-          className="px-2.5 py-1.5 rounded-lg bg-white text-black text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-200 cursor-pointer flex items-center gap-1"
-        >
+        <Button size="sm" variant="primary" onClick={() => setPending({ reward: r, status: 'DELIVERED' })}>
           <PackageCheck size={12} /> Marquer livré
-        </button>
-      )}
-      {r.status !== 'REVOKED' && r.status !== 'SOLD' && (
-        <button
-          type="button"
-          onClick={() => setPending({ reward: r, status: 'REVOKED' })}
-          className="px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-400 text-[11px] font-bold uppercase tracking-wider hover:bg-red-500/10 cursor-pointer flex items-center gap-1"
-        >
-          <X size={12} /> Retirer
-        </button>
+        </Button>
       )}
       {(r.status === 'REVOKED' || r.status === 'DELIVERED' || r.status === 'CLAIMED') && (
-        <button
-          type="button"
-          onClick={() => setPending({ reward: r, status: 'IN_INVENTORY' })}
-          className="px-2.5 py-1.5 rounded-lg border border-white/15 text-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-white/10 cursor-pointer flex items-center gap-1"
-          title="Remettre dans l’inventaire du joueur"
-        >
+        <Button size="sm" onClick={() => setPending({ reward: r, status: 'IN_INVENTORY' })} title="Remettre dans l’inventaire du joueur">
           <Undo2 size={12} /> Inventaire
-        </button>
+        </Button>
+      )}
+      {r.status !== 'REVOKED' && r.status !== 'SOLD' && (
+        <Button size="sm" variant="danger" onClick={() => setPending({ reward: r, status: 'REVOKED' })}>
+          <X size={12} /> Retirer
+        </Button>
       )}
     </div>
   );
@@ -335,62 +323,43 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
     );
   };
 
+  const closePending = () => {
+    setPending(null);
+    setPendingNote('');
+  };
+
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-1">Lots &amp; Véhicules</h1>
-          <p className="text-xs sm:text-sm text-neutral-400">
-            Lots gagnés à la roue ou offerts, réclamations des joueurs et livraison en ville.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-medium text-neutral-200 flex items-center gap-2 cursor-pointer"
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Actualiser
-        </button>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Lots & véhicules"
+        subtitle="Lots gagnés à la roue ou offerts, réclamations des joueurs et livraison en ville."
+        actions={
+          <Button onClick={() => void load()} loading={loading}>
+            <RefreshCw size={13} /> Actualiser
+          </Button>
+        }
+      />
 
-      {/* Mode d'emploi */}
-      <section className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 text-[13px] leading-relaxed text-neutral-300 flex flex-col gap-2">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-white">Comment ça marche ?</h2>
+      <HelpBox>
         <p>
-          Chaque lot gagné par un joueur (véhicule ou objet de la roue, ancien booster véhicule, cadeau de la direction) arrive dans{' '}
-          <b>son inventaire</b> (Espace Client). Le joueur choisit alors :
+          Chaque lot gagné par un joueur (véhicule ou objet de la roue, cadeau de la direction) arrive dans <b>son inventaire</b> (Espace
+          membre). Le joueur peut alors <b>le revendre</b> contre des jetons (rien à faire de votre côté, le lot passe en « Revendu »), ou{' '}
+          <b>le réclamer</b> pour le recevoir en ville : il apparaît dans « Réclamations à livrer ». Donnez-le au joueur en jeu, puis cliquez{' '}
+          <b>Marquer livré</b>.
         </p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>
-            <b>le revendre</b> contre des jetons : rien à faire de votre côté, le lot passe en « Revendu » ;
-          </li>
-          <li>
-            <b>le réclamer</b> pour le recevoir en ville : il apparaît dans <b>« Réclamations à livrer »</b> ci-dessous. Donnez-le au joueur en jeu,
-            puis cliquez <b>« Marquer livré »</b>.
-          </li>
-        </ul>
         <p className="text-neutral-400">
-          <b>Retirer</b> annule un lot (erreur, triche…). <b>Marquer livré</b> sur un lot encore « Dans l'inventaire » sert si vous l'avez déjà remis en
-          jeu sans que le joueur l'ait réclamé. Les boosters de collection offerts et les bons de bonus s'utilisent directement par le joueur : rien à livrer.
+          <b>Retirer</b> annule un lot (erreur, triche…). <b>Marquer livré</b> sur un lot encore « Dans l'inventaire » sert si vous l'avez déjà
+          remis en jeu sans réclamation. Les boosters de collection et les bons de bonus s'utilisent directement par le joueur : rien à livrer.
         </p>
-      </section>
+      </HelpBox>
 
-      {/* Claims to handle */}
-      <section className="p-5 rounded-2xl bg-sky-500/[0.04] border border-sky-500/20 flex flex-col gap-3">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-sky-300 flex items-center gap-2">
-          <PackageCheck size={14} /> Réclamations à livrer au joueur ({claims.length})
-        </h2>
-        {claims.length === 0 ? (
-          <p className="text-xs text-neutral-500">Aucune réclamation en attente.</p>
-        ) : (
-          claims.map(rewardRow)
-        )}
-      </section>
+      <Card title={`Réclamations à livrer (${claims.length})`} icon={<PackageCheck size={15} />} className={claims.length > 0 ? 'border-sky-400/30' : undefined}>
+        {claims.length === 0 ? <p className="text-xs text-neutral-500">Aucune réclamation en attente.</p> : <div className="flex flex-col gap-2">{claims.map(rewardRow)}</div>}
+      </Card>
 
-      {/* All rewards */}
-      <section className="p-5 rounded-2xl bg-neutral-950 border border-white/10 flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white">Tous les lots ({rewards.length})</h2>
+      <Card
+        title={`Tous les lots (${rewards.length})`}
+        right={
           <div className="flex gap-2">
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
@@ -399,23 +368,22 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Joueur, lot, modèle…"
-                className="h-9 pl-8 pr-3 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
+                className={cx(inputClass, 'h-8 w-44 pl-8 text-xs')}
               />
             </div>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as RewardStatus | 'ALL')}
-              className="h-9 px-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-neutral-300 focus:outline-none cursor-pointer"
-            >
-              <option value="ALL">Tous statuts</option>
+            <select value={filter} onChange={(e) => setFilter(e.target.value as RewardStatus | 'ALL')} className={cx(inputClass, 'h-8 w-auto text-xs cursor-pointer')}>
+              <option value="ALL" className="bg-black">
+                Tous statuts
+              </option>
               {(Object.keys(REWARD_STATUS) as RewardStatus[]).map((s) => (
-                <option key={s} value={s}>
+                <option key={s} value={s} className="bg-black">
                   {REWARD_STATUS[s].label}
                 </option>
               ))}
             </select>
           </div>
-        </div>
+        }
+      >
         {loading ? (
           <p className="text-xs text-neutral-500 flex items-center gap-2">
             <Loader2 size={13} className="animate-spin" /> Chargement…
@@ -425,276 +393,203 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
         ) : (
           <div className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1">{visible.map(rewardRow)}</div>
         )}
-      </section>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Grant */}
-        <section className="p-5 rounded-2xl bg-neutral-950 border border-white/10 flex flex-col gap-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-            <Gift size={14} /> Donner un véhicule ou un lot
-          </h2>
-          <select
-            value={grantCitizenId}
-            onChange={(e) => setGrantCitizenId(e.target.value)}
-            className="h-10 px-3 rounded-xl bg-neutral-900 border border-white/10 text-sm text-white focus:outline-none cursor-pointer"
-          >
-            <option value="">— Choisir un citoyen —</option>
-            {citizens.map((c) => (
-              <option key={c.profileId} value={c.profileId}>
-                {citizenLabel(c)}
-              </option>
-            ))}
-          </select>
-          <VehiclePicker selectedModel={grantVehicle?.model} onSelect={setGrantVehicle} className="max-h-56" />
-          {grantVehicle && (
-            <p className="text-xs text-white flex items-center gap-2">
-              <Check size={13} /> {vehicleDisplayName(grantVehicle.manufacturer, grantVehicle.model)}
-              <button type="button" onClick={() => setGrantVehicle(null)} className="text-neutral-500 hover:text-white cursor-pointer" aria-label="Retirer le véhicule">
-                <X size={12} />
-              </button>
-            </p>
-          )}
-          <input
-            type="text"
-            value={grantLabel}
-            onChange={(e) => setGrantLabel(e.target.value)}
-            maxLength={80}
-            placeholder={grantVehicle ? 'Nom affiché (optionnel)' : 'Nom du lot (si pas de véhicule)'}
-            className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
-          />
-          <input
-            type="text"
-            value={grantNote}
-            onChange={(e) => setGrantNote(e.target.value)}
-            maxLength={280}
-            placeholder="Note (optionnelle, visible par le joueur)"
-            className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
-          />
-          <button
-            type="button"
-            onClick={handleGrant}
-            disabled={busy}
-            className="h-11 rounded-xl bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-200 disabled:opacity-50 cursor-pointer"
-          >
-            Ajouter à l’inventaire du joueur
-          </button>
-
-          <div className="mt-2 pt-4 border-t border-white/10 flex flex-col gap-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-              <Gift size={14} /> Offrir un bonus de machine (même citoyen)
-            </h3>
-            <p className="text-xs text-neutral-400">
-              Le joueur déclenche le bonus gratuitement depuis l’inventaire. La mise est déduite de la valeur choisie.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <select
-                value={voucherGame}
-                onChange={(e) => setVoucherGame(e.target.value as 'doghouse' | 'wanted')}
-                className="h-10 px-3 rounded-xl bg-neutral-900 border border-white/10 text-sm text-white focus:outline-none cursor-pointer"
-              >
-                <option value="doghouse">The Dog House</option>
-                <option value="wanted">Wanted Dead or a Wild</option>
-              </select>
-              {voucherGame === 'wanted' ? (
-                <select
-                  value={voucherBuy}
-                  onChange={(e) => setVoucherBuy(e.target.value as 'gtr' | 'duel' | 'dmh')}
-                  className="h-10 px-3 rounded-xl bg-neutral-900 border border-white/10 text-sm text-white focus:outline-none cursor-pointer"
-                >
-                  <option value="gtr">Tours gratuits (GTR)</option>
-                  <option value="duel">Duel at Dawn</option>
-                  <option value="dmh">Dead Man's Hand</option>
-                </select>
-              ) : (
-                <input disabled value="Tours gratuits" className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-neutral-400" />
-              )}
-            </div>
-            <input
-              type="number"
-              min={1}
-              value={voucherValue}
-              onChange={(e) => setVoucherValue(Number(e.target.value))}
-              placeholder="Valeur du bonus (jetons)"
-              className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
-            />
-            <button
-              type="button"
-              onClick={handleGrantVoucher}
-              disabled={busy}
-              className="h-11 rounded-xl border border-white/20 text-white text-xs font-bold uppercase tracking-wider hover:bg-white/10 disabled:opacity-50 cursor-pointer"
-            >
-              Offrir le bonus au joueur
-            </button>
-          </div>
-
-          <div className="mt-2 pt-4 border-t border-white/10 flex flex-col gap-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-              <Layers size={14} /> Offrir des boosters de collection (même citoyen)
-            </h3>
-            <p className="text-xs text-neutral-400">Le joueur les ouvre gratuitement sur la page Collections (1 à 50 boosters).</p>
-            <div className="grid grid-cols-[1fr_96px] gap-3">
-              <select
-                value={packSet}
-                onChange={(e) => setPackSet(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-neutral-900 border border-white/10 text-sm text-white focus:outline-none cursor-pointer"
-              >
-                {packSets.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
+        <Card title="Offrir quelque chose à un joueur" icon={<Gift size={15} />}>
+          <div className="flex flex-col gap-5">
+            <Field label="Joueur">
+              <select value={grantCitizenId} onChange={(e) => setGrantCitizenId(e.target.value)} className={cx(inputClass, 'cursor-pointer')}>
+                <option value="" className="bg-black">
+                  — Choisir un joueur —
+                </option>
+                {citizens.map((c) => (
+                  <option key={c.profileId} value={c.profileId} className="bg-black">
+                    {citizenLabel(c)}
                   </option>
                 ))}
               </select>
+            </Field>
+            <Field label="Note (optionnelle, visible par le joueur)">
+              <input type="text" value={grantNote} onChange={(e) => setGrantNote(e.target.value)} maxLength={280} className={inputClass} />
+            </Field>
+
+            <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
+              <h3 className="text-[13px] font-semibold text-white flex items-center gap-2">
+                <Car size={14} className="text-neutral-400" /> Véhicule ou objet
+              </h3>
+              <VehiclePicker selectedModel={grantVehicle?.model} onSelect={setGrantVehicle} className="max-h-56" />
+              {grantVehicle && (
+                <p className="text-xs text-white flex items-center gap-2">
+                  <Check size={13} /> {vehicleDisplayName(grantVehicle.manufacturer, grantVehicle.model)}
+                  <button type="button" onClick={() => setGrantVehicle(null)} className="text-neutral-500 hover:text-white cursor-pointer" aria-label="Retirer le véhicule">
+                    <X size={12} />
+                  </button>
+                </p>
+              )}
               <input
-                type="number"
-                min={1}
-                max={50}
-                value={packQty}
-                onChange={(e) => setPackQty(Number(e.target.value))}
-                className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white font-mono focus:outline-none focus:border-white/30"
+                type="text"
+                value={grantLabel}
+                onChange={(e) => setGrantLabel(e.target.value)}
+                maxLength={80}
+                placeholder={grantVehicle ? 'Nom affiché (optionnel)' : 'Nom de l’objet (si pas de véhicule)'}
+                className={inputClass}
               />
+              <Button variant="primary" onClick={handleGrant} disabled={busy}>
+                Ajouter à l’inventaire du joueur
+              </Button>
             </div>
-            <button
-              type="button"
-              onClick={handleGrantPack}
-              disabled={busy || packSets.length === 0}
-              className="h-11 rounded-xl border border-white/20 text-white text-xs font-bold uppercase tracking-wider hover:bg-white/10 disabled:opacity-50 cursor-pointer"
-            >
-              Offrir les boosters au joueur
-            </button>
-          </div>
-        </section>
 
-        {/* Catalogue */}
-        <section className="p-5 rounded-2xl bg-neutral-950 border border-white/10 flex flex-col gap-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-            <Car size={14} /> Catalogue véhicules
-          </h2>
-          <p className="text-3xl font-bold font-mono text-white">
-            {catalogCount === null ? '…' : catalogCount.toLocaleString('fr-FR')}
-            <span className="text-sm font-normal text-neutral-500"> véhicules</span>
-          </p>
-          <p className="text-xs text-neutral-400">
-            Utilisés pour les lots de la roue et les dons. L’import met à jour les véhicules existants et ajoute les nouveaux
-            (format JSON du panel CTG accepté tel quel).
-          </p>
-          {importProgress && (
-            <div>
-              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className="h-full bg-white transition-all"
-                  style={{ width: `${(importProgress.done / importProgress.total) * 100}%` }}
-                />
+            <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
+              <h3 className="text-[13px] font-semibold text-white flex items-center gap-2">
+                <Gift size={14} className="text-neutral-400" /> Bonus de machine
+              </h3>
+              <p className="text-[11px] text-neutral-500">Le joueur déclenche le bonus gratuitement depuis l’inventaire. La mise est déduite de la valeur choisie.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <select value={voucherGame} onChange={(e) => setVoucherGame(e.target.value as 'doghouse' | 'wanted')} className={cx(inputClass, 'cursor-pointer')}>
+                  <option value="doghouse" className="bg-black">
+                    The Dog House
+                  </option>
+                  <option value="wanted" className="bg-black">
+                    Wanted
+                  </option>
+                </select>
+                {voucherGame === 'wanted' ? (
+                  <select value={voucherBuy} onChange={(e) => setVoucherBuy(e.target.value as 'gtr' | 'duel' | 'dmh')} className={cx(inputClass, 'cursor-pointer')}>
+                    <option value="gtr" className="bg-black">
+                      Tours gratuits
+                    </option>
+                    <option value="duel" className="bg-black">
+                      Duel at Dawn
+                    </option>
+                    <option value="dmh" className="bg-black">
+                      Dead Man’s Hand
+                    </option>
+                  </select>
+                ) : (
+                  <input disabled value="Tours gratuits" className={cx(inputClass, 'text-neutral-400')} />
+                )}
+                <NumberInput value={voucherValue} min={1} onChange={setVoucherValue} suffix="⛁" />
               </div>
-              <p className="text-[11px] font-mono text-neutral-500 mt-1">
-                {importProgress.done} / {importProgress.total}
+              <Button onClick={handleGrantVoucher} disabled={busy}>
+                Offrir le bonus
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
+              <h3 className="text-[13px] font-semibold text-white flex items-center gap-2">
+                <Layers size={14} className="text-neutral-400" /> Boosters de collection
+              </h3>
+              <p className="text-[11px] text-neutral-500">Le joueur les ouvre gratuitement sur la page Collections (1 à 50 boosters).</p>
+              <div className="grid grid-cols-[1fr_110px] gap-3">
+                <select value={packSet} onChange={(e) => setPackSet(e.target.value)} className={cx(inputClass, 'cursor-pointer')}>
+                  {packSets.map((x) => (
+                    <option key={x.id} value={x.id} className="bg-black">
+                      {x.name}
+                    </option>
+                  ))}
+                </select>
+                <NumberInput value={packQty} min={1} max={50} onChange={setPackQty} suffix="×" />
+              </div>
+              <Button onClick={handleGrantPack} disabled={busy || packSets.length === 0}>
+                Offrir les boosters
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          <Card title="Catalogue véhicules" icon={<Car size={15} />}>
+            <div className="flex flex-col gap-4">
+              <p className="text-3xl font-bold font-mono text-white">
+                {catalogCount === null ? '…' : fmt(catalogCount)}
+                <span className="text-sm font-normal text-neutral-500"> véhicules</span>
               </p>
-            </div>
-          )}
-          <div className="flex flex-col sm:flex-row gap-2 mt-auto">
-            <button
-              type="button"
-              onClick={handleImportBundled}
-              disabled={busy}
-              className="flex-1 h-10 rounded-xl bg-white/10 border border-white/15 text-white text-xs font-semibold hover:bg-white/15 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Download size={13} /> Réimporter le catalogue CTG
-            </button>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={busy}
-              className="flex-1 h-10 rounded-xl bg-white/10 border border-white/15 text-white text-xs font-semibold hover:bg-white/15 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Upload size={13} /> Importer un fichier JSON
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleImportFile(f);
-              }}
-            />
-          </div>
-        </section>
-
-        {/* Prix d'un véhicule */}
-        <section className="lg:col-span-2 p-5 rounded-2xl bg-neutral-950 border border-white/10 flex flex-col gap-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-            <PencilLine size={14} /> Corriger le prix d’un véhicule
-          </h2>
-          <p className="text-xs text-neutral-400">
-            Le nouveau prix s’applique partout : valeur des cartes de booster, lots de la roue, collections. Un prix corrigé
-            ici est protégé : les prochains imports ne l’écrasent plus.
-          </p>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <VehiclePicker selectedModel={priceVehicle?.model} onSelect={selectPriceVehicle} className="max-h-56" reloadKey={pickerReload} />
-            {priceVehicle ? (
-              <div className="flex flex-col gap-3">
-                <p className="text-sm font-semibold text-white flex items-center gap-2">
-                  {vehicleDisplayName(priceVehicle.manufacturer, priceVehicle.model)}
-                  <span className="text-[11px] font-mono text-neutral-500">{priceVehicle.model}</span>
-                  {priceVehicle.price_locked && (
-                    <span className="text-[10px] text-amber-300 flex items-center gap-1" title="Prix corrigé à la main, ignoré par l’import">
-                      <Lock size={10} /> corrigé
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-neutral-400">
-                  Prix actuel : <span className="font-mono text-white">{(priceVehicle.price ?? 0).toLocaleString('fr-FR')}</span>
-                </p>
+              <p className="text-xs text-neutral-400">
+                Utilisés pour les lots de la roue et les dons. L’import met à jour les véhicules existants et ajoute les nouveaux (format JSON du
+                panel CTG accepté tel quel).
+              </p>
+              {importProgress && (
+                <div>
+                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full bg-white transition-all" style={{ width: `${(importProgress.done / importProgress.total) * 100}%` }} />
+                  </div>
+                  <p className="text-[11px] font-mono text-neutral-500 mt-1">
+                    {importProgress.done} / {importProgress.total}
+                  </p>
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button className="flex-1" onClick={handleImportBundled} disabled={busy}>
+                  <Download size={13} /> Réimporter le catalogue CTG
+                </Button>
+                <Button className="flex-1" onClick={() => fileRef.current?.click()} disabled={busy}>
+                  <Upload size={13} /> Importer un fichier JSON
+                </Button>
                 <input
-                  type="text"
-                  inputMode="numeric"
-                  value={priceValue}
-                  onChange={(e) => setPriceValue(e.target.value)}
-                  placeholder="Nouveau prix"
-                  className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm font-mono text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
+                  ref={fileRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleImportFile(f);
+                  }}
                 />
-                <label className="flex items-start gap-2 text-xs text-neutral-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={priceUpdateInventory}
-                    onChange={(e) => setPriceUpdateInventory(e.target.checked)}
-                    className="mt-0.5"
-                  />
-                  Appliquer aussi aux exemplaires déjà gagnés encore dans les inventaires (valeur de revente)
-                </label>
-                <button
-                  type="button"
-                  onClick={handleSetPrice}
-                  disabled={busy || priceValue.trim() === ''}
-                  className="h-11 rounded-xl bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-neutral-200 disabled:opacity-50 cursor-pointer"
-                >
-                  Enregistrer le prix
-                </button>
               </div>
-            ) : (
-              <p className="text-xs text-neutral-500 self-center">Choisis un véhicule dans la liste pour modifier son prix.</p>
-            )}
-          </div>
-        </section>
+            </div>
+          </Card>
+
+          <Card title="Corriger le prix d’un véhicule" icon={<PencilLine size={15} />}>
+            <div className="flex flex-col gap-4">
+              <p className="text-xs text-neutral-400">
+                Le nouveau prix s’applique partout : lots de la roue, collections, revente. Un prix corrigé ici est protégé : les prochains
+                imports ne l’écrasent plus.
+              </p>
+              <VehiclePicker selectedModel={priceVehicle?.model} onSelect={selectPriceVehicle} className="max-h-48" reloadKey={pickerReload} />
+              {priceVehicle ? (
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm font-semibold text-white flex flex-wrap items-center gap-2">
+                    {vehicleDisplayName(priceVehicle.manufacturer, priceVehicle.model)}
+                    <span className="text-[11px] font-mono text-neutral-500">{priceVehicle.model}</span>
+                    {priceVehicle.price_locked && (
+                      <span className="text-[10px] text-amber-300 flex items-center gap-1" title="Prix corrigé à la main, ignoré par l’import">
+                        <Lock size={10} /> corrigé
+                      </span>
+                    )}
+                  </p>
+                  <Field label={`Nouveau prix (actuel : ${fmt(priceVehicle.price ?? 0)})`}>
+                    <input type="text" inputMode="numeric" value={priceValue} onChange={(e) => setPriceValue(e.target.value)} className={cx(inputClass, 'font-mono')} />
+                  </Field>
+                  <label className="flex items-start gap-2 text-xs text-neutral-300 cursor-pointer">
+                    <input type="checkbox" checked={priceUpdateInventory} onChange={(e) => setPriceUpdateInventory(e.target.checked)} className="mt-0.5" />
+                    Appliquer aussi aux exemplaires déjà gagnés encore dans les inventaires (valeur de revente)
+                  </label>
+                  <Button variant="primary" onClick={handleSetPrice} disabled={busy || priceValue.trim() === ''}>
+                    Enregistrer le prix
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-500">Choisissez un véhicule dans la liste pour modifier son prix.</p>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
 
-      {/* Confirm modal */}
       {pending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md bg-neutral-950 border border-white/15 rounded-3xl p-6 flex flex-col gap-4">
-            <h3 className="text-base font-bold text-white">{ACTION_LABEL[pending.status]}</h3>
+        <Modal title={ACTION_LABEL[pending.status]} onClose={closePending} width="max-w-md">
+          <div className="flex flex-col gap-4">
             <p className="text-sm text-neutral-300">
               <strong className="text-white">{pending.reward.label}</strong> — {citizenLabel(citizenById.get(pending.reward.profile_id))}
             </p>
             {pending.status === 'DELIVERED' && (
-              <p className="text-xs text-neutral-400">
-                Confirmez uniquement après avoir donné le véhicule / lot au joueur en jeu. Il sera ajouté à son garage sur le site.
-              </p>
+              <p className="text-xs text-neutral-400">Confirmez uniquement après avoir donné le véhicule / lot au joueur en jeu. Il sera ajouté à son garage sur le site.</p>
             )}
             {pending.status === 'IN_INVENTORY' && pending.reward.status === 'DELIVERED' && (
               <p className="text-xs text-amber-200">
-                Ce lot a déjà été remis en jeu : de retour dans l’inventaire, il ne pourra plus être revendu contre des jetons (sinon le
-                joueur garderait la voiture en ville ET toucherait les jetons). Pensez à récupérer le véhicule en jeu si besoin.
+                Ce lot a déjà été remis en jeu : de retour dans l’inventaire, il ne pourra plus être revendu contre des jetons (sinon le joueur
+                garderait la voiture en ville ET toucherait les jetons). Pensez à récupérer le véhicule en jeu si besoin.
               </p>
             )}
             <input
@@ -703,32 +598,18 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
               onChange={(e) => setPendingNote(e.target.value)}
               maxLength={280}
               placeholder="Note (optionnelle, ex. plaque, motif du retrait…)"
-              className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
+              className={inputClass}
             />
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setPending(null);
-                  setPendingNote('');
-                }}
-                className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-neutral-300 text-xs font-semibold uppercase tracking-wider cursor-pointer"
-              >
+            <div className="flex justify-end gap-2">
+              <Button variant="subtle" onClick={closePending}>
                 Annuler
-              </button>
-              <button
-                type="button"
-                onClick={runAction}
-                disabled={busy}
-                className={`flex-1 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider cursor-pointer disabled:opacity-50 ${
-                  pending.status === 'REVOKED' ? 'bg-red-600 text-white hover:bg-red-500' : 'bg-white text-black hover:bg-neutral-200'
-                }`}
-              >
-                {busy ? 'Envoi…' : 'Confirmer'}
-              </button>
+              </Button>
+              <Button variant={pending.status === 'REVOKED' ? 'danger' : 'primary'} onClick={runAction} loading={busy}>
+                Confirmer
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

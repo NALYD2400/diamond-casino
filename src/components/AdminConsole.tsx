@@ -47,7 +47,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, description: 'Bénéfices, activité, alertes' },
       { id: 'games', label: 'Machines', icon: Gamepad2, description: 'Ouvrir, fermer, stats, calibrage' },
-      { id: 'wheel', label: 'Lots de la roue', icon: Disc, description: 'Lots, chances, prix' },
+      { id: 'wheel', label: 'Roue de la Fortune', icon: Disc, description: 'Prix, lots, chances, podium' },
       { id: 'collections', label: 'Collections', icon: Layers, description: 'Albums, cartes, concession' },
     ],
   },

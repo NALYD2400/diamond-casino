@@ -42,10 +42,10 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   if (t && t.pending_vip > 0) alerts.push({ tone: 'warn', text: `${t.pending_vip} demande(s) VIP à valider (paiement en € à vérifier).`, action: { label: 'Voir', tab: 'vip' } });
   if (t && t.pending_rewards > 0) alerts.push({ tone: 'warn', text: `${t.pending_rewards} lot(s) réclamé(s) à livrer au joueur.`, action: { label: 'Voir', tab: 'rewards' } });
   const closed = (['mines', 'crash', 'doghouse', 'wanted', 'wheel', 'collections'] as const).filter((g) => !gamesConfig[g].enabled);
-  if (closed.length) alerts.push({ tone: 'info', text: `Jeu(x) fermé(s) : ${closed.map((g) => (g === 'wheel' ? 'Roue' : GAME_LABELS[g])).join(', ')}.`, action: { label: 'Jeux', tab: 'games' } });
+  if (closed.length) alerts.push({ tone: 'info', text: `Jeu(x) fermé(s) : ${closed.map((g) => (g === 'wheel' ? 'Roue' : GAME_LABELS[g])).join(', ')}.`, action: { label: 'Machines', tab: 'games' } });
   paidGames.forEach(([id, g]) => {
     if (g.rtp !== null && Number(g.wagered) > 200000 && Number(g.rtp) > 120) {
-      alerts.push({ tone: 'bad', text: `${GAME_LABELS[id] ?? id} a rendu ${g.rtp} % des mises ${period} : à surveiller (chance d'un joueur ou réglage trop généreux).`, action: { label: 'Jeux', tab: 'games' } });
+      alerts.push({ tone: 'bad', text: `${GAME_LABELS[id] ?? id} a rendu ${g.rtp} % des mises ${period} : à surveiller (chance d'un joueur ou réglage trop généreux).`, action: { label: 'Machines', tab: 'games' } });
     }
   });
 

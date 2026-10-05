@@ -3,7 +3,7 @@ import { Activity, Coins, Download, History, Lock, RefreshCw, ShieldCheck, Unloc
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { apiAdminDbUsage, apiAdminExportHistory, dbCheckHealth, type DbUsage, type HistoryExportKind, type SupabaseHealthResult } from '../../lib/supabase';
-import { Badge, Button, Card, Field, HelpBox, NumberInput, PageHeader, Toggle, fmt, inputClass } from './ui';
+import { Badge, Button, Card, Field, HelpBox, NumberInput, PageHeader, Toggle, csvCell, fmt, inputClass } from './ui';
 
 const SECURITY_POINTS = [
   ['Tirages des jeux', 'Mines, Crash, Dog House, Wanted et la roue sont tirés par le serveur avec un aléa cryptographique. Le navigateur ne fait qu’afficher.'],
@@ -29,13 +29,6 @@ const EXPORTS: { kind: HistoryExportKind; label: string; file: string; columns: 
     columns: ['created_at', 'type', 'game', 'amount', 'chips', 'status', 'description', 'citizen_id', 'rp_first_name', 'rp_last_name', 'id'],
   },
 ];
-
-/** Cellule CSV ; neutralise les formules (=, +, -, @) qu'un nom de joueur pourrait contenir */
-const csvCell = (v: unknown) => {
-  let s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
-  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return `"${s.replace(/"/g, '""')}"`;
-};
 
 const HistoryExportCard: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
   const [running, setRunning] = useState<HistoryExportKind | null>(null);
@@ -83,8 +76,8 @@ const HistoryExportCard: React.FC<{ showToast: (m: string) => void }> = ({ showT
 };
 
 export const SystemPanel: React.FC<{ showToast: (m: string) => void }> = ({ showToast }) => {
-  const { economy, setMaintenance, adjustCitizenBalance, resetCitizenWheelCooldown, reloadConfig } = useCasinoAdmin();
-  const { user, refreshProfile } = useCasinoUser();
+  const { economy, setMaintenance, adjustCitizenBalance, reloadConfig } = useCasinoAdmin();
+  const { user } = useCasinoUser();
   const [message, setMessage] = useState(economy.maintenanceMessage);
   const [health, setHealth] = useState<SupabaseHealthResult | null>(null);
   const [pinging, setPinging] = useState(false);
@@ -222,16 +215,6 @@ export const SystemPanel: React.FC<{ showToast: (m: string) => void }> = ({ show
                 </Button>
               </div>
             </Field>
-            <Button
-              onClick={async () => {
-                if (user && (await resetCitizenWheelCooldown(user.id))) {
-                  await refreshProfile();
-                  showToast('Vous pouvez retourner la roue.');
-                }
-              }}
-            >
-              Débloquer ma roue maintenant
-            </Button>
           </div>
         </Card>
       </div>

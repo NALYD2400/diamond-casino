@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Download, RefreshCw, ScrollText, Search } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import type { LogCategory } from '../../lib/supabase';
-import { Badge, Button, EmptyState, PageHeader, Segmented, cx, inputClass } from './ui';
+import { Badge, Button, EmptyState, PageHeader, Segmented, csvCell, cx, inputClass } from './ui';
 
 const CATEGORY: Record<LogCategory, { label: string; tone: 'info' | 'gold' | 'violet' | 'neutral' }> = {
   CITIZEN: { label: 'Joueurs', tone: 'violet' },
@@ -27,7 +27,7 @@ export const LogsPanel: React.FC = () => {
 
   const exportCsv = () => {
     const rows = [['date', 'categorie', 'action', 'detail', 'auteur'], ...list.map((l) => [l.createdAt || l.timestamp, l.category, l.action, l.detail, l.author])];
-    const csv = rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+    const csv = rows.map((r) => r.map(csvCell).join(';')).join('\n');
     const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;

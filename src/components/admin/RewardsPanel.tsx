@@ -1,14 +1,32 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Car, Check, Download, Gift, Layers, Loader2, Lock, PackageCheck, PencilLine, RefreshCw, Search, Undo2, Upload, X } from 'lucide-react';
+import {
+  ArrowRight,
+  Car,
+  Check,
+  Coins,
+  Copy,
+  Download,
+  Gift,
+  Inbox,
+  Layers,
+  Loader2,
+  Lock,
+  PackageCheck,
+  RefreshCw,
+  Search,
+  Undo2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useCasinoAdmin, type MockCitizen } from '../../context/CasinoAdminContext';
 import {
-  apiAdminGrantReward,
   apiAdminGrantCollectionPack,
+  apiAdminGrantReward,
   apiAdminGrantVoucher,
-  apiCollectionCatalog,
   apiAdminImportVehicles,
   apiAdminSetVehiclePrice,
   apiAdminUpdateReward,
+  apiCollectionCatalog,
   dbCountVehicles,
   dbFetchRewards,
   normalizeVehicleImport,
@@ -18,50 +36,62 @@ import {
 } from '../../lib/supabase';
 import { REWARD_SOURCE, REWARD_STATUS, formatRewardDate, vehicleDisplayName } from '../../lib/rewards';
 import { VehiclePicker } from './VehiclePicker';
-import { Button, Card, Field, HelpBox, Modal, NumberInput, PageHeader, cx, fmt, inputClass } from './ui';
+import { Badge, Button, Card, EmptyState, Field, Modal, NumberInput, PageHeader, Segmented, cx, fmt, inputClass } from './ui';
 
-interface RewardsPanelProps {
-  showToast: (msg: string, error?: boolean) => void;
-}
+type Tab = 'deliver' | 'all' | 'give' | 'catalog';
+type Action = 'DELIVERED' | 'REVOKED' | 'IN_INVENTORY';
+type PendingAction = { reward: PlayerReward; status: Action } | null;
+type GiftKind = 'vehicle' | 'item' | 'voucher' | 'pack';
 
-type PendingAction = { reward: PlayerReward; status: 'DELIVERED' | 'REVOKED' | 'IN_INVENTORY' } | null;
-
-const ACTION_LABEL: Record<'DELIVERED' | 'REVOKED' | 'IN_INVENTORY', string> = {
-  DELIVERED: 'Confirmer la livraison au joueur',
-  REVOKED: 'Confirmer le retrait',
-  IN_INVENTORY: 'Remettre dans l’inventaire',
+const KIND_LABEL: Record<PlayerReward['kind'], string> = {
+  vehicle: 'Véhicule',
+  item: 'Objet',
+  voucher: 'Bonus de machine',
+  pack: 'Booster',
 };
 
-export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
-  const { citizens, refreshCitizens, refreshLogs } = useCasinoAdmin();
+/** Seuls les véhicules et les objets se remettent en ville ; bonus et boosters s'utilisent sur le site */
+const isPhysical = (r: PlayerReward) => r.kind === 'vehicle' || r.kind === 'item';
 
+/** Actions possibles selon l'état du lot */
+function actionsFor(r: PlayerReward): { status: Action; label: string }[] {
+  switch (r.status) {
+    case 'CLAIMED':
+      return [
+        { status: 'DELIVERED', label: 'Livré' },
+        { status: 'IN_INVENTORY', label: 'Refuser la réclamation' },
+        { status: 'REVOKED', label: 'Retirer' },
+      ];
+    case 'IN_INVENTORY':
+      return [...(isPhysical(r) ? [{ status: 'DELIVERED' as const, label: 'Déjà remis en jeu' }] : []), { status: 'REVOKED', label: 'Retirer' }];
+    case 'DELIVERED':
+      return [
+        { status: 'IN_INVENTORY', label: 'Remettre dans l’inventaire' },
+        { status: 'REVOKED', label: 'Retirer' },
+      ];
+    case 'REVOKED':
+      return [{ status: 'IN_INVENTORY', label: 'Rendre au joueur' }];
+    default:
+      return [];
+  }
+}
+
+const CONFIRM: Record<Action, { title: string; button: string }> = {
+  DELIVERED: { title: 'Confirmer la livraison', button: 'C’est livré' },
+  REVOKED: { title: 'Retirer ce lot au joueur', button: 'Retirer le lot' },
+  IN_INVENTORY: { title: 'Remettre dans l’inventaire du joueur', button: 'Remettre' },
+};
+
+export const RewardsPanel: React.FC<{ showToast: (msg: string, error?: boolean) => void }> = ({ showToast }) => {
+  const { citizens, refreshCitizens, refreshLogs, refreshDashboard } = useCasinoAdmin();
+
+  const [tab, setTab] = useState<Tab>('deliver');
   const [rewards, setRewards] = useState<PlayerReward[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<RewardStatus | 'ALL'>('ALL');
-  const [search, setSearch] = useState('');
+  const [catalogCount, setCatalogCount] = useState<number | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [pendingNote, setPendingNote] = useState('');
   const [busy, setBusy] = useState(false);
-
-  // Grant form
-  const [grantCitizenId, setGrantCitizenId] = useState('');
-  const [grantVehicle, setGrantVehicle] = useState<VehicleCatalogEntry | null>(null);
-  const [grantLabel, setGrantLabel] = useState('');
-  const [grantNote, setGrantNote] = useState('');
-  // Bon de bonus offert (bonus buy gratuit sur une machine)
-  const [voucherGame, setVoucherGame] = useState<'doghouse' | 'wanted'>('doghouse');
-  const [voucherBuy, setVoucherBuy] = useState<'gtr' | 'duel' | 'dmh'>('gtr');
-  const [voucherValue, setVoucherValue] = useState(20000);
-
-  // Catalogue
-  const [catalogCount, setCatalogCount] = useState<number | null>(null);
-  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  // Correction du prix d'un véhicule
-  const [priceVehicle, setPriceVehicle] = useState<VehicleCatalogEntry | null>(null);
-  const [priceValue, setPriceValue] = useState('');
-  const [priceUpdateInventory, setPriceUpdateInventory] = useState(true);
-  const [pickerReload, setPickerReload] = useState(0);
 
   const citizenById = useMemo(() => new Map(citizens.map((c) => [c.profileId, c])), [citizens]);
 
@@ -84,39 +114,30 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
     void load();
   }, [load]);
 
-  const claims = rewards.filter((r) => r.status === 'CLAIMED');
+  /** Après une action : lots, journal, soldes et compteur du menu */
+  const refreshAll = () => Promise.all([load(), refreshLogs(), refreshCitizens(), refreshDashboard()]);
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rewards.filter((r) => {
-      if (filter !== 'ALL' && r.status !== filter) return false;
-      if (!q) return true;
-      const c = citizenById.get(r.profile_id);
-      return (
-        r.label.toLowerCase().includes(q) ||
-        (r.vehicle_model || '').toLowerCase().includes(q) ||
-        (c ? `${c.rpFirstName} ${c.rpLastName} ${c.citizenId}`.toLowerCase().includes(q) : false)
-      );
-    });
-  }, [rewards, filter, search, citizenById]);
+  const claims = useMemo(
+    () => rewards.filter((r) => r.status === 'CLAIMED').sort((a, b) => (a.claimed_at || a.created_at).localeCompare(b.claimed_at || b.created_at)),
+    [rewards],
+  );
 
-  const citizenLabel = (c?: MockCitizen) => (c ? `${c.rpFirstName} ${c.rpLastName} · #${c.citizenId}` : 'Citoyen supprimé');
+  const closePending = () => {
+    setPending(null);
+    setPendingNote('');
+  };
 
   const runAction = async () => {
     if (!pending) return;
     setBusy(true);
     try {
       await apiAdminUpdateReward(pending.reward.id, pending.status, pendingNote.trim() || undefined);
+      const label = pending.reward.label;
       showToast(
-        pending.status === 'DELIVERED'
-          ? `« ${pending.reward.label} » marqué comme livré au joueur.`
-          : pending.status === 'REVOKED'
-            ? `« ${pending.reward.label} » retiré au joueur.`
-            : `« ${pending.reward.label} » remis dans l’inventaire.`,
+        pending.status === 'DELIVERED' ? `« ${label} » livré.` : pending.status === 'REVOKED' ? `« ${label} » retiré au joueur.` : `« ${label} » remis dans l’inventaire.`,
       );
-      setPending(null);
-      setPendingNote('');
-      await Promise.all([load(), refreshLogs(), refreshCitizens()]);
+      closePending();
+      await refreshAll();
     } catch (err) {
       showToast((err as Error).message, true);
     } finally {
@@ -124,38 +145,411 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
     }
   };
 
-  const handleGrant = async () => {
-    if (!grantCitizenId) {
-      showToast('Choisissez un joueur.', true);
-      return;
-    }
-    if (!grantVehicle && !grantLabel.trim()) {
-      showToast('Choisissez un véhicule ou saisissez le nom du lot.', true);
-      return;
-    }
-    setBusy(true);
-    try {
-      await apiAdminGrantReward(grantCitizenId, {
-        vehicleModel: grantVehicle?.model,
-        label: grantLabel.trim() || undefined,
-        note: grantNote.trim() || undefined,
-      });
-      showToast('Lot ajouté à l’inventaire du joueur.');
-      setGrantVehicle(null);
-      setGrantLabel('');
-      setGrantNote('');
-      await Promise.all([load(), refreshLogs()]);
-    } catch (err) {
-      showToast((err as Error).message, true);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const playerName = (c?: MockCitizen) => (c ? `${c.rpFirstName} ${c.rpLastName}` : 'Joueur supprimé');
 
-  // Boosters de collection offerts
+  const counts = useMemo(() => {
+    const out: Partial<Record<RewardStatus, number>> = {};
+    for (const r of rewards) out[r.status] = (out[r.status] ?? 0) + 1;
+    return out;
+  }, [rewards]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Lots des joueurs"
+        subtitle="Ce que les joueurs ont gagné ou reçu, et ce qu'il vous reste à leur remettre en ville."
+        actions={
+          <Button onClick={() => void load()} loading={loading}>
+            <RefreshCw size={13} /> Actualiser
+          </Button>
+        }
+      />
+
+      <LifecycleStrip />
+
+      <div className="overflow-x-auto -mx-1 px-1">
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'deliver', label: `À livrer${claims.length ? ` · ${claims.length}` : ''}` },
+            { value: 'all', label: 'Tous les lots' },
+            { value: 'give', label: 'Offrir un lot' },
+            { value: 'catalog', label: 'Catalogue véhicules' },
+          ]}
+        />
+      </div>
+
+      {tab === 'deliver' && (
+        <DeliverTab claims={claims} loading={loading} citizenById={citizenById} playerName={playerName} onAction={(reward, status) => setPending({ reward, status })} showToast={showToast} />
+      )}
+
+      {tab === 'all' && (
+        <AllTab rewards={rewards} counts={counts} loading={loading} citizenById={citizenById} playerName={playerName} onAction={(reward, status) => setPending({ reward, status })} />
+      )}
+
+      {tab === 'give' && (
+        <GiveTab
+          citizens={citizens}
+          showToast={showToast}
+          onDone={async () => {
+            await Promise.all([load(), refreshLogs()]);
+          }}
+        />
+      )}
+
+      {tab === 'catalog' && (
+        <CatalogTab
+          count={catalogCount}
+          setCount={setCatalogCount}
+          showToast={showToast}
+          onChanged={async () => {
+            await Promise.all([load(), refreshLogs()]);
+          }}
+        />
+      )}
+
+      {pending && (
+        <Modal title={CONFIRM[pending.status].title} onClose={closePending} width="max-w-md">
+          <div className="flex flex-col gap-4">
+            <RewardSummary r={pending.reward} player={playerName(citizenById.get(pending.reward.profile_id))} />
+            <p className="text-[13px] text-neutral-300">
+              {pending.status === 'DELIVERED' &&
+                (pending.reward.kind === 'vehicle'
+                  ? 'Confirmez une fois le véhicule donné au joueur en jeu. Il apparaîtra dans son garage sur le site.'
+                  : 'Confirmez une fois l’objet donné au joueur en jeu.')}
+              {pending.status === 'REVOKED' && 'Le lot disparaît de l’inventaire du joueur (erreur, triche…). Vous pourrez le lui rendre plus tard depuis « Tous les lots ».'}
+              {pending.status === 'IN_INVENTORY' &&
+                (pending.reward.status === 'CLAIMED'
+                  ? 'La réclamation est annulée : le lot retourne dans l’inventaire du joueur, qui pourra le réclamer à nouveau ou le revendre.'
+                  : 'Le lot retourne dans l’inventaire du joueur.')}
+            </p>
+            {pending.status === 'IN_INVENTORY' && pending.reward.status === 'DELIVERED' && (
+              <p className="text-xs text-amber-200 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3">
+                Ce lot a déjà été remis en jeu : il ne pourra plus être revendu contre des jetons (sinon le joueur garderait la voiture en ville ET
+                toucherait les jetons). Pensez à récupérer le véhicule en jeu si besoin.
+              </p>
+            )}
+            <Field label="Note (optionnelle)" hint="Visible par le joueur et dans le journal. Ex. : plaque, motif du retrait…">
+              <input type="text" value={pendingNote} onChange={(e) => setPendingNote(e.target.value)} maxLength={280} className={inputClass} />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button variant="subtle" onClick={closePending}>
+                Annuler
+              </Button>
+              <Button variant={pending.status === 'REVOKED' ? 'danger' : 'primary'} onClick={runAction} loading={busy}>
+                {CONFIRM[pending.status].button}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Parcours d'un lot
+// ---------------------------------------------------------------------------
+
+const LifecycleStrip: React.FC = () => {
+  const step = (n: string, title: string, text: string, tone: 'neutral' | 'you' | 'auto' = 'neutral') => (
+    <div
+      className={cx(
+        'flex-1 min-w-[150px] rounded-xl border px-3 py-2.5',
+        tone === 'you' ? 'border-sky-400/30 bg-sky-500/[0.06]' : tone === 'auto' ? 'border-white/10 bg-white/[0.02]' : 'border-white/10 bg-white/[0.03]',
+      )}
+    >
+      <div className={cx('text-[10px] font-bold uppercase tracking-wider', tone === 'you' ? 'text-sky-300' : 'text-neutral-500')}>{n}</div>
+      <div className="text-[13px] font-semibold text-white mt-0.5">{title}</div>
+      <div className="text-[11px] text-neutral-400 leading-snug">{text}</div>
+    </div>
+  );
+  const arrow = <ArrowRight size={14} className="text-neutral-600 shrink-0 self-center hidden md:block" />;
+  return (
+    <div className="flex flex-col md:flex-row gap-2">
+      {step('1', 'Gagné ou offert', 'Roue, booster ou cadeau de la direction.')}
+      {arrow}
+      {step('2', 'Dans l’inventaire', 'Le joueur le voit dans son Espace membre.')}
+      {arrow}
+      <div className="flex-[2] flex flex-col sm:flex-row gap-2">
+        {step('3 · au choix du joueur', 'Il le revend', 'Contre des jetons. Automatique, rien à faire.', 'auto')}
+        {step('3 · au choix du joueur', 'Il le réclame → à vous', 'Remettez-le en jeu puis cliquez « Livré ».', 'you')}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Éléments communs
+// ---------------------------------------------------------------------------
+
+const RewardThumb: React.FC<{ r: PlayerReward; className?: string }> = ({ r, className }) => (
+  <div className={cx('rounded-lg overflow-hidden bg-neutral-900 shrink-0 flex items-center justify-center text-neutral-600 border border-white/5', className)}>
+    {r.image_url ? (
+      <img src={r.image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+    ) : r.kind === 'vehicle' ? (
+      <Car size={18} />
+    ) : r.kind === 'pack' ? (
+      <Layers size={18} />
+    ) : r.kind === 'voucher' ? (
+      <Coins size={18} />
+    ) : (
+      <Gift size={18} />
+    )}
+  </div>
+);
+
+const StatusBadge: React.FC<{ status: RewardStatus }> = ({ status }) => (
+  <span className={cx('inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap', REWARD_STATUS[status].className)}>{REWARD_STATUS[status].label}</span>
+);
+
+const RewardSummary: React.FC<{ r: PlayerReward; player: string }> = ({ r, player }) => (
+  <div className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/10 p-3">
+    <RewardThumb r={r} className="w-16 h-10" />
+    <div className="min-w-0">
+      <div className="text-[13px] font-semibold text-white truncate">{r.label}</div>
+      <div className="text-[11px] text-neutral-400 truncate">
+        {player} · {KIND_LABEL[r.kind]}
+      </div>
+    </div>
+  </div>
+);
+
+// ---------------------------------------------------------------------------
+// Onglet « À livrer »
+// ---------------------------------------------------------------------------
+
+const DeliverTab: React.FC<{
+  claims: PlayerReward[];
+  loading: boolean;
+  citizenById: Map<string, MockCitizen>;
+  playerName: (c?: MockCitizen) => string;
+  onAction: (r: PlayerReward, s: Action) => void;
+  showToast: (m: string) => void;
+}> = ({ claims, loading, citizenById, playerName, onAction, showToast }) => {
+  if (loading && claims.length === 0) {
+    return (
+      <p className="text-xs text-neutral-500 flex items-center gap-2">
+        <Loader2 size={13} className="animate-spin" /> Chargement…
+      </p>
+    );
+  }
+  if (claims.length === 0) {
+    return (
+      <Card>
+        <EmptyState icon={<Inbox size={30} />} title="Rien à livrer" hint="Quand un joueur réclame un véhicule ou un objet depuis son inventaire, il apparaît ici." />
+      </Card>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[12px] text-neutral-500">Du plus ancien au plus récent. Donnez le lot au joueur en jeu, puis cliquez « Livré ».</p>
+      {claims.map((r) => {
+        const c = citizenById.get(r.profile_id);
+        return (
+          <div key={r.id} className="rounded-2xl bg-neutral-950 border border-white/10 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <RewardThumb r={r} className="w-full sm:w-32 h-20" />
+            <div className="min-w-0 flex-1 flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[15px] font-semibold text-white">{r.label}</span>
+                <Badge>{KIND_LABEL[r.kind]}</Badge>
+              </div>
+              <div className="text-[13px] text-neutral-300">
+                Pour <b className="text-white">{playerName(c)}</b>
+                {c && <span className="font-mono text-neutral-500 text-xs"> #{c.citizenId}</span>}
+                {c?.phoneNumber && <span className="text-neutral-500 text-xs"> · tél. {c.phoneNumber}</span>}
+              </div>
+              <div className="text-[11px] text-neutral-500 flex flex-wrap items-center gap-x-2">
+                {r.vehicle_model && (
+                  <button
+                    type="button"
+                    className="font-mono text-neutral-300 hover:text-white inline-flex items-center gap-1 cursor-pointer"
+                    title="Copier le nom du modèle"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(r.vehicle_model!);
+                      showToast(`Modèle « ${r.vehicle_model} » copié.`);
+                    }}
+                  >
+                    {r.vehicle_model} <Copy size={10} />
+                  </button>
+                )}
+                <span>Réclamé {formatRewardDate(r.claimed_at || r.created_at)}</span>
+                <span>· {REWARD_SOURCE[r.source]?.long ?? r.source}</span>
+              </div>
+              {r.note && <div className="text-[11px] text-neutral-400 italic">« {r.note} »</div>}
+            </div>
+            <div className="flex sm:flex-col gap-2 shrink-0">
+              <Button variant="primary" onClick={() => onAction(r, 'DELIVERED')}>
+                <PackageCheck size={14} /> Livré
+              </Button>
+              <div className="flex gap-1">
+                <Button size="sm" variant="subtle" onClick={() => onAction(r, 'IN_INVENTORY')} title="Annule la réclamation : le lot retourne dans l’inventaire">
+                  <Undo2 size={12} /> Refuser
+                </Button>
+                <Button size="sm" variant="subtle" className="hover:!text-rose-300" onClick={() => onAction(r, 'REVOKED')}>
+                  <X size={12} /> Retirer
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Onglet « Tous les lots »
+// ---------------------------------------------------------------------------
+
+const STATUS_ORDER: RewardStatus[] = ['IN_INVENTORY', 'CLAIMED', 'DELIVERED', 'SOLD', 'USED', 'REVOKED'];
+
+const AllTab: React.FC<{
+  rewards: PlayerReward[];
+  counts: Partial<Record<RewardStatus, number>>;
+  loading: boolean;
+  citizenById: Map<string, MockCitizen>;
+  playerName: (c?: MockCitizen) => string;
+  onAction: (r: PlayerReward, s: Action) => void;
+}> = ({ rewards, counts, loading, citizenById, playerName, onAction }) => {
+  const [status, setStatus] = useState<RewardStatus | 'ALL'>('ALL');
+  const [kind, setKind] = useState<PlayerReward['kind'] | 'ALL'>('ALL');
+  const [search, setSearch] = useState('');
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rewards.filter((r) => {
+      if (status !== 'ALL' && r.status !== status) return false;
+      if (kind !== 'ALL' && r.kind !== kind) return false;
+      if (!q) return true;
+      const c = citizenById.get(r.profile_id);
+      return `${r.label} ${r.vehicle_model ?? ''} ${c ? `${c.rpFirstName} ${c.rpLastName} ${c.citizenId}` : ''}`.toLowerCase().includes(q);
+    });
+  }, [rewards, status, kind, search, citizenById]);
+
+  return (
+    <Card padded={false}>
+      <div className="flex flex-col gap-3 p-4 border-b border-white/10">
+        <div className="flex flex-wrap gap-1.5">
+          {(['ALL', ...STATUS_ORDER] as const).map((s) => {
+            const n = s === 'ALL' ? rewards.length : counts[s] ?? 0;
+            if (s !== 'ALL' && n === 0) return null;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatus(s)}
+                className={cx(
+                  'h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors',
+                  status === s ? 'bg-white text-black border-white' : 'border-white/10 text-neutral-400 hover:text-white',
+                )}
+              >
+                {s === 'ALL' ? 'Tous' : REWARD_STATUS[s].label} <span className="opacity-60">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Joueur, matricule, lot, modèle…" className={cx(inputClass, 'h-9 pl-8 text-xs')} />
+          </div>
+          <select value={kind} onChange={(e) => setKind(e.target.value as PlayerReward['kind'] | 'ALL')} className={cx(inputClass, 'h-9 sm:w-44 text-xs cursor-pointer')}>
+            <option value="ALL" className="bg-black">
+              Tous les types
+            </option>
+            {(Object.keys(KIND_LABEL) as PlayerReward['kind'][]).map((k) => (
+              <option key={k} value={k} className="bg-black">
+                {KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {loading && rewards.length === 0 ? (
+        <p className="p-5 text-xs text-neutral-500 flex items-center gap-2">
+          <Loader2 size={13} className="animate-spin" /> Chargement…
+        </p>
+      ) : visible.length === 0 ? (
+        <EmptyState title="Aucun lot" hint="Aucun lot ne correspond à ces filtres." />
+      ) : (
+        <ul className="divide-y divide-white/5 max-h-[640px] overflow-y-auto">
+          {visible.map((r) => {
+            const c = citizenById.get(r.profile_id);
+            const actions = actionsFor(r);
+            return (
+              <li key={r.id} className="flex flex-col md:flex-row md:items-center gap-3 px-4 py-3 hover:bg-white/[0.02]">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <RewardThumb r={r} className="w-14 h-9" />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[13px] font-semibold text-white truncate">{r.label}</span>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <div className="text-[11px] text-neutral-500 truncate">
+                      {playerName(c)}
+                      {c && <span className="font-mono"> #{c.citizenId}</span>} · {KIND_LABEL[r.kind]} · {REWARD_SOURCE[r.source]?.short ?? r.source} ·{' '}
+                      {formatRewardDate(r.created_at)}
+                      {r.status === 'SOLD' && r.sold_for != null && ` · revendu ${fmt(r.sold_for)} ⛁`}
+                      {r.handled_by && ` · par ${r.handled_by}`}
+                    </div>
+                    {r.note && <div className="text-[11px] text-neutral-400 italic truncate">« {r.note} »</div>}
+                  </div>
+                </div>
+                {actions.length > 0 && (
+                  <div className="flex flex-wrap gap-1 md:justify-end shrink-0">
+                    {actions.map((a) => (
+                      <Button
+                        key={a.status + a.label}
+                        size="sm"
+                        variant={a.status === 'DELIVERED' && r.status === 'CLAIMED' ? 'primary' : a.status === 'REVOKED' ? 'danger' : 'ghost'}
+                        onClick={() => onAction(r, a.status)}
+                      >
+                        {a.label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="px-4 py-2.5 border-t border-white/10 text-[11px] text-neutral-500">
+        Les 300 derniers lots (plus toutes les réclamations en attente). Un lot revendu ou utilisé est terminé : plus aucune action possible.
+      </div>
+    </Card>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Onglet « Offrir un lot »
+// ---------------------------------------------------------------------------
+
+const GIFT_KINDS: { id: GiftKind; label: string; hint: string; icon: React.ElementType }[] = [
+  { id: 'vehicle', label: 'Véhicule', hint: 'Du catalogue, à réclamer puis livrer en ville', icon: Car },
+  { id: 'item', label: 'Objet', hint: 'Nom libre (montre, tenue…), à livrer en ville', icon: Gift },
+  { id: 'voucher', label: 'Bonus de machine', hint: 'Bonus gratuit sur Dog House ou Wanted', icon: Coins },
+  { id: 'pack', label: 'Boosters', hint: 'À ouvrir sur la page Collections', icon: Layers },
+];
+
+const GiveTab: React.FC<{ citizens: MockCitizen[]; showToast: (m: string, error?: boolean) => void; onDone: () => Promise<void> }> = ({ citizens, showToast, onDone }) => {
+  const [playerId, setPlayerId] = useState('');
+  const [kind, setKind] = useState<GiftKind>('vehicle');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const [vehicle, setVehicle] = useState<VehicleCatalogEntry | null>(null);
+  const [label, setLabel] = useState('');
+  const [voucherGame, setVoucherGame] = useState<'doghouse' | 'wanted'>('doghouse');
+  const [voucherBuy, setVoucherBuy] = useState<'gtr' | 'duel' | 'dmh'>('gtr');
+  const [voucherValue, setVoucherValue] = useState(20000);
   const [packSets, setPackSets] = useState<{ id: string; name: string }[]>([]);
   const [packSet, setPackSet] = useState('autos');
   const [packQty, setPackQty] = useState(1);
+
   useEffect(() => {
     apiCollectionCatalog()
       .then((c) => {
@@ -165,287 +559,104 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
       .catch(() => {});
   }, []);
 
-  const handleGrantPack = async () => {
-    if (!grantCitizenId) {
-      showToast('Choisissez un joueur.', true);
-      return;
-    }
+  const player = citizens.find((c) => c.profileId === playerId);
+  const ready =
+    !!player &&
+    (kind === 'vehicle' ? !!vehicle : kind === 'item' ? !!label.trim() : kind === 'voucher' ? voucherValue >= 1 : packSets.length > 0 && packQty >= 1);
+
+  const summary =
+    kind === 'vehicle'
+      ? vehicle
+        ? label.trim() || vehicleDisplayName(vehicle.manufacturer, vehicle.model)
+        : 'un véhicule'
+      : kind === 'item'
+        ? label.trim() || 'un objet'
+        : kind === 'voucher'
+          ? `un bonus ${voucherGame === 'wanted' ? 'Wanted' : 'Dog House'} de ${fmt(voucherValue)} ⛁`
+          : `${packQty} booster(s) ${packSets.find((p) => p.id === packSet)?.name ?? ''}`;
+
+  const give = async () => {
+    if (!player) return;
     setBusy(true);
     try {
-      const n = await apiAdminGrantCollectionPack(grantCitizenId, packSet, Math.min(50, Math.max(1, Math.floor(packQty) || 1)), grantNote.trim() || undefined);
-      showToast(`${n} booster(s) de collection ajouté(s) à l’inventaire du joueur.`);
-      setGrantNote('');
-      await Promise.all([load(), refreshLogs()]);
+      const n = note.trim() || undefined;
+      if (kind === 'vehicle' || kind === 'item') {
+        await apiAdminGrantReward(player.profileId, { vehicleModel: kind === 'vehicle' ? vehicle?.model : undefined, label: label.trim() || undefined, note: n });
+      } else if (kind === 'voucher') {
+        await apiAdminGrantVoucher(player.profileId, { game: voucherGame, buy: voucherGame === 'wanted' ? voucherBuy : 'buy', value: Math.floor(voucherValue), note: n });
+      } else {
+        await apiAdminGrantCollectionPack(player.profileId, packSet, Math.min(50, Math.max(1, Math.floor(packQty) || 1)), n);
+      }
+      showToast(`${summary} offert à ${player.rpFirstName} ${player.rpLastName}.`);
+      setVehicle(null);
+      setLabel('');
+      setNote('');
+      await onDone();
     } catch (err) {
       showToast((err as Error).message, true);
     } finally {
       setBusy(false);
     }
-  };
-
-  const handleGrantVoucher = async () => {
-    if (!grantCitizenId) {
-      showToast('Choisissez un joueur.', true);
-      return;
-    }
-    if (!Number.isFinite(voucherValue) || voucherValue < 1) {
-      showToast('Saisissez une valeur valide.', true);
-      return;
-    }
-    setBusy(true);
-    try {
-      await apiAdminGrantVoucher(grantCitizenId, {
-        game: voucherGame,
-        buy: voucherGame === 'wanted' ? voucherBuy : 'buy',
-        value: Math.floor(voucherValue),
-        note: grantNote.trim() || undefined,
-      });
-      showToast('Bon de bonus ajouté à l’inventaire du joueur.');
-      setGrantNote('');
-      await Promise.all([load(), refreshLogs()]);
-    } catch (err) {
-      showToast((err as Error).message, true);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const importRows = async (raw: unknown) => {
-    const rows = normalizeVehicleImport(raw);
-    if (rows.length === 0) throw new Error('Aucun véhicule trouvé dans le fichier.');
-    setImportProgress({ done: 0, total: rows.length });
-    const count = await apiAdminImportVehicles(rows, (done) => setImportProgress({ done, total: rows.length }));
-    showToast(`${count.toLocaleString('fr-FR')} véhicules importés / mis à jour.`);
-    setCatalogCount(await dbCountVehicles());
-    await refreshLogs();
-  };
-
-  const selectPriceVehicle = (v: VehicleCatalogEntry) => {
-    setPriceVehicle(v);
-    setPriceValue(String(v.price ?? 0));
-  };
-
-  const handleSetPrice = async () => {
-    if (!priceVehicle) return;
-    const price = Number(priceValue.replace(/[\s .,]/g, ''));
-    if (!Number.isFinite(price) || price < 0) {
-      showToast('Prix invalide.', true);
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await apiAdminSetVehiclePrice(priceVehicle.model, price, priceUpdateInventory);
-      showToast(
-        `${vehicleDisplayName(priceVehicle.manufacturer, priceVehicle.model)} : ${res.old_price.toLocaleString('fr-FR')} → ${res.price.toLocaleString('fr-FR')}` +
-          (priceUpdateInventory ? ` (${res.updated_rewards} lot(s) en inventaire mis à jour)` : ''),
-      );
-      setPriceVehicle({ ...priceVehicle, price: res.price, price_locked: true });
-      setPickerReload((k) => k + 1);
-      await Promise.all([load(), refreshLogs()]);
-    } catch (err) {
-      showToast((err as Error).message, true);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleImportBundled = async () => {
-    setBusy(true);
-    try {
-      const res = await fetch('/data/ctg_vehicles.json');
-      if (!res.ok) throw new Error(`Catalogue introuvable (HTTP ${res.status})`);
-      await importRows(await res.json());
-    } catch (err) {
-      showToast((err as Error).message, true);
-    } finally {
-      setBusy(false);
-      setImportProgress(null);
-    }
-  };
-
-  const handleImportFile = async (file: File) => {
-    setBusy(true);
-    try {
-      if (file.size > 20 * 1024 * 1024) throw new Error('Fichier trop volumineux (20 Mo maximum).');
-      await importRows(JSON.parse(await file.text()));
-    } catch (err) {
-      showToast(err instanceof SyntaxError ? 'Le fichier n’est pas un JSON valide.' : (err as Error).message, true);
-    } finally {
-      setBusy(false);
-      setImportProgress(null);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
-  const actionButtons = (r: PlayerReward) => (
-    <div className="flex flex-wrap gap-1.5 justify-end">
-      {(r.status === 'CLAIMED' || r.status === 'IN_INVENTORY') && (
-        <Button size="sm" variant="primary" onClick={() => setPending({ reward: r, status: 'DELIVERED' })}>
-          <PackageCheck size={12} /> Marquer livré
-        </Button>
-      )}
-      {(r.status === 'REVOKED' || r.status === 'DELIVERED' || r.status === 'CLAIMED') && (
-        <Button size="sm" onClick={() => setPending({ reward: r, status: 'IN_INVENTORY' })} title="Remettre dans l’inventaire du joueur">
-          <Undo2 size={12} /> Inventaire
-        </Button>
-      )}
-      {r.status !== 'REVOKED' && r.status !== 'SOLD' && (
-        <Button size="sm" variant="danger" onClick={() => setPending({ reward: r, status: 'REVOKED' })}>
-          <X size={12} /> Retirer
-        </Button>
-      )}
-    </div>
-  );
-
-  const rewardRow = (r: PlayerReward) => {
-    const c = citizenById.get(r.profile_id);
-    const status = REWARD_STATUS[r.status];
-    return (
-      <div key={r.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="w-24 h-14 rounded-lg overflow-hidden bg-neutral-900 shrink-0 flex items-center justify-center text-neutral-600">
-          {r.image_url ? <img src={r.image_url} alt="" className="w-full h-full object-cover" loading="lazy" /> : r.kind === 'vehicle' ? <Car size={20} /> : <Gift size={20} />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-white">{r.label}</span>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${status.className}`}>{status.label}</span>
-          </div>
-          <p className="text-xs text-neutral-400 mt-0.5">{citizenLabel(c)}</p>
-          <p className="text-[11px] font-mono text-neutral-500 mt-0.5">
-            {r.vehicle_model ? `${r.vehicle_model} · ` : ''}
-            {REWARD_SOURCE[r.source]?.short ?? r.source} · {formatRewardDate(r.created_at)}
-            {r.handled_by ? ` · traité par ${r.handled_by}` : ''}
-          </p>
-          {r.note && <p className="text-[11px] text-neutral-400 italic mt-0.5">« {r.note} »</p>}
-        </div>
-        {actionButtons(r)}
-      </div>
-    );
-  };
-
-  const closePending = () => {
-    setPending(null);
-    setPendingNote('');
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Lots & véhicules"
-        subtitle="Lots gagnés à la roue ou offerts, réclamations des joueurs et livraison en ville."
-        actions={
-          <Button onClick={() => void load()} loading={loading}>
-            <RefreshCw size={13} /> Actualiser
-          </Button>
-        }
-      />
-
-      <HelpBox>
-        <p>
-          Chaque lot gagné par un joueur (véhicule ou objet de la roue, cadeau de la direction) arrive dans <b>son inventaire</b> (Espace
-          membre). Le joueur peut alors <b>le revendre</b> contre des jetons (rien à faire de votre côté, le lot passe en « Revendu »), ou{' '}
-          <b>le réclamer</b> pour le recevoir en ville : il apparaît dans « Réclamations à livrer ». Donnez-le au joueur en jeu, puis cliquez{' '}
-          <b>Marquer livré</b>.
-        </p>
-        <p className="text-neutral-400">
-          <b>Retirer</b> annule un lot (erreur, triche…). <b>Marquer livré</b> sur un lot encore « Dans l'inventaire » sert si vous l'avez déjà
-          remis en jeu sans réclamation. Les boosters de collection et les bons de bonus s'utilisent directement par le joueur : rien à livrer.
-        </p>
-      </HelpBox>
-
-      <Card title={`Réclamations à livrer (${claims.length})`} icon={<PackageCheck size={15} />} className={claims.length > 0 ? 'border-sky-400/30' : undefined}>
-        {claims.length === 0 ? <p className="text-xs text-neutral-500">Aucune réclamation en attente.</p> : <div className="flex flex-col gap-2">{claims.map(rewardRow)}</div>}
-      </Card>
-
-      <Card
-        title={`Tous les lots (${rewards.length})`}
-        right={
-          <div className="flex gap-2">
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Joueur, lot, modèle…"
-                className={cx(inputClass, 'h-8 w-44 pl-8 text-xs')}
-              />
-            </div>
-            <select value={filter} onChange={(e) => setFilter(e.target.value as RewardStatus | 'ALL')} className={cx(inputClass, 'h-8 w-auto text-xs cursor-pointer')}>
-              <option value="ALL" className="bg-black">
-                Tous statuts
-              </option>
-              {(Object.keys(REWARD_STATUS) as RewardStatus[]).map((s) => (
-                <option key={s} value={s} className="bg-black">
-                  {REWARD_STATUS[s].label}
+    <Card>
+      <div className="flex flex-col gap-6 max-w-3xl">
+        <Field label="1. À quel joueur ?">
+          <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} className={cx(inputClass, 'cursor-pointer')}>
+            <option value="" className="bg-black">
+              — Choisir un joueur —
+            </option>
+            {[...citizens]
+              .sort((a, b) => `${a.rpFirstName} ${a.rpLastName}`.localeCompare(`${b.rpFirstName} ${b.rpLastName}`))
+              .map((c) => (
+                <option key={c.profileId} value={c.profileId} className="bg-black">
+                  {c.rpFirstName} {c.rpLastName} · #{c.citizenId}
                 </option>
               ))}
-            </select>
+          </select>
+        </Field>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-medium text-neutral-400">2. Quoi ?</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {GIFT_KINDS.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                onClick={() => setKind(k.id)}
+                className={cx(
+                  'text-left rounded-xl border p-3 cursor-pointer transition-colors',
+                  kind === k.id ? 'bg-white text-black border-white' : 'border-white/10 text-neutral-300 hover:bg-white/5',
+                )}
+              >
+                <k.icon size={16} className={kind === k.id ? 'text-black' : 'text-neutral-500'} />
+                <div className="text-[13px] font-semibold mt-1.5">{k.label}</div>
+                <div className={cx('text-[11px] leading-snug', kind === k.id ? 'text-black/60' : 'text-neutral-500')}>{k.hint}</div>
+              </button>
+            ))}
           </div>
-        }
-      >
-        {loading ? (
-          <p className="text-xs text-neutral-500 flex items-center gap-2">
-            <Loader2 size={13} className="animate-spin" /> Chargement…
-          </p>
-        ) : visible.length === 0 ? (
-          <p className="text-xs text-neutral-500">Aucun lot.</p>
-        ) : (
-          <div className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1">{visible.map(rewardRow)}</div>
-        )}
-      </Card>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Offrir quelque chose à un joueur" icon={<Gift size={15} />}>
-          <div className="flex flex-col gap-5">
-            <Field label="Joueur">
-              <select value={grantCitizenId} onChange={(e) => setGrantCitizenId(e.target.value)} className={cx(inputClass, 'cursor-pointer')}>
-                <option value="" className="bg-black">
-                  — Choisir un joueur —
-                </option>
-                {citizens.map((c) => (
-                  <option key={c.profileId} value={c.profileId} className="bg-black">
-                    {citizenLabel(c)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Note (optionnelle, visible par le joueur)">
-              <input type="text" value={grantNote} onChange={(e) => setGrantNote(e.target.value)} maxLength={280} className={inputClass} />
-            </Field>
-
-            <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
-              <h3 className="text-[13px] font-semibold text-white flex items-center gap-2">
-                <Car size={14} className="text-neutral-400" /> Véhicule ou objet
-              </h3>
-              <VehiclePicker selectedModel={grantVehicle?.model} onSelect={setGrantVehicle} className="max-h-56" />
-              {grantVehicle && (
+        <div className="flex flex-col gap-3">
+          <span className="text-[11px] font-medium text-neutral-400">3. Détails</span>
+          {kind === 'vehicle' && (
+            <>
+              <VehiclePicker selectedModel={vehicle?.model} onSelect={setVehicle} className="max-h-60" />
+              {vehicle && (
                 <p className="text-xs text-white flex items-center gap-2">
-                  <Check size={13} /> {vehicleDisplayName(grantVehicle.manufacturer, grantVehicle.model)}
-                  <button type="button" onClick={() => setGrantVehicle(null)} className="text-neutral-500 hover:text-white cursor-pointer" aria-label="Retirer le véhicule">
-                    <X size={12} />
-                  </button>
+                  <Check size={13} /> {vehicleDisplayName(vehicle.manufacturer, vehicle.model)} · {fmt(vehicle.price ?? 0)} $
                 </p>
               )}
-              <input
-                type="text"
-                value={grantLabel}
-                onChange={(e) => setGrantLabel(e.target.value)}
-                maxLength={80}
-                placeholder={grantVehicle ? 'Nom affiché (optionnel)' : 'Nom de l’objet (si pas de véhicule)'}
-                className={inputClass}
-              />
-              <Button variant="primary" onClick={handleGrant} disabled={busy}>
-                Ajouter à l’inventaire du joueur
-              </Button>
-            </div>
-
-            <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
-              <h3 className="text-[13px] font-semibold text-white flex items-center gap-2">
-                <Gift size={14} className="text-neutral-400" /> Bonus de machine
-              </h3>
-              <p className="text-[11px] text-neutral-500">Le joueur déclenche le bonus gratuitement depuis l’inventaire. La mise est déduite de la valeur choisie.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="Nom affiché (optionnel)" className={inputClass} />
+            </>
+          )}
+          {kind === 'item' && (
+            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="Nom de l’objet, ex. : Montre Vacheron Royale" className={inputClass} />
+          )}
+          {kind === 'voucher' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="Machine">
                 <select value={voucherGame} onChange={(e) => setVoucherGame(e.target.value as 'doghouse' | 'wanted')} className={cx(inputClass, 'cursor-pointer')}>
                   <option value="doghouse" className="bg-black">
                     The Dog House
@@ -454,6 +665,8 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
                     Wanted
                   </option>
                 </select>
+              </Field>
+              <Field label="Bonus">
                 {voucherGame === 'wanted' ? (
                   <select value={voucherBuy} onChange={(e) => setVoucherBuy(e.target.value as 'gtr' | 'duel' | 'dmh')} className={cx(inputClass, 'cursor-pointer')}>
                     <option value="gtr" className="bg-black">
@@ -469,19 +682,15 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
                 ) : (
                   <input disabled value="Tours gratuits" className={cx(inputClass, 'text-neutral-400')} />
                 )}
+              </Field>
+              <Field label="Valeur" hint="La mise est déduite de cette valeur.">
                 <NumberInput value={voucherValue} min={1} onChange={setVoucherValue} suffix="⛁" />
-              </div>
-              <Button onClick={handleGrantVoucher} disabled={busy}>
-                Offrir le bonus
-              </Button>
+              </Field>
             </div>
-
-            <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
-              <h3 className="text-[13px] font-semibold text-white flex items-center gap-2">
-                <Layers size={14} className="text-neutral-400" /> Boosters de collection
-              </h3>
-              <p className="text-[11px] text-neutral-500">Le joueur les ouvre gratuitement sur la page Collections (1 à 50 boosters).</p>
-              <div className="grid grid-cols-[1fr_110px] gap-3">
+          )}
+          {kind === 'pack' && (
+            <div className="grid grid-cols-[1fr_120px] gap-3">
+              <Field label="Album">
                 <select value={packSet} onChange={(e) => setPackSet(e.target.value)} className={cx(inputClass, 'cursor-pointer')}>
                   {packSets.map((x) => (
                     <option key={x.id} value={x.id} className="bg-black">
@@ -489,128 +698,204 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({ showToast }) => {
                     </option>
                   ))}
                 </select>
+              </Field>
+              <Field label="Nombre (1 à 50)">
                 <NumberInput value={packQty} min={1} max={50} onChange={setPackQty} suffix="×" />
-              </div>
-              <Button onClick={handleGrantPack} disabled={busy || packSets.length === 0}>
-                Offrir les boosters
-              </Button>
+              </Field>
             </div>
-          </div>
-        </Card>
+          )}
+        </div>
 
-        <div className="flex flex-col gap-6">
-          <Card title="Catalogue véhicules" icon={<Car size={15} />}>
-            <div className="flex flex-col gap-4">
-              <p className="text-3xl font-bold font-mono text-white">
-                {catalogCount === null ? '…' : fmt(catalogCount)}
-                <span className="text-sm font-normal text-neutral-500"> véhicules</span>
-              </p>
-              <p className="text-xs text-neutral-400">
-                Utilisés pour les lots de la roue et les dons. L’import met à jour les véhicules existants et ajoute les nouveaux (format JSON du
-                panel CTG accepté tel quel).
-              </p>
-              {importProgress && (
-                <div>
-                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full bg-white transition-all" style={{ width: `${(importProgress.done / importProgress.total) * 100}%` }} />
-                  </div>
-                  <p className="text-[11px] font-mono text-neutral-500 mt-1">
-                    {importProgress.done} / {importProgress.total}
-                  </p>
-                </div>
-              )}
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button className="flex-1" onClick={handleImportBundled} disabled={busy}>
-                  <Download size={13} /> Réimporter le catalogue CTG
-                </Button>
-                <Button className="flex-1" onClick={() => fileRef.current?.click()} disabled={busy}>
-                  <Upload size={13} /> Importer un fichier JSON
-                </Button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void handleImportFile(f);
-                  }}
-                />
-              </div>
-            </div>
-          </Card>
+        <Field label="Note (optionnelle, visible par le joueur)">
+          <input type="text" value={note} onChange={(e) => setNote(e.target.value)} maxLength={280} placeholder="Ex. : gagnant de l’événement du samedi" className={inputClass} />
+        </Field>
 
-          <Card title="Corriger le prix d’un véhicule" icon={<PencilLine size={15} />}>
-            <div className="flex flex-col gap-4">
-              <p className="text-xs text-neutral-400">
-                Le nouveau prix s’applique partout : lots de la roue, collections, revente. Un prix corrigé ici est protégé : les prochains
-                imports ne l’écrasent plus.
-              </p>
-              <VehiclePicker selectedModel={priceVehicle?.model} onSelect={selectPriceVehicle} className="max-h-48" reloadKey={pickerReload} />
-              {priceVehicle ? (
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm font-semibold text-white flex flex-wrap items-center gap-2">
-                    {vehicleDisplayName(priceVehicle.manufacturer, priceVehicle.model)}
-                    <span className="text-[11px] font-mono text-neutral-500">{priceVehicle.model}</span>
-                    {priceVehicle.price_locked && (
-                      <span className="text-[10px] text-amber-300 flex items-center gap-1" title="Prix corrigé à la main, ignoré par l’import">
-                        <Lock size={10} /> corrigé
-                      </span>
-                    )}
-                  </p>
-                  <Field label={`Nouveau prix (actuel : ${fmt(priceVehicle.price ?? 0)})`}>
-                    <input type="text" inputMode="numeric" value={priceValue} onChange={(e) => setPriceValue(e.target.value)} className={cx(inputClass, 'font-mono')} />
-                  </Field>
-                  <label className="flex items-start gap-2 text-xs text-neutral-300 cursor-pointer">
-                    <input type="checkbox" checked={priceUpdateInventory} onChange={(e) => setPriceUpdateInventory(e.target.checked)} className="mt-0.5" />
-                    Appliquer aussi aux exemplaires déjà gagnés encore dans les inventaires (valeur de revente)
-                  </label>
-                  <Button variant="primary" onClick={handleSetPrice} disabled={busy || priceValue.trim() === ''}>
-                    Enregistrer le prix
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-xs text-neutral-500">Choisissez un véhicule dans la liste pour modifier son prix.</p>
-              )}
-            </div>
-          </Card>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-white/10">
+          <span className="text-[13px] text-neutral-400">
+            {player ? (
+              <>
+                Offrir <b className="text-white">{summary}</b> à <b className="text-white">{player.rpFirstName} {player.rpLastName}</b>.
+              </>
+            ) : (
+              'Choisissez d’abord un joueur.'
+            )}
+          </span>
+          <Button variant="primary" onClick={give} loading={busy} disabled={!ready}>
+            <Gift size={13} /> Offrir
+          </Button>
         </div>
       </div>
+    </Card>
+  );
+};
 
-      {pending && (
-        <Modal title={ACTION_LABEL[pending.status]} onClose={closePending} width="max-w-md">
-          <div className="flex flex-col gap-4">
-            <p className="text-sm text-neutral-300">
-              <strong className="text-white">{pending.reward.label}</strong> — {citizenLabel(citizenById.get(pending.reward.profile_id))}
-            </p>
-            {pending.status === 'DELIVERED' && (
-              <p className="text-xs text-neutral-400">Confirmez uniquement après avoir donné le véhicule / lot au joueur en jeu. Il sera ajouté à son garage sur le site.</p>
-            )}
-            {pending.status === 'IN_INVENTORY' && pending.reward.status === 'DELIVERED' && (
-              <p className="text-xs text-amber-200">
-                Ce lot a déjà été remis en jeu : de retour dans l’inventaire, il ne pourra plus être revendu contre des jetons (sinon le joueur
-                garderait la voiture en ville ET toucherait les jetons). Pensez à récupérer le véhicule en jeu si besoin.
+// ---------------------------------------------------------------------------
+// Onglet « Catalogue véhicules »
+// ---------------------------------------------------------------------------
+
+const CatalogTab: React.FC<{
+  count: number | null;
+  setCount: (n: number) => void;
+  showToast: (m: string, error?: boolean) => void;
+  onChanged: () => Promise<void>;
+}> = ({ count, setCount, showToast, onChanged }) => {
+  const { segments, saveSegments } = useCasinoAdmin();
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [vehicle, setVehicle] = useState<VehicleCatalogEntry | null>(null);
+  const [price, setPrice] = useState('');
+  const [updateInventory, setUpdateInventory] = useState(true);
+  const [pickerReload, setPickerReload] = useState(0);
+
+  const importRows = async (raw: unknown) => {
+    const rows = normalizeVehicleImport(raw);
+    if (rows.length === 0) throw new Error('Aucun véhicule trouvé dans le fichier.');
+    setProgress({ done: 0, total: rows.length });
+    const n = await apiAdminImportVehicles(rows, (done) => setProgress({ done, total: rows.length }));
+    showToast(`${fmt(n)} véhicules importés / mis à jour.`);
+    setCount(await dbCountVehicles());
+    setPickerReload((k) => k + 1);
+    await onChanged();
+  };
+
+  const runImport = async (getRaw: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await importRows(await getRaw());
+    } catch (err) {
+      showToast(err instanceof SyntaxError ? 'Le fichier n’est pas un JSON valide.' : (err as Error).message, true);
+    } finally {
+      setBusy(false);
+      setProgress(null);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const savePrice = async () => {
+    if (!vehicle) return;
+    const value = Number(price.replace(/[\s .,]/g, ''));
+    if (!Number.isFinite(value) || value < 0) {
+      showToast('Prix invalide.', true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await apiAdminSetVehiclePrice(vehicle.model, value, updateInventory);
+      showToast(
+        `${vehicleDisplayName(vehicle.manufacturer, vehicle.model)} : ${fmt(res.old_price)} → ${fmt(res.price)}` +
+          (updateInventory ? ` (${res.updated_rewards} lot(s) en inventaire mis à jour)` : ''),
+      );
+      setVehicle({ ...vehicle, price: res.price, price_locked: true });
+      setPickerReload((k) => k + 1);
+      // Les lots de la roue gardent la valeur du véhicule : on les réenregistre pour que le serveur la relise
+      if (segments.some((s) => s.type === 'vehicle' && s.vehicleModel === vehicle.model)) await saveSegments(segments);
+      await onChanged();
+    } catch (err) {
+      showToast((err as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6">
+      <Card title="Importer des véhicules" icon={<Download size={15} />}>
+        <div className="flex flex-col gap-4">
+          <p className="text-3xl font-bold font-mono text-white">
+            {count === null ? '…' : fmt(count)}
+            <span className="text-sm font-normal text-neutral-500"> véhicules</span>
+          </p>
+          <p className="text-xs text-neutral-400">
+            La liste des véhicules utilisables pour la roue, les dons et les collections. L’import met à jour les véhicules existants et ajoute les
+            nouveaux (format JSON du panel CTG accepté tel quel). Les prix corrigés à la main ne sont pas écrasés.
+          </p>
+          {progress && (
+            <div>
+              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full bg-white transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+              </div>
+              <p className="text-[11px] font-mono text-neutral-500 mt-1">
+                {progress.done} / {progress.total}
               </p>
-            )}
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={() =>
+                void runImport(async () => {
+                  const res = await fetch('/data/ctg_vehicles.json');
+                  if (!res.ok) throw new Error(`Catalogue introuvable (HTTP ${res.status})`);
+                  return res.json();
+                })
+              }
+              disabled={busy}
+            >
+              <RefreshCw size={13} /> Réimporter le catalogue CTG
+            </Button>
+            <Button onClick={() => fileRef.current?.click()} disabled={busy}>
+              <Upload size={13} /> Importer un fichier JSON
+            </Button>
             <input
-              type="text"
-              value={pendingNote}
-              onChange={(e) => setPendingNote(e.target.value)}
-              maxLength={280}
-              placeholder="Note (optionnelle, ex. plaque, motif du retrait…)"
-              className={inputClass}
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                if (f.size > 20 * 1024 * 1024) {
+                  showToast('Fichier trop volumineux (20 Mo maximum).', true);
+                  return;
+                }
+                void runImport(async () => JSON.parse(await f.text()));
+              }}
             />
-            <div className="flex justify-end gap-2">
-              <Button variant="subtle" onClick={closePending}>
-                Annuler
-              </Button>
-              <Button variant={pending.status === 'REVOKED' ? 'danger' : 'primary'} onClick={runAction} loading={busy}>
-                Confirmer
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Corriger le prix d’un véhicule" icon={<Lock size={15} />}>
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-neutral-400">
+            Le prix sert de valeur partout : rentabilité de la roue, collections, revente. Un prix corrigé ici est protégé des prochains imports.
+          </p>
+          <VehiclePicker
+            selectedModel={vehicle?.model}
+            onSelect={(v) => {
+              setVehicle(v);
+              setPrice(String(v.price ?? 0));
+            }}
+            className="max-h-52"
+            reloadKey={pickerReload}
+          />
+          {vehicle ? (
+            <div className="flex flex-col gap-3 rounded-xl bg-white/[0.03] border border-white/10 p-4">
+              <p className="text-sm font-semibold text-white flex flex-wrap items-center gap-2">
+                {vehicleDisplayName(vehicle.manufacturer, vehicle.model)}
+                <span className="text-[11px] font-mono text-neutral-500">{vehicle.model}</span>
+                {vehicle.price_locked && (
+                  <span className="text-[10px] text-amber-300 flex items-center gap-1" title="Prix corrigé à la main, ignoré par l’import">
+                    <Lock size={10} /> corrigé
+                  </span>
+                )}
+              </p>
+              <Field label={`Nouveau prix (actuel : ${fmt(vehicle.price ?? 0)} $)`}>
+                <input type="text" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} className={cx(inputClass, 'font-mono')} />
+              </Field>
+              <label className="flex items-start gap-2 text-xs text-neutral-300 cursor-pointer">
+                <input type="checkbox" checked={updateInventory} onChange={(e) => setUpdateInventory(e.target.checked)} className="mt-0.5" />
+                Appliquer aussi aux exemplaires déjà gagnés, encore dans les inventaires (valeur de revente)
+              </label>
+              <Button variant="primary" className="self-end" onClick={savePrice} loading={busy} disabled={price.trim() === ''}>
+                Enregistrer le prix
               </Button>
             </div>
-          </div>
-        </Modal>
-      )}
+          ) : (
+            <p className="text-xs text-neutral-500">Choisissez un véhicule dans la liste.</p>
+          )}
+        </div>
+      </Card>
     </div>
   );
 };

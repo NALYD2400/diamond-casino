@@ -199,7 +199,9 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
           <span>Lot</span>
           <span>Poids</span>
           <span>Chance</span>
-          <span className="text-right">Coût / tour</span>
+          <span className="text-right" title="Valeur du lot × sa chance : ce que ce lot coûte au casino en moyenne à chaque tour">
+            Coût moyen / tour
+          </span>
           <span />
         </div>
         <ul className="divide-y divide-white/5">
@@ -235,8 +237,11 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
                 <span className="font-mono text-xs text-white w-12 text-right">{fmt(chances[i], chances[i] < 1 ? 2 : 1)} %</span>
               </div>
 
-              <span className="hidden md:block text-right font-mono text-xs text-neutral-300">
-                {lotValue(seg, ctx) === null ? <span className="text-neutral-600">—</span> : `${fmt(costs[i])} ⛁`}
+              <span
+                className="hidden md:block text-right font-mono text-xs text-neutral-300"
+                title={lotValue(seg, ctx) === null ? 'Objet sans valeur en jetons : non compté' : `${fmt(lotValue(seg, ctx))} × ${fmt(chances[i], 2)} %`}
+              >
+                {lotValue(seg, ctx) === null ? <span className="text-neutral-600">non chiffré</span> : `${fmt(costs[i])} ⛁`}
               </span>
 
               <div className="flex justify-end gap-0.5">
@@ -269,6 +274,9 @@ export const WheelPanel: React.FC<{ showToast: (m: string) => void }> = ({ showT
           <span>
             Chance d'un lot = son poids ÷ la somme des poids ({fmt(lots.reduce((a, s) => a + Math.max(0, s.dropRate), 0), 2)}). Un poids de 0 ne sort jamais.
             L'ordre de la liste est l'ordre sur la roue.
+            <br />
+            Coût moyen = valeur du lot × sa chance. Additionnés, ils donnent le « Rendu au joueur / tour » : le plus gros coût est le lot qui pèse le
+            plus sur la marge.
           </span>
           <Button
             size="sm"
@@ -550,7 +558,7 @@ const SegmentEditor: React.FC<{
         )}
 
         {(seg.type === 'mystery' || seg.type === 'clothing') && (
-          <Field label="Objet reçu" hint="Nom affiché dans l'inventaire du joueur. Vous le remettez en jeu depuis « Lots & véhicules ». Non chiffré dans la rentabilité.">
+          <Field label="Objet reçu" hint="Nom affiché dans l'inventaire du joueur. Vous le remettez en jeu depuis « Lots des joueurs ». Non chiffré dans la rentabilité.">
             <input className={inputClass} maxLength={80} value={String(seg.value)} onChange={(e) => setSeg({ ...seg, value: e.target.value })} />
           </Field>
         )}

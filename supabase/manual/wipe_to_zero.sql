@@ -1,31 +1,54 @@
 -- REMISE À ZÉRO du casino (à lancer À LA MAIN dans Supabase > SQL Editor).
 -- Ce fichier n'est PAS une migration : il ne s'exécute jamais tout seul.
 --
--- Efface : historique des parties, transactions, journal admin, ouvertures de boosters,
---          lots/inventaires, manches Mines.
+-- Efface : historique des parties (machines, roue, Mines, Crash), transactions, journal admin,
+--          ouvertures de boosters, lots / inventaires / bons de bonus, cartes et albums de collection.
 -- Remet à zéro : soldes de jetons, gains cumulés, tirages, VIP, véhicules, inventaire des comptes.
 -- CONSERVE : les comptes (identité, Discord, rôle staff), les réglages du casino
---            (casino_settings), les packs/cartes/raretés de boosters, le catalogue de véhicules.
+--            (casino_settings), les albums / cartes / raretés, le catalogue de véhicules.
 --
 -- Tout est dans UNE transaction : si une ligne échoue, rien n'est modifié.
--- Une copie de sauvegarde est faite avant (tables wipe_backup_*), à supprimer quand tu es sûr.
+-- Une copie de sauvegarde est faite avant (tables bak_<date>_*), à supprimer quand tu es sûr.
+-- Changer le préfixe ci-dessous (bak_AAAAMMJJ_) à chaque nouvelle remise à zéro.
 
 begin;
 
--- 1) Sauvegarde (copie des données qui vont être effacées ou remises à zéro)
-create table wipe_backup_profiles          as select * from public.profiles;
-create table wipe_backup_bets_history      as select * from public.bets_history;
-create table wipe_backup_transactions      as select * from public.casino_transactions;
-create table wipe_backup_player_rewards    as select * from public.player_rewards;
-create table wipe_backup_booster_openings  as select * from public.booster_openings;
-create table wipe_backup_admin_logs        as select * from public.admin_logs;
+-- 1) Sauvegarde
+create table public.bak_20261005_profiles               as select * from public.profiles;
+create table public.bak_20261005_bets_history           as select * from public.bets_history;
+create table public.bak_20261005_transactions           as select * from public.casino_transactions;
+create table public.bak_20261005_player_rewards         as select * from public.player_rewards;
+create table public.bak_20261005_booster_openings       as select * from public.booster_openings;
+create table public.bak_20261005_admin_logs             as select * from public.admin_logs;
+create table public.bak_20261005_mines_rounds           as select * from public.mines_rounds;
+create table public.bak_20261005_crash_rounds           as select * from public.crash_rounds;
+create table public.bak_20261005_collection_owned       as select * from public.collection_owned;
+create table public.bak_20261005_collection_completions as select * from public.collection_completions;
+create table public.bak_20261005_collection_openings    as select * from public.collection_openings;
 
--- 2) Effacement de l'historique et des lots
+-- Les sauvegardes ne doivent pas être lisibles depuis le site
+alter table public.bak_20261005_profiles               enable row level security;
+alter table public.bak_20261005_bets_history           enable row level security;
+alter table public.bak_20261005_transactions           enable row level security;
+alter table public.bak_20261005_player_rewards         enable row level security;
+alter table public.bak_20261005_booster_openings       enable row level security;
+alter table public.bak_20261005_admin_logs             enable row level security;
+alter table public.bak_20261005_mines_rounds           enable row level security;
+alter table public.bak_20261005_crash_rounds           enable row level security;
+alter table public.bak_20261005_collection_owned       enable row level security;
+alter table public.bak_20261005_collection_completions enable row level security;
+alter table public.bak_20261005_collection_openings    enable row level security;
+
+-- 2) Effacement de l'historique, des lots et des collections
 delete from public.mines_rounds;
+delete from public.crash_rounds;
 delete from public.bets_history;
 delete from public.casino_transactions;
 delete from public.booster_openings;
 delete from public.player_rewards;
+delete from public.collection_owned;
+delete from public.collection_completions;
+delete from public.collection_openings;
 delete from public.admin_logs;
 
 -- 3) Remise à zéro des comptes (les comptes eux-mêmes sont conservés)
@@ -47,13 +70,19 @@ update public.profiles set
 -- 4) Contrôle : tout doit être à zéro
 select
   (select count(*) from public.bets_history)        as parties,
+  (select count(*) from public.crash_rounds)        as crash,
+  (select count(*) from public.mines_rounds)        as mines,
   (select count(*) from public.casino_transactions) as transactions,
   (select count(*) from public.player_rewards)      as lots,
-  (select coalesce(sum(chips), 0) from public.profiles) as jetons_total;
+  (select count(*) from public.collection_owned)    as cartes,
+  (select coalesce(sum(chips), 0) from public.profiles) as jetons_total,
+  (select count(*) from public.profiles)            as comptes_conserves;
 
 commit;
 
--- Pour annuler après coup (tant que les copies existent) : recopier depuis wipe_backup_*.
--- Quand tu es sûr, supprime les copies :
---   drop table wipe_backup_profiles, wipe_backup_bets_history, wipe_backup_transactions,
---              wipe_backup_player_rewards, wipe_backup_booster_openings, wipe_backup_admin_logs;
+-- Pour annuler après coup (tant que les copies existent) : recopier depuis bak_20261005_*.
+-- Quand tu es sûr, supprime les copies (et celles des remises à zéro précédentes) :
+--   drop table public.bak_20261005_profiles, public.bak_20261005_bets_history, public.bak_20261005_transactions,
+--              public.bak_20261005_player_rewards, public.bak_20261005_booster_openings, public.bak_20261005_admin_logs,
+--              public.bak_20261005_mines_rounds, public.bak_20261005_crash_rounds, public.bak_20261005_collection_owned,
+--              public.bak_20261005_collection_completions, public.bak_20261005_collection_openings;

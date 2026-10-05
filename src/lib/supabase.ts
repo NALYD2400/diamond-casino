@@ -1108,6 +1108,45 @@ export interface AdminDashboard {
 
 export const apiAdminDashboard = (days: number) => rpc<AdminDashboard>('admin_dashboard', { p_days: days });
 
+/** Joueur tel qu'il apparaît dans un classement */
+export interface LeaderboardPlayer {
+  id: string;
+  name: string;
+  citizen_id: string;
+  role: ProfileRole;
+  avatar_url: string | null;
+}
+export interface LeaderboardActivity extends LeaderboardPlayer {
+  rounds: number;
+  wagered: number;
+  paid: number;
+  net: number;
+  max_bet: number;
+  fav_game: string;
+  last_at: string;
+}
+export interface LeaderboardRound extends LeaderboardPlayer {
+  game_id: string;
+  bet_amount: number;
+  win_amount: number;
+  created_at: string;
+}
+export interface AdminLeaderboards {
+  since: string;
+  days: number;
+  members_only: boolean;
+  players: LeaderboardActivity[];
+  big_bets: LeaderboardRound[];
+  big_wins: LeaderboardRound[];
+  big_losses: LeaderboardRound[];
+  richest: (LeaderboardPlayer & { value: number })[];
+  lifetime: (LeaderboardPlayer & { value: number })[];
+  collections: { id: string; name: string; total: number; top: (LeaderboardPlayer & { cards: number; found: number; completed: boolean })[] }[];
+}
+
+export const apiAdminLeaderboards = (days: number, membersOnly: boolean) =>
+  rpc<AdminLeaderboards>('admin_leaderboards', { p_days: days, p_members_only: membersOnly });
+
 export type StatsGameId = 'mines' | 'doghouse' | 'wanted' | 'lucky_wheel' | 'boosters' | 'crash' | 'collections';
 
 interface GameStatsPlayer {

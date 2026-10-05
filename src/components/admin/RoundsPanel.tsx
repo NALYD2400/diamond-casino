@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dices, Loader2, RefreshCw } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { dbFetchAllBets, type SupabaseBetEntry } from '../../lib/supabase';
+import { PlayerPicker } from './PlayerPicker';
 import { Badge, Button, EmptyState, PageHeader, cx, fmt, fmtDate, inputClass } from './ui';
 
 const PAGE = 50;
@@ -99,16 +100,9 @@ export const RoundsPanel: React.FC = () => {
             </option>
           ))}
         </select>
-        <select className={cx(inputClass, 'w-auto cursor-pointer max-w-[260px]')} value={profileId} onChange={(e) => setProfileId(e.target.value)}>
-          <option value="" className="bg-black">
-            Tous les joueurs
-          </option>
-          {citizens.map((c) => (
-            <option key={c.profileId} value={c.profileId} className="bg-black">
-              {c.rpFirstName} {c.rpLastName} · #{c.citizenId}
-            </option>
-          ))}
-        </select>
+        <div className="w-full sm:w-80">
+          <PlayerPicker citizens={citizens} value={profileId} onChange={setProfileId} placeholder="Tous les joueurs (rechercher…)" clearLabel="Tous" />
+        </div>
         <select className={cx(inputClass, 'w-auto cursor-pointer')} value={minWin} onChange={(e) => setMinWin(Number(e.target.value))}>
           {MIN_WINS.map((m) => (
             <option key={m.value} value={m.value} className="bg-black">

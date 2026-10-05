@@ -13,6 +13,7 @@ import {
   Lock,
   ScrollText,
   Server,
+  Trophy,
   Users,
 } from 'lucide-react';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
@@ -27,12 +28,13 @@ import { VipPanel } from './admin/VipPanel';
 import { RewardsPanel } from './admin/RewardsPanel';
 import { LogsPanel } from './admin/LogsPanel';
 import { RoundsPanel } from './admin/RoundsPanel';
+import { LeaderboardsPanel } from './admin/LeaderboardsPanel';
 import { SystemPanel } from './admin/SystemPanel';
 import { ROLE_LABEL, cx } from './admin/ui';
 
-export type AdminTab = 'dashboard' | 'players' | 'games' | 'wheel' | 'collections' | 'vip' | 'rewards' | 'rounds' | 'logs' | 'system';
+export type AdminTab = 'dashboard' | 'players' | 'games' | 'wheel' | 'collections' | 'vip' | 'rewards' | 'leaderboards' | 'rounds' | 'logs' | 'system';
 
-const TABS: AdminTab[] = ['dashboard', 'players', 'games', 'wheel', 'collections', 'vip', 'rewards', 'rounds', 'logs', 'system'];
+const TABS: AdminTab[] = ['dashboard', 'players', 'games', 'wheel', 'collections', 'vip', 'rewards', 'leaderboards', 'rounds', 'logs', 'system'];
 
 interface NavItem {
   id: AdminTab;
@@ -57,6 +59,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { id: 'players', label: 'Joueurs', icon: Users, description: 'Comptes, soldes, fiches' },
       { id: 'vip', label: 'VIP', icon: Crown, description: 'Demandes et offres' },
       { id: 'rewards', label: 'Lots des joueurs', icon: Car, description: 'À livrer, offrir, catalogue' },
+      { id: 'leaderboards', label: 'Classements', icon: Trophy, description: 'Mises, gains, pertes, collections' },
     ],
   },
   {
@@ -251,6 +254,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ initialTab }) => {
             {tab === 'collections' && <CollectionsPanel showToast={showToast} />}
             {tab === 'vip' && <VipPanel showToast={showToast} />}
             {tab === 'rewards' && <RewardsPanel showToast={showToast} />}
+            {tab === 'leaderboards' && <LeaderboardsPanel />}
             {tab === 'rounds' && <RoundsPanel />}
             {tab === 'logs' && <LogsPanel />}
             {tab === 'system' && <SystemPanel showToast={showToast} />}

@@ -35,6 +35,7 @@ import {
   type VehicleCatalogEntry,
 } from '../../lib/supabase';
 import { REWARD_SOURCE, REWARD_STATUS, formatRewardDate, vehicleDisplayName } from '../../lib/rewards';
+import { PlayerPicker } from './PlayerPicker';
 import { VehiclePicker } from './VehiclePicker';
 import { Badge, Button, Card, EmptyState, Field, Modal, NumberInput, PageHeader, Segmented, cx, fmt, inputClass } from './ui';
 
@@ -603,18 +604,7 @@ const GiveTab: React.FC<{ citizens: MockCitizen[]; showToast: (m: string, error?
     <Card>
       <div className="flex flex-col gap-6 max-w-3xl">
         <Field label="1. À quel joueur ?">
-          <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} className={cx(inputClass, 'cursor-pointer')}>
-            <option value="" className="bg-black">
-              — Choisir un joueur —
-            </option>
-            {[...citizens]
-              .sort((a, b) => `${a.rpFirstName} ${a.rpLastName}`.localeCompare(`${b.rpFirstName} ${b.rpLastName}`))
-              .map((c) => (
-                <option key={c.profileId} value={c.profileId} className="bg-black">
-                  {c.rpFirstName} {c.rpLastName} · #{c.citizenId}
-                </option>
-              ))}
-          </select>
+          <PlayerPicker citizens={citizens} value={playerId} onChange={setPlayerId} />
         </Field>
 
         <div className="flex flex-col gap-1.5">
@@ -739,7 +729,6 @@ const CatalogTab: React.FC<{
   showToast: (m: string, error?: boolean) => void;
   onChanged: () => Promise<void>;
 }> = ({ count, setCount, showToast, onChanged }) => {
-  const { segments, saveSegments } = useCasinoAdmin();
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -788,8 +777,6 @@ const CatalogTab: React.FC<{
       );
       setVehicle({ ...vehicle, price: res.price, price_locked: true });
       setPickerReload((k) => k + 1);
-      // Les lots de la roue gardent la valeur du véhicule : on les réenregistre pour que le serveur la relise
-      if (segments.some((s) => s.type === 'vehicle' && s.vehicleModel === vehicle.model)) await saveSegments(segments);
       await onChanged();
     } catch (err) {
       showToast((err as Error).message, true);
@@ -858,7 +845,7 @@ const CatalogTab: React.FC<{
       <Card title="Corriger le prix d’un véhicule" icon={<Lock size={15} />}>
         <div className="flex flex-col gap-4">
           <p className="text-xs text-neutral-400">
-            Le prix sert de valeur partout : rentabilité de la roue, collections, revente. Un prix corrigé ici est protégé des prochains imports.
+            Le prix sert de valeur partout : roue (lots et podium), collections, revente. Un prix corrigé ici est protégé des prochains imports.
           </p>
           <VehiclePicker
             selectedModel={vehicle?.model}

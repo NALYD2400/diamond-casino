@@ -19,9 +19,9 @@ import {
   TrendingUp,
   Trophy,
 } from 'lucide-react';
-import { useCasinoAdmin, type WheelSegmentConfig } from '../../context/CasinoAdminContext';
+import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { type GamesConfig } from '../../lib/gamesConfig';
-import { wheelExpected as wheelExpectedFor } from '../../lib/wheelEconomy';
+import { usePackSets, wheelExpected as wheelExpectedFor } from '../../lib/wheelEconomy';
 import { apiAdminGameStats, type AdminGameStats, type StatsGameId } from '../../lib/supabase';
 import { calculateMultiplier } from '../mines/minesMath';
 import { MAX_WIN_X_BET, maxBuyBet } from '../doghouse/dogHouseEngine';
@@ -70,13 +70,17 @@ const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines:
 const MIN_ROUNDS = 200;
 
 /** Valeur moyenne d'un tour de roue (même calcul que l'onglet Roue et que wheel_ev() côté serveur) */
-const wheelExpected = (segments: WheelSegmentConfig[]) => wheelExpectedFor(segments);
+function useWheelExpected(): number {
+  const { segments, vipConfig } = useCasinoAdmin();
+  const packSets = usePackSets();
+  return useMemo(() => wheelExpectedFor(segments, { packSets, vipConfig }), [segments, packSets, vipConfig]);
+}
 
 /** Planchers imposés par le serveur (normalize_games_config) : en dessous, l'achat de bonus fait perdre le casino */
 const MIN_BUY_PRICE = { doghouse: 115, gtr: 80, duel: 134, dmh: 219 } as const;
 
 /** RTP visé (%) pour une ligne de la répartition, ou null si non applicable */
-function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: WheelSegmentConfig[]): number | null {
+function targetFor(machine: MachineId, key: string, cfg: GamesConfig, wheelEv: number): number | null {
   switch (machine) {
     case 'doghouse':
       if (key === 'boost') return 93;
@@ -94,7 +98,7 @@ function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: 
     case 'crash':
       return cfg.crash.rtp;
     case 'wheel':
-      return key === '__all' && cfg.wheel.spinPrice > 0 ? (wheelExpected(segments) / cfg.wheel.spinPrice) * 100 : null;
+      return key === '__all' && cfg.wheel.spinPrice > 0 ? (wheelEv / cfg.wheel.spinPrice) * 100 : null;
     case 'boosters':
     case 'collections':
       // Les collections rendent des cartes (revente et récompense à part) : pas de RTP par booster
@@ -103,14 +107,14 @@ function targetFor(machine: MachineId, key: string, cfg: GamesConfig, segments: 
 }
 
 /** RTP visé global, pondéré par ce qui a été misé dans chaque mode */
-function overallTarget(machine: MachineId, stats: AdminGameStats | undefined, cfg: GamesConfig, segments: WheelSegmentConfig[]): number | null {
+function overallTarget(machine: MachineId, stats: AdminGameStats | undefined, cfg: GamesConfig, wheelEv: number): number | null {
   if (machine === 'boosters' || machine === 'collections') return null;
-  if (machine === 'wheel' || machine === 'mines' || machine === 'crash') return targetFor(machine, '__all', cfg, segments);
+  if (machine === 'wheel' || machine === 'mines' || machine === 'crash') return targetFor(machine, '__all', cfg, wheelEv);
   const rows = (stats?.breakdown ?? []).filter((r) => Number(r.wagered) > 0);
   const total = rows.reduce((a, r) => a + Number(r.wagered), 0);
-  if (!total) return targetFor(machine, 'spin', cfg, segments);
+  if (!total) return targetFor(machine, 'spin', cfg, wheelEv);
   let acc = 0;
-  for (const r of rows) acc += Number(r.wagered) * (targetFor(machine, r.key, cfg, segments) ?? 95);
+  for (const r of rows) acc += Number(r.wagered) * (targetFor(machine, r.key, cfg, wheelEv) ?? 95);
   return acc / total;
 }
 
@@ -166,7 +170,8 @@ const signed = (n: number) => `${n >= 0 ? '+' : ''}${fmt(n)}`;
 // ---------------------------------------------------------------------------
 
 export const MachinesPanel: React.FC<{ showToast: (m: string) => void; goTo: (t: AdminTab) => void }> = ({ showToast, goTo }) => {
-  const { gamesConfig, saveGamesConfig, economy, setMaintenance, segments, dashboardDays } = useCasinoAdmin();
+  const { gamesConfig, saveGamesConfig, economy, setMaintenance, dashboardDays } = useCasinoAdmin();
+  const wheelEv = useWheelExpected();
   const [days, setDays] = useState<number>(dashboardDays || 7);
   const [stats, setStats] = useState<Partial<Record<MachineId, AdminGameStats>>>({});
   const [loading, setLoading] = useState(false);
@@ -205,7 +210,7 @@ export const MachinesPanel: React.FC<{ showToast: (m: string) => void; goTo: (t:
   const rows = MACHINES.map((m) => {
     const s = stats[m.id];
     const rtp = s?.summary.rtp ?? null;
-    const target = overallTarget(m.id, s, gamesConfig, segments);
+    const target = overallTarget(m.id, s, gamesConfig, wheelEv);
     return { m, s, rtp: rtp === null ? null : Number(rtp), target, v: verdict(m.id, Number(s?.summary.rounds ?? 0), rtp === null ? null : Number(rtp), target) };
   });
   const played = rows.filter((r) => Number(r.s?.summary.rounds ?? 0) > 0);
@@ -444,7 +449,8 @@ const MachineDetail: React.FC<{
   showToast: (m: string) => void;
   goTo: (t: AdminTab) => void;
 }> = ({ row, period, periodPicker, onBack, onToggle, maintenance, showToast, goTo }) => {
-  const { gamesConfig, segments } = useCasinoAdmin();
+  const { gamesConfig } = useCasinoAdmin();
+  const wheelEv = useWheelExpected();
   const [tab, setTab] = useState<'stats' | 'settings'>('stats');
   const topRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -573,7 +579,7 @@ const MachineDetail: React.FC<{
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {s.breakdown.map((b) => {
-                      const t = targetFor(m.id, b.key, gamesConfig, segments);
+                      const t = targetFor(m.id, b.key, gamesConfig, wheelEv);
                       const p = Number(b.wagered) - Number(b.paid);
                       return (
                         <tr key={b.key}>
@@ -724,7 +730,8 @@ const PlayerList: React.FC<{ title: string; empty: string; players: AdminGameSta
 // ---------------------------------------------------------------------------
 
 const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void; goTo: (t: AdminTab) => void }> = ({ id, showToast, goTo }) => {
-  const { gamesConfig, saveGamesConfig, segments } = useCasinoAdmin();
+  const { gamesConfig, saveGamesConfig } = useCasinoAdmin();
+  const wheelEv = useWheelExpected();
   const [draft, setDraft] = useState<GamesConfig>(gamesConfig);
   const [saving, setSaving] = useState(false);
   const strip = (c: GamesConfig) => JSON.stringify({ ...c[id], enabled: undefined });
@@ -909,7 +916,7 @@ const MachineSettings: React.FC<{ id: MachineId; showToast: (m: string) => void;
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-[13px] text-neutral-400">
               Tour à <b className="text-white font-mono">{fmt(gamesConfig.wheel.spinPrice)} ⛁</b> · retour joueur{' '}
-              <b className="text-white font-mono">{retour(wheelExpected(segments), gamesConfig.wheel.spinPrice)}</b> (max {fmt(gamesConfig.wheel.maxRtp)} %).
+              <b className="text-white font-mono">{retour(wheelEv, gamesConfig.wheel.spinPrice)}</b> (max {fmt(gamesConfig.wheel.maxRtp)} %).
               <br />
               Le prix, le garde-fou et les lots se règlent tous au même endroit.
             </div>

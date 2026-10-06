@@ -13,31 +13,33 @@
 
 begin;
 
--- 1) Sauvegarde
-create table public.bak_20261005_profiles               as select * from public.profiles;
-create table public.bak_20261005_bets_history           as select * from public.bets_history;
-create table public.bak_20261005_transactions           as select * from public.casino_transactions;
-create table public.bak_20261005_player_rewards         as select * from public.player_rewards;
-create table public.bak_20261005_booster_openings       as select * from public.booster_openings;
-create table public.bak_20261005_admin_logs             as select * from public.admin_logs;
-create table public.bak_20261005_mines_rounds           as select * from public.mines_rounds;
-create table public.bak_20261005_crash_rounds           as select * from public.crash_rounds;
-create table public.bak_20261005_collection_owned       as select * from public.collection_owned;
-create table public.bak_20261005_collection_completions as select * from public.collection_completions;
-create table public.bak_20261005_collection_openings    as select * from public.collection_openings;
+-- 1) Sauvegarde (schéma privé « backups », jamais exposé par l'API du site)
+create schema if not exists backups;
+revoke all on schema backups from public, anon, authenticated;
+create table backups.bak_20261005_profiles               as select * from public.profiles;
+create table backups.bak_20261005_bets_history           as select * from public.bets_history;
+create table backups.bak_20261005_transactions           as select * from public.casino_transactions;
+create table backups.bak_20261005_player_rewards         as select * from public.player_rewards;
+create table backups.bak_20261005_booster_openings       as select * from public.booster_openings;
+create table backups.bak_20261005_admin_logs             as select * from public.admin_logs;
+create table backups.bak_20261005_mines_rounds           as select * from public.mines_rounds;
+create table backups.bak_20261005_crash_rounds           as select * from public.crash_rounds;
+create table backups.bak_20261005_collection_owned       as select * from public.collection_owned;
+create table backups.bak_20261005_collection_completions as select * from public.collection_completions;
+create table backups.bak_20261005_collection_openings    as select * from public.collection_openings;
 
 -- Les sauvegardes ne doivent pas être lisibles depuis le site
-alter table public.bak_20261005_profiles               enable row level security;
-alter table public.bak_20261005_bets_history           enable row level security;
-alter table public.bak_20261005_transactions           enable row level security;
-alter table public.bak_20261005_player_rewards         enable row level security;
-alter table public.bak_20261005_booster_openings       enable row level security;
-alter table public.bak_20261005_admin_logs             enable row level security;
-alter table public.bak_20261005_mines_rounds           enable row level security;
-alter table public.bak_20261005_crash_rounds           enable row level security;
-alter table public.bak_20261005_collection_owned       enable row level security;
-alter table public.bak_20261005_collection_completions enable row level security;
-alter table public.bak_20261005_collection_openings    enable row level security;
+alter table backups.bak_20261005_profiles               enable row level security;
+alter table backups.bak_20261005_bets_history           enable row level security;
+alter table backups.bak_20261005_transactions           enable row level security;
+alter table backups.bak_20261005_player_rewards         enable row level security;
+alter table backups.bak_20261005_booster_openings       enable row level security;
+alter table backups.bak_20261005_admin_logs             enable row level security;
+alter table backups.bak_20261005_mines_rounds           enable row level security;
+alter table backups.bak_20261005_crash_rounds           enable row level security;
+alter table backups.bak_20261005_collection_owned       enable row level security;
+alter table backups.bak_20261005_collection_completions enable row level security;
+alter table backups.bak_20261005_collection_openings    enable row level security;
 
 -- 2) Effacement de l'historique, des lots et des collections
 delete from public.mines_rounds;
@@ -82,7 +84,7 @@ commit;
 
 -- Pour annuler après coup (tant que les copies existent) : recopier depuis bak_20261005_*.
 -- Quand tu es sûr, supprime les copies (et celles des remises à zéro précédentes) :
---   drop table public.bak_20261005_profiles, public.bak_20261005_bets_history, public.bak_20261005_transactions,
---              public.bak_20261005_player_rewards, public.bak_20261005_booster_openings, public.bak_20261005_admin_logs,
---              public.bak_20261005_mines_rounds, public.bak_20261005_crash_rounds, public.bak_20261005_collection_owned,
---              public.bak_20261005_collection_completions, public.bak_20261005_collection_openings;
+--   drop table backups.bak_20261005_profiles, backups.bak_20261005_bets_history, backups.bak_20261005_transactions,
+--              backups.bak_20261005_player_rewards, backups.bak_20261005_booster_openings, backups.bak_20261005_admin_logs,
+--              backups.bak_20261005_mines_rounds, backups.bak_20261005_crash_rounds, backups.bak_20261005_collection_owned,
+--              backups.bak_20261005_collection_completions, backups.bak_20261005_collection_openings;

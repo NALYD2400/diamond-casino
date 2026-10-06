@@ -264,6 +264,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   SET_IN_USE: 'Des joueurs ont déjà ouvert des boosters de cet album : il ne peut plus être supprimé. Décochez « Album en vente » pour le cacher.',
   SET_ON_WHEEL: 'Un lot de la Roue de la Fortune donne un booster de cet album : retirez-le de la roue avant de supprimer l’album.',
   COLLECTION_UNREACHABLE: 'Une carte de l’album ne peut jamais sortir (rareté à 0 % dans ce booster) : l’album serait impossible à compléter.',
+  BANK_EMPTY: 'La caisse du casino est vide : les jeux rouvriront dès que la direction l’aura rechargée.',
+  BANK_LIMIT: 'Mise trop élevée pour la caisse actuelle du casino : baissez votre mise.',
+  BUY_BET_TOO_HIGH: 'Mise trop élevée pour acheter ce bonus.',
+  REWARD_USED: 'Ce bon ou ce booster a déjà été utilisé : il ne peut pas revenir en inventaire.',
+  RATE_LIMITED: 'Trop de demandes pour le moment, réessayez plus tard.',
+  DISCORD_REQUIRED: 'Connectez-vous avec Discord pour créer votre fiche.',
+  INVALID_ACTION: 'Action inconnue.',
 };
 
 export class CasinoApiError extends Error {
@@ -413,7 +420,27 @@ export interface SlotRoundResponse<R> {
   profile: ProfilePayload;
   /** Bonus offert : mise réellement utilisée par le serveur */
   bet?: number;
+  /** Jackpot progressif remporté sur ce tour (0 sinon) */
+  jackpot?: number;
+  /** Gain max d'une manche après ce tour (caisse du casino) */
+  maxWin?: number;
 }
+
+// -------------------------------------------------------------
+// Caisse du casino et jackpot (affichage public)
+// -------------------------------------------------------------
+
+export interface CasinoLimits {
+  /** Gain max d'une manche : part autorisée de la caisse du casino */
+  max_win: number;
+  /** false : caisse vide, jeux fermés */
+  open: boolean;
+  jackpot: number;
+  jackpot_last_winner: string | null;
+  jackpot_last_amount: number | null;
+  jackpot_last_date: string | null;
+}
+export const apiCasinoLimits = () => rpc<CasinoLimits>('casino_limits');
 
 /** Réveille la fonction Edge (aucun effet côté serveur) pour éviter le démarrage à froid */
 export function apiWarmSlotRound(): void {
@@ -1110,12 +1137,44 @@ export interface AdminDashboard {
     mines_open_stake: number;
     crash_open_rounds?: number;
     crash_open_stake?: number;
+    jackpots_won?: number;
   };
+  /** Statistiques sans les comptes staff */
+  members_only?: boolean;
+  /** Caisse du casino (absente avant la migration de la caisse) */
+  bank?: CasinoBank | null;
   top_players: { id: string; name: string; citizen_id: string; role: ProfileRole; wagered: number; paid: number; net: number; rounds: number }[];
   daily: { day: string; wagered: number; paid: number; rounds: number }[];
 }
 
-export const apiAdminDashboard = (days: number) => rpc<AdminDashboard>('admin_dashboard', { p_days: days });
+export async function apiAdminDashboard(days: number, membersOnly = true): Promise<AdminDashboard> {
+  try {
+    return await rpc<AdminDashboard>('admin_dashboard', { p_days: days, p_members_only: membersOnly });
+  } catch (err) {
+    // Base pas encore migrée (caisse du casino) : ancienne version sans le filtre staff
+    if (err instanceof CasinoApiError && err.code === 'FORBIDDEN') throw err;
+    return rpc<AdminDashboard>('admin_dashboard', { p_days: days });
+  }
+}
+
+export interface CasinoBank {
+  balance: number;
+  /** Plus haut niveau atteint : au-dessus, le bénéfice est partagé entre la caisse et la direction */
+  peak: number;
+  /** Bénéfice revenant à la direction depuis la dernière récupération */
+  owner_total: number;
+  start_amount: number;
+  max_win: number;
+  updated_at: string;
+  jackpot: number;
+  jackpot_last_winner: string | null;
+  jackpot_last_amount: number | null;
+  jackpot_last_date: string | null;
+}
+
+/** Direction (FONDATEUR / DÉVELOPPEUR) : recharger, retirer ou récupérer le bénéfice de la caisse */
+export const apiAdminBankUpdate = (action: 'deposit' | 'withdraw' | 'collect', amount: number, reason?: string) =>
+  rpc<CasinoBank>('admin_bank_update', { p_action: action, p_amount: amount, p_reason: reason ?? null });
 
 /** Joueur tel qu'il apparaît dans un classement */
 export interface LeaderboardPlayer {

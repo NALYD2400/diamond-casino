@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, History, Info, Rocket, RotateCw, ShieldCheck, Target, TrendingUp, Zap } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
+import { useCappedMaxPayout } from '../../lib/casinoLimits';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { GameVolumeModalRow } from '../VolumeControl';
 import {
@@ -79,7 +80,9 @@ interface HistoryItem {
 export const CrashGame: React.FC = () => {
   const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
   const { gamesConfig } = useCasinoAdmin();
-  const cfg = gamesConfig.crash;
+  // Gain max : réglage du jeu, plafonné par la caisse du casino
+  const cappedMaxPayout = useCappedMaxPayout(gamesConfig.crash.maxPayout);
+  const cfg = useMemo(() => ({ ...gamesConfig.crash, maxPayout: cappedMaxPayout }), [gamesConfig.crash, cappedMaxPayout]);
   const closed = useMachineClosed('crash');
   const { audio, muted, volume, toggleMute, setVolume } = useOriginalsSound();
 

@@ -166,6 +166,9 @@ interface CasinoAdminContextType {
   dashboard: AdminDashboard | null;
   dashboardDays: number;
   setDashboardDays: (days: number) => void;
+  /** Statistiques sans les comptes staff (tests de la direction exclus) */
+  dashboardMembersOnly: boolean;
+  setDashboardMembersOnly: (value: boolean) => void;
   refreshDashboard: () => Promise<void>;
 
   lastError: { message: string; at: number } | null;
@@ -282,6 +285,7 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [logs, setLogs] = useState<AdminLogEntry[]>([]);
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [dashboardDays, setDashboardDays] = useState<number>(7);
+  const [dashboardMembersOnly, setDashboardMembersOnly] = useState(true);
   const [lastError, setLastError] = useState<{ message: string; at: number } | null>(null);
 
   const reportError = useCallback((err: unknown) => {
@@ -386,11 +390,11 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const refreshDashboard = useCallback(async () => {
     if (!isStaff) return;
     try {
-      setDashboard(await apiAdminDashboard(dashboardDays));
+      setDashboard(await apiAdminDashboard(dashboardDays, dashboardMembersOnly));
     } catch (err) {
       reportError(err);
     }
-  }, [isStaff, dashboardDays, reportError]);
+  }, [isStaff, dashboardDays, dashboardMembersOnly, reportError]);
 
   useEffect(() => {
     if (!isStaff) {
@@ -646,6 +650,8 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
       dashboard,
       dashboardDays,
       setDashboardDays,
+      dashboardMembersOnly,
+      setDashboardMembersOnly,
       refreshDashboard,
       lastError,
     }),
@@ -680,6 +686,7 @@ export const CasinoAdminProvider: React.FC<{ children: React.ReactNode }> = ({ c
       refreshLogs,
       dashboard,
       dashboardDays,
+      dashboardMembersOnly,
       refreshDashboard,
       lastError,
     ],

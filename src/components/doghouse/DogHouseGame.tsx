@@ -25,6 +25,8 @@ import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
 import { SlotRtpText } from '../slots/SlotRtpText';
 import { useVouchers } from '../slots/useVouchers';
+import { JackpotTicker, JackpotWinOverlay } from '../slots/JackpotTicker';
+import { announceJackpot, refreshCasinoLimits, setCasinoMaxWin, useCappedMaxPayout } from '../../lib/casinoLimits';
 import { DogSymbol } from './DogSymbols';
 import {
   BOOST_BET_MULTIPLIER,
@@ -88,8 +90,12 @@ interface FreeSpinsState {
 export const DogHouseGame: React.FC = () => {
   const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
   const { gamesConfig } = useCasinoAdmin();
-  const cfg = gamesConfig.doghouse;
+  // Gain max : réglage de la machine, plafonné par la caisse du casino
+  const cappedMaxPayout = useCappedMaxPayout(gamesConfig.doghouse.maxPayout);
+  const cfg = useMemo(() => ({ ...gamesConfig.doghouse, maxPayout: cappedMaxPayout }), [gamesConfig.doghouse, cappedMaxPayout]);
   const closed = useMachineClosed('doghouse');
+  /** Jackpot remporté sur la manche en cours, annoncé une fois l'animation terminée */
+  const pendingJackpotRef = useRef(0);
   const buyPriceX = cfg.buyPrice;
 
   const betLevels = useMemo(() => clampBetLevels(BET_LEVELS, cfg.minBet, cfg.maxBet), [cfg.minBet, cfg.maxBet]);
@@ -243,9 +249,12 @@ export const DogHouseGame: React.FC = () => {
             ? await apiPlaySlotRound<DogHouseRound>({ game: 'doghouse', bet: voucher.voucher?.bet ?? bet, voucher_id: voucher.id })
             : await apiPlaySlotRound<DogHouseRound>({ game: 'doghouse', bet, mode: roundMode });
           if (voucher) voucherBetRef.current = res.bet ?? voucher.voucher?.bet ?? bet;
-          // Le gain est déjà crédité : on le masque jusqu'à sa présentation
-          setHiddenWin(res.paid);
+          // Le gain (et un éventuel jackpot) est déjà crédité : on le masque jusqu'à sa présentation
+          pendingJackpotRef.current = res.jackpot ?? 0;
+          setHiddenWin(res.paid + pendingJackpotRef.current);
           applyServerProfile(res.profile);
+          setCasinoMaxWin(res.maxWin);
+          void refreshCasinoLimits();
           return res.round;
         } catch (err) {
           setMessage(err instanceof CasinoApiError ? err.message.toUpperCase() : 'ERREUR SERVEUR');
@@ -513,6 +522,11 @@ export const DogHouseGame: React.FC = () => {
       setHiddenWin(0);
       setPhase('idle');
       busyRef.current = false;
+      if (pendingJackpotRef.current > 0) {
+        setAutoLeft(0);
+        announceJackpot(pendingJackpotRef.current);
+        pendingJackpotRef.current = 0;
+      }
       if (voucher) void reloadVouchers();
     },
     [animateReels, startReels, abortReels, bet, boost, cfg.boostEnabled, buyPriceX, displayCredit, obtainRound, presentWins, runFreeSpins, wait, reloadVouchers],
@@ -610,6 +624,7 @@ export const DogHouseGame: React.FC = () => {
   return (
     <div className="relative bg-[#0f1923] pt-[80px] sm:pt-[90px]">
       <MachineClosedBanner state={closed} />
+      <JackpotWinOverlay />
       <div
         data-fullscreen-root
         className="relative w-full overflow-hidden select-none"
@@ -628,6 +643,7 @@ export const DogHouseGame: React.FC = () => {
           </Link>
             <FullscreenButton />
           </div>
+          <JackpotTicker className="hidden md:inline-flex" />
           <div className="flex items-center rounded-full bg-black/80 border border-white/20 shadow-lg backdrop-blur-md p-1 sm:p-1.5 text-xs sm:text-sm font-extrabold tracking-wide">
             <button
               onClick={() => !locked && isAuthenticated && setMode('real')}

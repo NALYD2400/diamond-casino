@@ -4,6 +4,7 @@
 -- Efface : historique des parties (machines, roue, Mines, Crash), transactions, journal admin,
 --          ouvertures de boosters, lots / inventaires / bons de bonus, cartes et albums de collection.
 -- Remet à zéro : soldes de jetons, gains cumulés, tirages, VIP, véhicules, inventaire des comptes.
+--                La caisse du casino et le jackpot repartent de leur montant de départ.
 -- CONSERVE : les comptes (identité, Discord, rôle staff), les réglages du casino
 --            (casino_settings), les albums / cartes / raretés, le catalogue de véhicules.
 --
@@ -69,6 +70,16 @@ update public.profiles set
   vehicles        = '{}',
   inventory       = '{}';
 
+-- Caisse du casino et jackpot repartent de leur montant de départ
+update public.casino_bank set balance = start_amount, peak = start_amount, owner_total = 0, updated_at = now();
+update public.jackpot_pool set
+  current_amount   = coalesce((public.games_config()->'bank'->>'jackpotSeed')::bigint, 100000),
+  last_winner_name = null,
+  last_win_amount  = null,
+  last_win_date    = null,
+  updated_at       = now()
+where id = 'slots';
+
 -- 4) Contrôle : tout doit être à zéro
 select
   (select count(*) from public.bets_history)        as parties,
@@ -78,7 +89,8 @@ select
   (select count(*) from public.player_rewards)      as lots,
   (select count(*) from public.collection_owned)    as cartes,
   (select coalesce(sum(chips), 0) from public.profiles) as jetons_total,
-  (select count(*) from public.profiles)            as comptes_conserves;
+  (select count(*) from public.profiles)            as comptes_conserves,
+  (select balance from public.casino_bank)          as caisse;
 
 commit;
 

@@ -23,6 +23,7 @@ import { useCasinoAdmin } from '../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from './MachineClosedBanner';
 import { apiMinesCashout, apiMinesCurrent, apiMinesReveal, apiMinesStart, CasinoApiError, type MinesRoundState } from '../lib/supabase';
 import { clampBetLevels } from '../lib/gamesConfig';
+import { useCappedMaxPayout } from '../lib/casinoLimits';
 import { MinesAudio } from './mines/minesAudio';
 import { SampleBank } from './slots/sampleBank';
 import { GameVolumeButton, GameVolumeModalRow } from './VolumeControl';
@@ -71,7 +72,9 @@ type SampleName = 'coin1' | 'coin2' | 'coin3' | 'winSmall' | 'winMedium' | 'winB
 export const MinesGame: React.FC = () => {
   const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
   const { gamesConfig } = useCasinoAdmin();
-  const cfg = gamesConfig.mines;
+  // Gain max : réglage du jeu, plafonné par la caisse du casino
+  const cappedMaxPayout = useCappedMaxPayout(gamesConfig.mines.maxPayout);
+  const cfg = useMemo(() => ({ ...gamesConfig.mines, maxPayout: cappedMaxPayout }), [gamesConfig.mines, cappedMaxPayout]);
   const closed = useMachineClosed('mines');
   const closedRef = useRef(closed);
   closedRef.current = closed;

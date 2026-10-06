@@ -1,7 +1,7 @@
 import React from 'react';
 import { Lock } from 'lucide-react';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
-import type { GamesConfig } from '../lib/gamesConfig';
+import type { GameKey } from '../lib/gamesConfig';
 
 export type MachineClosedState = 'maintenance' | 'closed' | null;
 
@@ -10,7 +10,7 @@ export type MachineClosedState = 'maintenance' | 'closed' | null;
  * la ferme. Purement informatif : le serveur refuse de toute façon les mises
  * sur une machine fermée.
  */
-export function useMachineClosed(id: keyof GamesConfig): MachineClosedState {
+export function useMachineClosed(id: GameKey): MachineClosedState {
   const { economy, gamesConfig } = useCasinoAdmin();
   if (economy.maintenanceMode) return 'maintenance';
   return gamesConfig[id].enabled ? null : 'closed';

@@ -58,6 +58,21 @@ export interface CrashConfig {
   maxPayout: number;
 }
 
+/**
+ * Caisse du casino et jackpot progressif (appliqués par le serveur).
+ * - maxWinPct : gain max d'une manche = ce % de la caisse
+ * - keepPct : part du bénéfice qui reste dans la caisse quand elle dépasse son plus haut niveau (le reste va à la direction)
+ * - jackpotPct : part de chaque mise des machines à sous versée au jackpot (comptée dans leur RTP)
+ * - jackpotSeed / jackpotAverage : montant de départ et montant moyen d'un jackpot remporté
+ */
+export interface BankConfig {
+  maxWinPct: number;
+  keepPct: number;
+  jackpotPct: number;
+  jackpotSeed: number;
+  jackpotAverage: number;
+}
+
 export interface GamesConfig {
   mines: MinesConfig;
   crash: CrashConfig;
@@ -93,25 +108,30 @@ export interface GamesConfig {
     sellBonusGold: number;
     sellBonusDiamond: number;
   };
+  bank: BankConfig;
 }
 
+/** Identifiant d'un jeu dans games_config (tout sauf le bloc « bank ») */
+export type GameKey = Exclude<keyof GamesConfig, 'bank'>;
+
 export const DEFAULT_GAMES_CONFIG: GamesConfig = {
-  mines: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxPayout: 5000000 },
-  crash: { enabled: true, minBet: 10, maxBet: 100000, rtp: 90, maxMultiplier: 1000, maxPayout: 5000000 },
-  doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 84, boostEnabled: true, maxPayout: 10000000, spinRtp: 90, maxBuyBet: 100000 },
+  mines: { enabled: true, minBet: 10, maxBet: 100000, rtp: 85, maxPayout: 5000000 },
+  crash: { enabled: true, minBet: 10, maxBet: 100000, rtp: 85, maxMultiplier: 1000, maxPayout: 5000000 },
+  doghouse: { enabled: true, minBet: 20, maxBet: 100000, buyEnabled: true, buyPrice: 76, boostEnabled: true, maxPayout: 1000000, spinRtp: 84, maxBuyBet: 100000 },
   wanted: {
     enabled: true,
     minBet: 10,
     maxBet: 100000,
     buyEnabled: true,
-    buyPrices: { gtr: 80, duel: 134, dmh: 219 },
-    maxPayout: 10000000,
-    spinRtp: 90,
+    buyPrices: { gtr: 92, duel: 134, dmh: 219 },
+    maxPayout: 1000000,
+    spinRtp: 84,
     maxBuyBet: 100000,
   },
-  wheel: { enabled: true, spinPrice: 25000, maxRtp: 90 },
-  boosters: { enabled: false, maxRtp: 90, sellRate: 70 },
-  collections: { enabled: true, maxRtp: 90, packMaxRtp: 60, dailyPackLimit: 0, sellRate: 70, sellBonusSilver: 0, sellBonusGold: 5, sellBonusDiamond: 10 },
+  wheel: { enabled: true, spinPrice: 25000, maxRtp: 85 },
+  boosters: { enabled: false, maxRtp: 85, sellRate: 70 },
+  collections: { enabled: true, maxRtp: 85, packMaxRtp: 60, dailyPackLimit: 0, sellRate: 70, sellBonusSilver: 0, sellBonusGold: 5, sellBonusDiamond: 10 },
+  bank: { maxWinPct: 10, keepPct: 20, jackpotPct: 1, jackpotSeed: 100000, jackpotAverage: 500000 },
 };
 
 export interface VipTierConfig {
@@ -142,6 +162,7 @@ export function mergeGamesConfig(raw: unknown): GamesConfig {
     wheel: { ...DEFAULT_GAMES_CONFIG.wheel, ...(r.wheel || {}) },
     boosters: { ...DEFAULT_GAMES_CONFIG.boosters, ...(r.boosters || {}) },
     collections: { ...DEFAULT_GAMES_CONFIG.collections, ...(r.collections || {}) },
+    bank: { ...DEFAULT_GAMES_CONFIG.bank, ...(r.bank || {}) },
   };
 }
 
@@ -187,8 +208,11 @@ export const spinScale = (game: keyof typeof SLOT_RTP, cfg: { spinRtp?: number }
 /** Mise maximum d'achat de bonus : limite du moteur (gain max) et réglage de la console, la plus basse des deux */
 export const buyBetLimit = (engineLimit: number, cfg: { maxBuyBet?: number }) => Math.min(engineLimit, Number(cfg.maxBuyBet) || Infinity);
 
-/** RTP réellement appliqué aux tours normaux d'une machine */
+/** RTP réellement appliqué aux tours normaux d'une machine (hors jackpot) */
 export const slotSpinRtp = (game: keyof typeof SLOT_RTP, cfg: { spinRtp?: number }) => SLOT_RTP[game] * spinScale(game, cfg);
+
+/** RTP affiché aux joueurs : tours normaux + part des mises reversée au jackpot progressif */
+export const slotTotalRtp = (game: keyof typeof SLOT_RTP, cfg: GamesConfig) => slotSpinRtp(game, cfg[game]) + (Number(cfg.bank?.jackpotPct) || 0);
 
 /** 96.5 -> "96,5 %", 97 -> "97 %" */
 export const formatRtp = (rtp: number): string =>

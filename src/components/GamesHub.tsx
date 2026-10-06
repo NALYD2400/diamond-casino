@@ -28,7 +28,8 @@ import {
 import { useCasinoUser } from '../context/CasinoUserContext';
 import { useCasinoAdmin } from '../context/CasinoAdminContext';
 import { useMachineClosed } from './MachineClosedBanner';
-import { GAME_LABELS, SLOT_RTP, formatRtp, slotSpinRtp, type GamesConfig } from '../lib/gamesConfig';
+import { GAME_LABELS, SLOT_RTP, formatRtp, slotTotalRtp, type GameKey } from '../lib/gamesConfig';
+import { JackpotBanner } from './slots/JackpotTicker';
 import { apiCollectionCatalog, apiRecentWheelWins, dbFetchBetsHistory, type SupabaseBetEntry, type WheelWin } from '../lib/supabase';
 import { Wheel } from './wheel/Wheel';
 import { BombArt, GemArt } from './mines/MinesArt';
@@ -286,10 +287,10 @@ const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
 ];
 
 const MACHINE_IDS = ['doghouse', 'wanted', 'mines', 'crash', 'wheel', 'collections'] as const;
-const isMachine = (id: string): id is keyof GamesConfig => (MACHINE_IDS as readonly string[]).includes(id);
+const isMachine = (id: string): id is GameKey => (MACHINE_IDS as readonly string[]).includes(id);
 
 /** Carte d'une machine : suit en temps réel son ouverture / fermeture par la direction */
-const MachineTile: React.FC<{ game: GameTile & { id: keyof GamesConfig }; index: number }> = ({ game, index }) => {
+const MachineTile: React.FC<{ game: GameTile & { id: GameKey }; index: number }> = ({ game, index }) => {
   const closed = useMachineClosed(game.id);
   const { gamesConfig } = useCasinoAdmin();
   // Le RTP des Originals se règle dans la console : on affiche la valeur en vigueur
@@ -297,7 +298,7 @@ const MachineTile: React.FC<{ game: GameTile & { id: keyof GamesConfig }; index:
     game.id === 'mines' || game.id === 'crash'
       ? formatRtp(gamesConfig[game.id].rtp)
       : game.id === 'doghouse' || game.id === 'wanted'
-        ? formatRtp(slotSpinRtp(game.id, gamesConfig[game.id]))
+        ? formatRtp(slotTotalRtp(game.id, gamesConfig))
         : game.rtp;
   const shown = { ...game, rtp };
   return <Tile game={shown} index={index} closed={closed} />;
@@ -755,6 +756,8 @@ export const GamesHub: React.FC = () => {
               </>
             )}
           </div>
+
+          <JackpotBanner />
 
           {/* Bannière */}
           <Link

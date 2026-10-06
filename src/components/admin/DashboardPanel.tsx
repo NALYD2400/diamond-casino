@@ -1,12 +1,17 @@
 import React from 'react';
 import { AlertTriangle, Car, Coins, Crown, Gamepad2, RefreshCw, TrendingDown, TrendingUp, Users, Wrench } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
-import { GAME_LABELS, slotSpinRtp } from '../../lib/gamesConfig';
+import { GAME_LABELS, slotTotalRtp } from '../../lib/gamesConfig';
+import { BankCard } from './BankCard';
 import type { AdminTab } from '../AdminConsole';
 import { Badge, Button, Card, EmptyState, HelpBox, PageHeader, RoleBadge, Segmented, Stat, cx, fmt, fmtChips } from './ui';
 
+/** En dessous, le RTP réel d'un jeu dépend surtout du hasard (gros gains rares) : pas d'alerte */
+const MIN_ROUNDS = 1000;
+
 export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ goTo }) => {
-  const { dashboard, dashboardDays, setDashboardDays, refreshDashboard, economy, gamesConfig } = useCasinoAdmin();
+  const { dashboard, dashboardDays, setDashboardDays, dashboardMembersOnly, setDashboardMembersOnly, refreshDashboard, economy, gamesConfig } =
+    useCasinoAdmin();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const refresh = async () => {
@@ -24,8 +29,8 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   const targetRtp: Record<string, string> = {
     mines: `${fmt(gamesConfig.mines.rtp)} %`,
     crash: `${fmt(gamesConfig.crash.rtp)} %`,
-    doghouse: `≈ ${fmt(slotSpinRtp('doghouse', gamesConfig.doghouse))} %`,
-    wanted: `≈ ${fmt(slotSpinRtp('wanted', gamesConfig.wanted))} %`,
+    doghouse: `≈ ${fmt(slotTotalRtp('doghouse', gamesConfig))} %`,
+    wanted: `≈ ${fmt(slotTotalRtp('wanted', gamesConfig))} %`,
     lucky_wheel: `≤ ${fmt(gamesConfig.wheel.maxRtp)} %`,
     boosters: `≤ ${fmt(gamesConfig.boosters.maxRtp)} %`,
   };
@@ -38,9 +43,13 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
   if (t && t.pending_rewards > 0) alerts.push({ tone: 'warn', text: `${t.pending_rewards} lot(s) réclamé(s) à livrer au joueur.`, action: { label: 'Voir', tab: 'rewards' } });
   const closed = (['mines', 'crash', 'doghouse', 'wanted', 'wheel', 'collections'] as const).filter((g) => !gamesConfig[g].enabled);
   if (closed.length) alerts.push({ tone: 'info', text: `Jeu(x) fermé(s) : ${closed.map((g) => (g === 'wheel' ? 'Roue' : GAME_LABELS[g])).join(', ')}.`, action: { label: 'Machines', tab: 'games' } });
+  const bank = dashboard?.bank;
+  if (bank && bank.balance <= 0) alerts.push({ tone: 'bad', text: 'La caisse du casino est vide : tous les jeux sont fermés. Rechargez-la ci-dessous.' });
+  else if (bank && bank.balance < bank.start_amount * 0.5) alerts.push({ tone: 'warn', text: `La caisse est sous la moitié de son montant de départ (${fmt(bank.balance)} jetons) : le gain max par manche a baissé.` });
+  // Sous MIN_ROUNDS parties, un seul gros gain fait varier le RTP de plusieurs dizaines de points : pas d'alerte
   paidGames.forEach(([id, g]) => {
-    if (g.rtp !== null && Number(g.wagered) > 200000 && Number(g.rtp) > 120) {
-      alerts.push({ tone: 'bad', text: `${GAME_LABELS[id] ?? id} a rendu ${g.rtp} % des mises ${period} : à surveiller (chance d'un joueur ou réglage trop généreux).`, action: { label: 'Machines', tab: 'games' } });
+    if (g.rtp !== null && Number(g.rounds) >= MIN_ROUNDS && Number(g.rtp) > 110) {
+      alerts.push({ tone: 'bad', text: `${GAME_LABELS[id] ?? id} a rendu ${g.rtp} % des mises sur ${fmt(g.rounds)} parties ${period} : à vérifier (réglage trop généreux ?).`, action: { label: 'Machines', tab: 'games' } });
     }
   });
 
@@ -51,6 +60,14 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
         subtitle="Les vrais chiffres du casino, calculés directement dans la base de données à partir de chaque partie jouée."
         actions={
           <>
+            <Segmented
+              value={dashboardMembersOnly ? 'members' : 'all'}
+              onChange={(v) => setDashboardMembersOnly(v === 'members')}
+              options={[
+                { value: 'members', label: 'Joueurs' },
+                { value: 'all', label: 'Avec le staff' },
+              ]}
+            />
             <Segmented
               value={dashboardDays}
               onChange={setDashboardDays}
@@ -122,7 +139,13 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
         />
       </div>
 
-      <Card title={`Résultats par jeu ${period}`} icon={<Gamepad2 size={15} />} padded={false}>
+      {dashboard && <BankCard bank={dashboard.bank} />}
+
+      <Card
+        title={`Résultats par jeu ${period}${dashboardMembersOnly ? ' (sans le staff)' : ''}`}
+        icon={<Gamepad2 size={15} />}
+        padded={false}
+      >
         {Object.keys(games).length === 0 ? (
           <EmptyState title="Aucune partie sur la période" hint="Les parties jouées en jetons apparaîtront ici." />
         ) : (
@@ -158,8 +181,17 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
                           <span className="text-neutral-500 text-xs">{targetRtp[id] ?? '—'}</span>
                         ) : (
                           <span className="inline-flex flex-col items-end">
-                            <span className={cx('font-mono font-semibold', Number(g.rtp) > 100 ? 'text-rose-300' : 'text-white')}>{g.rtp} %</span>
-                            <span className="text-[10px] text-neutral-500">visé {targetRtp[id] ?? '—'}</span>
+                            <span
+                              className={cx(
+                                'font-mono font-semibold',
+                                Number(g.rounds) < MIN_ROUNDS ? 'text-neutral-400' : Number(g.rtp) > 100 ? 'text-rose-300' : 'text-white',
+                              )}
+                            >
+                              {g.rtp} %
+                            </span>
+                            <span className="text-[10px] text-neutral-500">
+                              {Number(g.rounds) < MIN_ROUNDS ? `peu de parties · visé ${targetRtp[id] ?? '—'}` : `visé ${targetRtp[id] ?? '—'}`}
+                            </span>
                           </span>
                         )}
                       </td>
@@ -245,7 +277,9 @@ export const DashboardPanel: React.FC<{ goTo: (tab: AdminTab) => void }> = ({ go
         </p>
         <p>
           <b>RTP réel</b> = payé ÷ misé. Sur quelques centaines de parties il varie beaucoup (un gros bonus suffit à le faire passer
-          au-dessus de 100 %). Il se rapproche du RTP visé quand le nombre de parties augmente.
+          au-dessus de 100 %). Il se rapproche du RTP visé quand le nombre de parties augmente : en dessous de {fmt(MIN_ROUNDS)} parties
+          il est affiché en gris et ne déclenche pas d'alerte. Par défaut les comptes staff sont exclus, pour que vos tests ne
+          faussent pas les chiffres.
         </p>
         <p>
           <b>Jetons créés</b> = jetons apparus sans mise : crédits manuels du staff, dotations VIP et revente de lots (véhicules

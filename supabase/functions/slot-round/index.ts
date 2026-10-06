@@ -3,7 +3,7 @@
  *
  * Le navigateur envoie seulement { game, bet, mode } ; le serveur :
  *   1. identifie le joueur via son jeton Supabase,
- *   2. lit les réglages des jeux (games_config),
+ *   2. lit les réglages des jeux (games_config) et le gain max autorisé par la caisse du casino,
  *   3. joue la manche complète avec un aléa cryptographique,
  *   4. débite la mise et crédite le gain en une seule transaction SQL
  *      (settle_slot_round, exécutable uniquement avec la clé service_role),
@@ -61,6 +61,8 @@ const KNOWN_ERRORS = [
   'BUY_DISABLED',
   'BOOST_DISABLED',
   'VOUCHER_NOT_FOUND',
+  'BANK_EMPTY',
+  'BANK_LIMIT',
 ];
 
 Deno.serve(async (req) => {
@@ -79,9 +81,18 @@ Deno.serve(async (req) => {
 
   // Vérification du jeton (getUser : contrôle aussi la révocation de session)
   // et lecture de la config en parallèle — un aller-retour de moins par tour.
-  const [authRes, cfgRes] = await Promise.all([admin.auth.getUser(token), admin.rpc('games_config')]);
+  const [authRes, cfgRes, limitsRes] = await Promise.all([
+    admin.auth.getUser(token),
+    admin.rpc('games_config'),
+    admin.rpc('casino_limits'),
+  ]);
   const user = authRes.data?.user;
   if (authRes.error || !user) return json({ error: 'AUTH_REQUIRED' }, 401);
+
+  // Gain max d'une manche : réglage du jeu, et jamais plus que la part autorisée de la caisse du casino
+  const bankMaxWin = Number(limitsRes.data?.max_win ?? Infinity);
+  if (!(bankMaxWin > 0)) return json({ error: 'BANK_EMPTY' }, 503);
+  const capOf = (cfg: { maxPayout: number }) => Math.min(Number(cfg.maxPayout), bankMaxWin);
 
   let body: { game?: string; bet?: number; mode?: string; buy?: string; voucher_id?: string };
   try {
@@ -115,9 +126,9 @@ Deno.serve(async (req) => {
     let vdetail: Record<string, unknown>;
     let vbetUsed = 0;
     if (v.game === 'doghouse') {
-      const vbet = Math.max(vcfg.minBet, Math.min(Number(v.bet), dogMaxBuyBet(vcfg.buyPrice, vcfg.maxPayout)));
+      const vbet = Math.max(vcfg.minBet, Math.min(Number(v.bet), dogMaxBuyBet(vcfg.buyPrice, capOf(vcfg))));
       vbetUsed = vbet;
-      vround = playDogHouseRound({ bet: vbet, mode: 'buy', buyPriceX: vcfg.buyPrice, maxPayout: vcfg.maxPayout, rng: secureRandom });
+      vround = playDogHouseRound({ bet: vbet, mode: 'buy', buyPriceX: vcfg.buyPrice, maxPayout: capOf(vcfg), rng: secureRandom });
       vdetail = { mode: 'voucher', bonus: vround.freeSpins ? 'free_spins' : null };
     } else {
       // Duel at Dawn et Dead Man's Hand ne s'achètent plus (gain max selon la mise) : un ancien bon
@@ -126,12 +137,12 @@ Deno.serve(async (req) => {
       const vbuy: WantedBonus = 'gtr';
       const faceValue = Number(v.bet) * (vcfg.buyPrices[vbuy0] ?? vcfg.buyPrices.gtr);
       const wantedBet = Math.floor(faceValue / vcfg.buyPrices.gtr);
-      const vbet = Math.max(vcfg.minBet, Math.min(wantedBet, wantedMaxBuyBet(vcfg.buyPrices.gtr, vcfg.maxPayout)));
+      const vbet = Math.max(vcfg.minBet, Math.min(wantedBet, wantedMaxBuyBet(vcfg.buyPrices.gtr, capOf(vcfg))));
       vbetUsed = vbet;
-      vround = playWantedRound({ bet: vbet, buy: vbuy, buyPrices: vcfg.buyPrices, maxPayout: vcfg.maxPayout, rng: secureRandom });
+      vround = playWantedRound({ bet: vbet, buy: vbuy, buyPrices: vcfg.buyPrices, maxPayout: capOf(vcfg), rng: secureRandom });
       vdetail = { mode: 'voucher', bonus: vround.bonus?.bonus ?? null };
     }
-    const vpaid = Math.floor(vround.totalWin);
+    let vpaid = Math.floor(vround.totalWin);
     const { data: vprofile, error: verr } = await admin.rpc('settle_voucher_round', {
       p_user_id: user.id,
       p_reward_id: rw.id,
@@ -142,7 +153,8 @@ Deno.serve(async (req) => {
       const code = KNOWN_ERRORS.find((c) => (verr.message ?? '').includes(c)) ?? 'SERVER_ERROR';
       return json({ error: code }, code === 'SERVER_ERROR' ? 500 : 400);
     }
-    return json({ round: vround, cost: 0, paid: vpaid, profile: vprofile, voucher: true, bet: vbetUsed });
+    vpaid = Number(vprofile?.paid_win ?? vpaid);
+    return json({ round: vround, cost: 0, paid: vpaid, profile: vprofile, voucher: true, bet: vbetUsed, maxWin: vprofile?.max_win });
   }
 
   const game = body.game;
@@ -156,33 +168,36 @@ Deno.serve(async (req) => {
   const cfg = config[game];
   if (!cfg.enabled) return json({ error: 'GAME_DISABLED' }, 403);
   if (bet < cfg.minBet || bet > cfg.maxBet) return json({ error: 'INVALID_BET' }, 400);
+  const cap = capOf(cfg);
+  // La caisse doit pouvoir payer au moins le double de la mise
+  if (cap < bet * 2) return json({ error: 'BANK_LIMIT' }, 400);
 
   let round;
   let detail: Record<string, unknown>;
   if (game === 'doghouse') {
     const mode = (['spin', 'boost', 'buy'].includes(body.mode ?? '') ? body.mode : 'spin') as DogRoundMode;
     if (mode === 'buy' && !cfg.buyEnabled) return json({ error: 'BUY_DISABLED' }, 403);
-    if (mode === 'buy' && bet > Math.min(dogMaxBuyBet(cfg.buyPrice, cfg.maxPayout), Number(cfg.maxBuyBet) || Infinity)) {
+    if (mode === 'buy' && bet > Math.min(dogMaxBuyBet(cfg.buyPrice, cap), Number(cfg.maxBuyBet) || Infinity)) {
       return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
     }
     if (mode === 'boost' && !cfg.boostEnabled) return json({ error: 'BOOST_DISABLED' }, 403);
     // Achat de bonus : retour réglé par son prix ; tours normaux et boostés : par spinRtp
     const extraScale = mode === 'buy' ? undefined : (mode === 'boost' ? boostPayoutScale(bet) : 1) * spinScale(cfg);
-    round = playDogHouseRound({ bet, mode, buyPriceX: cfg.buyPrice, maxPayout: cfg.maxPayout, extraScale, rng: secureRandom });
+    round = playDogHouseRound({ bet, mode, buyPriceX: cfg.buyPrice, maxPayout: cap, extraScale, rng: secureRandom });
     detail = { mode, bonus: round.freeSpins ? 'free_spins' : null };
   } else {
     const buy = (['gtr', 'duel', 'dmh'].includes(body.buy ?? '') ? body.buy : null) as WantedBonus | null;
     if (buy && !cfg.buyEnabled) return json({ error: 'BUY_DISABLED' }, 403);
-    if (buy && bet > Math.min(wantedMaxBuyBet(cfg.buyPrices[buy], cfg.maxPayout, buy), Number(cfg.maxBuyBet) || Infinity)) {
+    if (buy && bet > Math.min(wantedMaxBuyBet(cfg.buyPrices[buy], cap, buy), Number(cfg.maxBuyBet) || Infinity)) {
       return json({ error: 'BUY_BET_TOO_HIGH' }, 400);
     }
     const extraScale = buy ? undefined : capPayoutScale(bet) * spinScale(cfg);
-    round = playWantedRound({ bet, buy, buyPrices: cfg.buyPrices, maxPayout: cfg.maxPayout, extraScale, rng: secureRandom });
+    round = playWantedRound({ bet, buy, buyPrices: cfg.buyPrices, maxPayout: cap, extraScale, rng: secureRandom });
     detail = { mode: buy ? 'buy' : 'spin', bonus: round.bonus?.bonus ?? null };
   }
 
   const cost = Math.ceil(round.cost);
-  const paid = Math.floor(round.totalWin);
+  let paid = Math.floor(round.totalWin);
 
   const { data: profile, error } = await admin.rpc('settle_slot_round', {
     p_user_id: user.id,
@@ -197,5 +212,7 @@ Deno.serve(async (req) => {
     return json({ error: code }, code === 'SERVER_ERROR' ? 500 : 400);
   }
 
-  return json({ round, cost, paid, profile });
+  // Gain réellement versé (la caisse a pu baisser entre le tirage et l'encaissement) et jackpot éventuel
+  paid = Number(profile?.paid_win ?? paid);
+  return json({ round, cost, paid, profile, jackpot: Number(profile?.jackpot_win ?? 0), maxWin: profile?.max_win });
 });

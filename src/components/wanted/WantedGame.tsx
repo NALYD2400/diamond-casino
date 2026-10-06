@@ -6,11 +6,13 @@ import { useCasinoUser } from '../../context/CasinoUserContext';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
 import { MachineClosedBanner, useMachineClosed } from '../MachineClosedBanner';
 import { apiPlaySlotRound, CasinoApiError, type PlayerReward } from '../../lib/supabase';
-import { buyBetLimit, clampBetLevels, formatRtp, slotSpinRtp, spinScale } from '../../lib/gamesConfig';
+import { buyBetLimit, clampBetLevels, spinScale } from '../../lib/gamesConfig';
 import { useSlotTimeline } from '../slots/useSlotTimeline';
 import { useSlotWarmup } from '../slots/useSlotWarmup';
 import { SlotRtpText } from '../slots/SlotRtpText';
 import { useVouchers } from '../slots/useVouchers';
+import { JackpotTicker, JackpotWinOverlay } from '../slots/JackpotTicker';
+import { announceJackpot, refreshCasinoLimits, setCasinoMaxWin, useCappedMaxPayout } from '../../lib/casinoLimits';
 import { WantedAudio } from './wantedAudio';
 import { GameVolumeButton, GameVolumeModalRow } from '../VolumeControl';
 import { WantedLogo, WantedSymbol } from './WantedSymbols';
@@ -100,8 +102,12 @@ interface DmhHud {
 export const WantedGame: React.FC = () => {
   const { user, isAuthenticated, applyServerProfile } = useCasinoUser();
   const { gamesConfig } = useCasinoAdmin();
-  const cfg = gamesConfig.wanted;
+  // Gain max : réglage de la machine, plafonné par la caisse du casino
+  const cappedMaxPayout = useCappedMaxPayout(gamesConfig.wanted.maxPayout);
+  const cfg = useMemo(() => ({ ...gamesConfig.wanted, maxPayout: cappedMaxPayout }), [gamesConfig.wanted, cappedMaxPayout]);
   const closed = useMachineClosed('wanted');
+  /** Jackpot remporté sur la manche en cours, annoncé une fois l'animation terminée */
+  const pendingJackpotRef = useRef(0);
   const buyPrices = cfg.buyPrices;
   const betLevels = useMemo(() => clampBetLevels(BET_LEVELS, cfg.minBet, cfg.maxBet), [cfg.minBet, cfg.maxBet]);
 
@@ -235,8 +241,12 @@ export const WantedGame: React.FC = () => {
             ? await apiPlaySlotRound<WantedRound>({ game: 'wanted', bet: voucher.voucher?.bet ?? bet, voucher_id: voucher.id })
             : await apiPlaySlotRound<WantedRound>({ game: 'wanted', bet, buy });
           if (voucher) voucherBetRef.current = res.bet ?? voucher.voucher?.bet ?? bet;
-          setHiddenWin(res.paid);
+          // Le gain (et un éventuel jackpot) est déjà crédité : on le masque jusqu'à sa présentation
+          pendingJackpotRef.current = res.jackpot ?? 0;
+          setHiddenWin(res.paid + pendingJackpotRef.current);
           applyServerProfile(res.profile);
+          setCasinoMaxWin(res.maxWin);
+          void refreshCasinoLimits();
           return res.round;
         } catch (err) {
           setMessage(err instanceof CasinoApiError ? err.message.toUpperCase() : 'ERREUR SERVEUR');
@@ -520,6 +530,11 @@ export const WantedGame: React.FC = () => {
       setHiddenWin(0);
       setPhase('idle');
       busyRef.current = false;
+      if (pendingJackpotRef.current > 0) {
+        setAutoLeft(0);
+        announceJackpot(pendingJackpotRef.current);
+        pendingJackpotRef.current = 0;
+      }
       if (voucher) void reloadVouchers();
     },
     [animateReels, startReels, bet, buyPrices, displayCredit, obtainRound, presentWins, runBonus, wait, reloadVouchers],
@@ -611,6 +626,7 @@ export const WantedGame: React.FC = () => {
   return (
     <div className="relative bg-[#120a07] pt-[80px] sm:pt-[90px]">
       <MachineClosedBanner state={closed} />
+      <JackpotWinOverlay />
       <div data-fullscreen-root
         className="relative w-full overflow-hidden select-none" style={{ height: 'max(680px, calc(100svh - 90px))' }}>
         <Backdrop theme={theme} />
@@ -626,6 +642,7 @@ export const WantedGame: React.FC = () => {
           </Link>
             <FullscreenButton />
           </div>
+          <JackpotTicker className="hidden md:inline-flex" />
           <div className="flex items-center rounded-full bg-black/80 border border-white/20 shadow-lg backdrop-blur-md p-1 sm:p-1.5 text-xs sm:text-sm font-extrabold tracking-wide">
             <button
               onClick={() => !locked && isAuthenticated && setMode('real')}
@@ -708,7 +725,7 @@ export const WantedGame: React.FC = () => {
           <div className="hidden lg:flex w-[170px] shrink-0 flex-col gap-2">
             <InfoCard title="GAIN MAX" value={`${fmt(Math.floor(Math.min(maxWinMultiplier(bet), cfg.maxPayout / bet)))}x`} />
             <InfoCard title="VS" value="x2 → x100" sub="Multiplicateurs additionnés sur la ligne" />
-            <InfoCard title="RTP" value={formatRtp(slotSpinRtp('wanted', cfg))} />
+            <InfoCard title="RTP" value={<SlotRtpText game="wanted" />} />
           </div>
         </div>
 
@@ -1464,7 +1481,7 @@ const SidePanel: React.FC<{ className?: string; onBuy: () => void; disabled: boo
   </div>
 );
 
-const InfoCard: React.FC<{ title: string; value: string; sub?: string }> = ({ title, value, sub }) => (
+const InfoCard: React.FC<{ title: string; value: React.ReactNode; sub?: string }> = ({ title, value, sub }) => (
   <div className="rounded-lg bg-black/50 backdrop-blur p-3 text-center border border-white/10">
     <div className="font-['Oswald'] font-bold text-[#e0b040] text-xs tracking-wider">{title}</div>
     <div className="font-['Oswald'] font-bold text-white text-xl">{value}</div>

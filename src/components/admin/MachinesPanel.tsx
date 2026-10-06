@@ -20,7 +20,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useCasinoAdmin } from '../../context/CasinoAdminContext';
-import { buyBetLimit, slotSpinRtp, spinScale, type GamesConfig } from '../../lib/gamesConfig';
+import { buyBetLimit, slotSpinRtp, spinScale, type GameKey, type GamesConfig } from '../../lib/gamesConfig';
 import { usePackSets, wheelExpected as wheelExpectedFor } from '../../lib/wheelEconomy';
 import { apiAdminGameStats, type AdminGameStats, type StatsGameId } from '../../lib/supabase';
 import { calculateMultiplier } from '../mines/minesMath';
@@ -47,7 +47,7 @@ import {
   fmtDate,
 } from './ui';
 
-type MachineId = keyof GamesConfig;
+type MachineId = GameKey;
 
 const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: string; icon: React.ElementType; route: string }[] = [
   { id: 'doghouse', statsId: 'doghouse', name: 'The Dog House', short: 'Dog House', icon: Dog, route: '/slots' },
@@ -64,7 +64,7 @@ const MACHINES: { id: MachineId; statsId: StatsGameId; name: string; short: stri
 
 /** Valeur moyenne des bonus achetés (en × la mise), mesurée sur les moteurs */
 const DOG_BONUS_VALUE = 63;
-const WANTED_BONUS_VALUE = { gtr: 73, duel: 107, dmh: 175 } as const;
+const WANTED_BONUS_VALUE = { gtr: 77, duel: 107, dmh: 176 } as const;
 /** Écart-type d'une manche en × la mise : plus il est grand, plus le RTP réel met du temps à se stabiliser */
 const VOLATILITY: Record<MachineId, number> = { doghouse: 12, wanted: 15, mines: 3, crash: 6, wheel: 1.5, boosters: 1, collections: 1 };
 const MIN_ROUNDS = 200;
@@ -81,17 +81,19 @@ const MIN_BUY_PRICE = { doghouse: 67, gtr: 80, duel: 134, dmh: 219 } as const;
 
 /** RTP visé (%) pour une ligne de la répartition, ou null si non applicable */
 function targetFor(machine: MachineId, key: string, cfg: GamesConfig, wheelEv: number): number | null {
+  // Machines à sous : la part des mises versée au jackpot progressif s'ajoute au retour des tirages
+  const jackpot = Number(cfg.bank?.jackpotPct) || 0;
   switch (machine) {
     case 'doghouse':
-      if (key === 'boost') return 93 * spinScale('doghouse', cfg.doghouse);
-      if (key === 'buy') return (DOG_BONUS_VALUE / Math.max(1, cfg.doghouse.buyPrice)) * 100;
-      return slotSpinRtp('doghouse', cfg.doghouse);
+      if (key === 'boost') return 93 * spinScale('doghouse', cfg.doghouse) + jackpot;
+      if (key === 'buy') return (DOG_BONUS_VALUE / Math.max(1, cfg.doghouse.buyPrice)) * 100 + jackpot;
+      return slotSpinRtp('doghouse', cfg.doghouse) + jackpot;
     case 'wanted': {
       if (key.startsWith('buy_')) {
         const b = key.slice(4) as keyof typeof WANTED_BONUS_VALUE;
-        return b in WANTED_BONUS_VALUE ? (WANTED_BONUS_VALUE[b] / Math.max(1, cfg.wanted.buyPrices[b])) * 100 : null;
+        return b in WANTED_BONUS_VALUE ? (WANTED_BONUS_VALUE[b] / Math.max(1, cfg.wanted.buyPrices[b])) * 100 + jackpot : null;
       }
-      return slotSpinRtp('wanted', cfg.wanted);
+      return slotSpinRtp('wanted', cfg.wanted) + jackpot;
     }
     case 'mines':
       return cfg.mines.rtp;

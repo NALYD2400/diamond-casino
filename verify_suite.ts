@@ -414,6 +414,17 @@ async function main() {
         supabase.rpc('admin_grant_reward', { p_profile_id: '00000000-0000-0000-0000-000000000000', p_vehicle_model: 'adder', p_label: null, p_note: null }),
       )],
       ['cannot import the vehicle catalogue', isRefused(() => supabase.rpc('admin_import_vehicles', { p_rows: [] }))],
+      ['cannot move money in or out of the casino bank', isRefused(() =>
+        supabase.rpc('admin_bank_update', { p_action: 'deposit', p_amount: 1000, p_reason: 'x' }),
+      )],
+      ['cannot read the casino bank table directly', (async () => {
+        const { data, error } = await supabase.from('casino_bank').select('balance');
+        return !!error || !data || data.length === 0;
+      })()],
+      ['can read the public casino limits (max win, jackpot)', (async () => {
+        const { data, error } = await supabase.rpc('casino_limits');
+        return !error && typeof data?.max_win === 'number' && typeof data?.jackpot === 'number' && !('balance' in (data ?? {}));
+      })()],
       ['cannot read player prizes', (async () => {
         const { data } = await supabase.from('player_rewards').select('id');
         return !data || data.length === 0;

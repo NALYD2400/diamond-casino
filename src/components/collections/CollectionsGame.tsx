@@ -2,7 +2,8 @@
  * COLLECTIONS — albums de cartes « marques » de GTA V (autos & mode).
  *
  * 1. Choix de l'album, progression, récompense à la clé (réglée par album)
- * 2. Achat d'un booster (ou ouverture d'un booster gagné à la roue)
+ * 2. Achat d'un booster, de 10 d'un coup (ouverts à la suite), ou ouverture
+ *    d'un booster gagné à la roue
  * 3. Ouverture : glisser le long du haut du paquet pour le déchirer
  * 4. Révélation carte par carte (NOUVELLE ! / doublon)
  * 5. Album : cartes possédées, manquantes, secrètes, revente des doublons
@@ -13,12 +14,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Gift, Info, Loader2, Sparkles, Trophy, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, FastForward, Gift, Info, Layers, Loader2, Sparkles, Trophy, X } from 'lucide-react';
 import { useCasinoUser } from '../../context/CasinoUserContext';
 import {
   apiCollectionCatalog,
   apiMyCollections,
   apiOpenCollectionPack,
+  apiOpenCollectionPacks,
   type CollectionCatalog,
   type CollectionSetData,
   type MyCollections,
@@ -39,6 +41,9 @@ import { fmtChips, fmtPct, rarityMap, rarityTier, resolveBrandCard, setOdds, typ
 type Stage = 'opening' | 'reveal' | 'summary';
 
 const VOLUME_KEY = 'collections_volume';
+/** Taille de l'achat groupé */
+const MULTI = 10;
+type PackResult = Omit<OpenCollectionPackResult, 'profile'>;
 
 function useViewport() {
   const [size, setSize] = useState(() => ({ w: typeof window === 'undefined' ? 1280 : window.innerWidth, h: typeof window === 'undefined' ? 800 : window.innerHeight }));
@@ -101,7 +106,11 @@ export const CollectionsGame: React.FC = () => {
 
   // Ouverture
   const [stage, setStage] = useState<Stage | null>(null);
-  const [result, setResult] = useState<OpenCollectionPackResult | null>(null);
+  // Boosters de l'ouverture en cours (1, ou 10 pour l'achat groupé)
+  const [packs, setPacks] = useState<PackResult[]>([]);
+  const [packIdx, setPackIdx] = useState(0);
+  const result: PackResult | null = packs[packIdx] ?? null;
+  const multi = packs.length > 1;
   const [torn, setTorn] = useState(false);
   const [autoTear, setAutoTear] = useState(false);
   const [cardsOut, setCardsOut] = useState(false);
@@ -192,7 +201,24 @@ export const CollectionsGame: React.FC = () => {
   const dailyLimit = catalog?.config.dailyPackLimit ?? 0;
   const boughtToday = (set && mine?.bought_today?.[set.id]) || 0;
   const limitReached = dailyLimit > 0 && boughtToday >= dailyLimit;
+  const multiPrice = (set?.pack_price ?? 0) * MULTI;
+  const canAffordMulti = !!set && balance >= multiPrice;
+  const multiLimitReached = dailyLimit > 0 && boughtToday + MULTI > dailyLimit;
   const drawn = useMemo(() => (result ? result.cards.map((c) => ({ card: resolveBrandCard(c, rarities), isNew: c.is_new, count: c.count })) : []), [result, rarities]);
+  // Récapitulatif : toutes les cartes des boosters ouverts (les plus rares d'abord en ×10)
+  const summaryDrawn = useMemo(() => {
+    const all = packs.flatMap((p) => p.cards.map((c) => ({ card: resolveBrandCard(c, rarities), isNew: c.is_new, count: c.count })));
+    return packs.length > 1 ? all.sort((a, b) => rarityTier(b.card.rarity) - rarityTier(a.card.rarity)) : all;
+  }, [packs, rarities]);
+  const summary = useMemo(
+    () => ({
+      completed: packs.some((p) => p.completed),
+      reward: packs.reduce((t, p) => t + p.reward, 0),
+      price: packs.reduce((t, p) => t + p.price, 0),
+      gift: packs.length > 0 && packs.every((p) => p.gift),
+    }),
+    [packs],
+  );
 
   // Dimensions
   const packW = Math.round(Math.max(170, Math.min(250, (vh - 300) / 1.62, vw - 120)));
@@ -201,22 +227,35 @@ export const CollectionsGame: React.FC = () => {
 
   // ------------------------------------------------------------------ actions
 
-  const open = async (giftId?: string) => {
-    if (!set || busy.current || !isAuthenticated) return;
-    audio.current!.unlock();
-    setError(null);
-    busy.current = true;
-    setResult(null);
+  /** Remet la scène d'ouverture à zéro pour le booster suivant */
+  const resetPackScene = () => {
     setTorn(false);
     setAutoTear(false);
     setCardsOut(false);
     setCurrent(0);
     setFlipped(false);
+    setCharging(false);
+  };
+
+  const open = async (giftId?: string, qty = 1) => {
+    if (!set || busy.current || !isAuthenticated) return;
+    audio.current!.unlock();
+    setError(null);
+    busy.current = true;
+    setPacks([]);
+    setPackIdx(0);
+    resetPackScene();
     setStage('opening');
     try {
-      const res = await apiOpenCollectionPack(set.id, giftId);
-      applyServerProfile(res.profile);
-      setResult(res);
+      if (qty > 1) {
+        const res = await apiOpenCollectionPacks(set.id, qty);
+        applyServerProfile(res.profile);
+        setPacks(res.packs);
+      } else {
+        const res = await apiOpenCollectionPack(set.id, giftId);
+        applyServerProfile(res.profile);
+        setPacks([res]);
+      }
     } catch (e) {
       setError((e as Error).message);
       setStage(null);
@@ -240,11 +279,23 @@ export const CollectionsGame: React.FC = () => {
     };
   }, [stage, torn, result]);
 
-  const finish = useCallback(() => {
+  /** Fin de tous les boosters : récapitulatif */
+  const finishAll = useCallback(() => {
     setStage('summary');
     loadMine();
     void refreshProfile().catch(() => {});
   }, [loadMine, refreshProfile]);
+
+  /** Fin du booster en cours : on enchaîne sur le suivant s'il en reste */
+  const finish = useCallback(() => {
+    if (packIdx + 1 < packs.length) {
+      resetPackScene();
+      setPackIdx((i) => i + 1);
+      setStage('opening');
+      return;
+    }
+    finishAll();
+  }, [packIdx, packs.length, finishAll]);
 
   const advance = useCallback(() => {
     if (stage !== 'reveal' || charging || !drawn.length) return;
@@ -302,7 +353,8 @@ export const CollectionsGame: React.FC = () => {
 
   const close = () => {
     setStage(null);
-    setResult(null);
+    setPacks([]);
+    setPackIdx(0);
   };
 
   // ------------------------------------------------------------------ rendu
@@ -457,7 +509,20 @@ export const CollectionsGame: React.FC = () => {
                   >
                     {closed ? 'Collections fermées' : limitReached ? 'Limite du jour atteinte' : !canAfford ? `Solde insuffisant · ${fmtChips(set.pack_price)}` : `Ouvrir · ${fmtChips(set.pack_price)}`}
                   </button>
-                ) : (
+                ) : null}
+                {isAuthenticated && !closed && (
+                  <button
+                    type="button"
+                    onClick={() => void open(undefined, MULTI)}
+                    disabled={!canAffordMulti || multiLimitReached}
+                    title={multiLimitReached ? 'Pas assez d’achats restants aujourd’hui pour 10 boosters' : !canAffordMulti ? 'Solde insuffisant' : undefined}
+                    className="flex items-center gap-2 rounded-full border font-bold text-xs sm:text-sm tracking-wider uppercase px-6 sm:px-7 py-4 transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                    style={{ color: accent, borderColor: rgba(accent, 0.55), background: rgba(accent, 0.14) }}
+                  >
+                    <Layers size={16} /> ×{MULTI} · {fmtChips(multiPrice)}
+                  </button>
+                )}
+                {isAuthenticated ? null : (
                   <Link to="/espace-membre" className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 sm:px-9 py-4 shadow-[0_0_30px_rgba(255,255,255,0.35)]">
                     Se connecter pour ouvrir
                   </Link>
@@ -490,10 +555,20 @@ export const CollectionsGame: React.FC = () => {
       <AnimatePresence>
         {stage && set && packLook && (
           <motion.div key="overlay" className="fixed inset-0 z-[70] bg-black/92 backdrop-blur-sm overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {multi && stage !== 'summary' && (
+              <div className="absolute top-5 left-4 sm:left-6 z-40 rounded-full liquid-glass border border-white/20 px-4 py-2 text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <Layers size={14} style={{ color: accent }} /> Booster {packIdx + 1} / {packs.length}
+              </div>
+            )}
             <div className="absolute top-5 right-4 sm:right-6 z-40 flex items-center gap-2">
               {stage === 'reveal' && (
                 <button type="button" onClick={finish} className="rounded-full liquid-glass border border-white/20 hover:bg-white/10 px-4 py-2 text-xs sm:text-sm font-semibold text-white">
-                  Tout révéler
+                  {multi && packIdx + 1 < packs.length ? 'Booster suivant' : 'Tout révéler'}
+                </button>
+              )}
+              {multi && stage !== 'summary' && (
+                <button type="button" onClick={finishAll} className="rounded-full liquid-glass border border-white/20 hover:bg-white/10 px-4 py-2 text-xs sm:text-sm font-semibold text-white flex items-center gap-1.5">
+                  <FastForward size={14} /> Tout ouvrir
                 </button>
               )}
               <FullscreenButton />
@@ -607,7 +682,7 @@ export const CollectionsGame: React.FC = () => {
                 {stage === 'summary' && result && (
                   <motion.div key="summary" className="absolute inset-0 overflow-y-auto pt-16 pb-10 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <div className="max-w-5xl mx-auto flex flex-col items-center">
-                      {result.completed ? (
+                      {summary.completed ? (
                         <motion.div className="relative text-center mb-8" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 140, damping: 12 }}>
                           <div className="absolute left-1/2 top-1/2 w-[520px] h-[520px] -ml-[260px] -mt-[260px] bst-rays pointer-events-none opacity-80" style={{ ['--bst-ray' as string]: rgba('#fbbf24', 0.3) }} />
                           <Burst color="#fbbf24" count={80} spread={320} />
@@ -616,29 +691,37 @@ export const CollectionsGame: React.FC = () => {
                           <h2 className="relative text-4xl sm:text-6xl text-white leading-none mt-1" style={{ fontFamily: 'var(--font-serif)' }}>
                             {set.name}
                           </h2>
-                          <p className="relative mt-3 text-3xl sm:text-4xl font-bold font-mono text-amber-300">+{fmtChips(result.reward)}</p>
+                          <p className="relative mt-3 text-3xl sm:text-4xl font-bold font-mono text-amber-300">+{fmtChips(summary.reward)}</p>
                         </motion.div>
                       ) : (
                         <>
                           <p className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-white/60">{set.name}</p>
                           <h2 className="mt-1 text-3xl sm:text-5xl text-white leading-none text-center" style={{ fontFamily: 'var(--font-serif)' }}>
-                            Votre <span className="italic text-white/70">tirage</span>
+                            {multi ? (
+                              <>
+                                Vos <span className="italic text-white/70">{packs.length} boosters</span>
+                              </>
+                            ) : (
+                              <>
+                                Votre <span className="italic text-white/70">tirage</span>
+                              </>
+                            )}
                           </h2>
                         </>
                       )}
                       <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
                         <span className="rounded-full liquid-glass border border-white/20 px-4 py-2 text-white">
-                          Nouvelles cartes <b className="font-mono ml-1">{drawn.filter((d) => d.isNew).length}</b>
+                          Nouvelles cartes <b className="font-mono ml-1">{summaryDrawn.filter((d) => d.isNew).length}</b>
                         </span>
                         <span className="rounded-full liquid-glass border border-white/20 px-4 py-2 text-white/80">
                           Album <b className="font-mono ml-1">{ownedCount} / {setSize}</b>
                         </span>
-                        <span className="rounded-full liquid-glass border border-white/20 px-4 py-2 text-white/80">{result.gift ? 'Booster offert' : `Payé ${fmtChips(result.price)}`}</span>
+                        <span className="rounded-full liquid-glass border border-white/20 px-4 py-2 text-white/80">{summary.gift ? 'Booster offert' : `Payé ${fmtChips(summary.price)}`}</span>
                       </div>
-                      <div className="mt-8 flex flex-wrap justify-center gap-4 sm:gap-6">
-                        {drawn.map((d, i) => (
-                          <motion.div key={i} className="relative" initial={{ opacity: 0, y: 30, rotate: -4 }} animate={{ opacity: 1, y: 0, rotate: 0 }} transition={{ delay: i * 0.08, type: 'spring', stiffness: 160, damping: 18 }}>
-                            <BrandCardFace card={d.card} width={vw < 640 ? Math.min(160, (vw - 48) / 2) : 180} setName={set.name} setSize={setSize} />
+                      <div className={`mt-8 flex flex-wrap justify-center ${multi ? 'gap-3' : 'gap-4 sm:gap-6'}`}>
+                        {summaryDrawn.map((d, i) => (
+                          <motion.div key={i} className="relative" initial={{ opacity: 0, y: 30, rotate: -4 }} animate={{ opacity: 1, y: 0, rotate: 0 }} transition={{ delay: Math.min(i * (multi ? 0.03 : 0.08), 1.5), type: 'spring', stiffness: 160, damping: 18 }}>
+                            <BrandCardFace card={d.card} width={multi ? (vw < 640 ? Math.min(110, (vw - 56) / 3) : 130) : vw < 640 ? Math.min(160, (vw - 48) / 2) : 180} setName={set.name} setSize={setSize} />
                             <span className={`absolute -top-2 -right-2 z-10 rounded-full text-[10px] font-extrabold px-2 py-1 uppercase shadow-lg ${d.isNew ? 'bg-emerald-400 text-black' : 'bg-neutral-800 text-white border border-white/20'}`}>
                               {d.isNew ? 'Nouvelle' : `×${d.count}`}
                             </span>
@@ -653,6 +736,15 @@ export const CollectionsGame: React.FC = () => {
                           className="bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm tracking-wider uppercase rounded-full px-7 py-4 transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.35)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
                         >
                           {limitReached ? 'Limite du jour atteinte' : `Encore un · ${fmtChips(set.pack_price)}`}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void open(undefined, MULTI)}
+                          disabled={closed || !canAffordMulti || multiLimitReached}
+                          className="flex items-center gap-2 rounded-full border font-bold text-xs sm:text-sm tracking-wider uppercase px-6 py-4 transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          style={{ color: accent, borderColor: rgba(accent, 0.55), background: rgba(accent, 0.14) }}
+                        >
+                          <Layers size={15} /> Encore ×{MULTI} · {fmtChips(multiPrice)}
                         </button>
                         {gifts.length > 0 && (
                           <button type="button" onClick={() => void open(gifts[0].id)} disabled={closed} className="flex items-center gap-2 rounded-full border border-amber-300/50 bg-amber-300/10 hover:bg-amber-300/20 text-amber-100 font-bold text-xs sm:text-sm uppercase px-6 py-4 disabled:opacity-40">

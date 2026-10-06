@@ -258,6 +258,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   SET_NOT_FOUND: 'Cette collection n’est pas disponible.',
   GIFT_NOT_FOUND: 'Ce booster offert a déjà été ouvert.',
   COLLECTION_DAILY_LIMIT: 'Limite de boosters achetés aujourd’hui atteinte pour cet album. Revenez demain !',
+  INVALID_QTY: 'Nombre de boosters invalide (1 à 10).',
   GIFT_WRONG_SET: 'Ce booster offert appartient à l’autre collection.',
   COLLECTION_UNPROFITABLE: 'Collection perdante pour le casino : la revente moyenne d’un booster ou le retour sur un album complet dépasse la limite. Baissez les prix de revente / la récompense, montez le prix du booster ou rendez les cartes rares plus rares.',
   SET_IN_USE: 'Des joueurs ont déjà ouvert des boosters de cet album : il ne peut plus être supprimé. Décochez « Album en vente » pour le cacher.',
@@ -861,6 +862,14 @@ export const apiCollectionCatalog = () => rpc<CollectionCatalog>('collection_cat
 export const apiMyCollections = () => rpc<MyCollections>('my_collections');
 export const apiOpenCollectionPack = (setId: string, giftId?: string | null) =>
   rpc<OpenCollectionPackResult>('open_collection_pack', { p_set_id: setId, p_reward_id: giftId ?? null });
+export interface OpenCollectionPacksResult {
+  set_id: string;
+  packs: Omit<OpenCollectionPackResult, 'profile'>[];
+  profile: ProfilePayload;
+}
+/** Achat de plusieurs boosters d'un coup (1 à 10), tout ou rien */
+export const apiOpenCollectionPacks = (setId: string, qty: number) =>
+  rpc<OpenCollectionPacksResult>('open_collection_packs', { p_set_id: setId, p_qty: qty });
 export const apiSellCollectionCards = (items: { card_id: string; qty: number }[]) =>
   rpc<{ sold: number; chips: number; rate: number; profile: ProfilePayload }>('sell_collection_cards', { p_items: items });
 

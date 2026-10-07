@@ -556,18 +556,38 @@ export const CollectionsGame: React.FC = () => {
         {stage && set && packLook && (
           <motion.div key="overlay" className="fixed inset-0 z-[70] bg-black/92 backdrop-blur-sm overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {multi && stage !== 'summary' && (
-              <div className="absolute top-5 left-4 sm:left-6 z-40 rounded-full liquid-glass border border-white/20 px-4 py-2 text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                <Layers size={14} style={{ color: accent }} /> Booster {packIdx + 1} / {packs.length}
+              <div className="absolute top-5 left-4 sm:left-6 z-40">
+                <div className="flex flex-col gap-1.5 rounded-2xl bg-black/60 border border-white/15 backdrop-blur-md px-3.5 py-2">
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] font-bold text-white/80">
+                    <Layers size={13} style={{ color: accent }} />
+                    Booster <span className="font-mono text-white">{packIdx + 1}</span>
+                    <span className="text-white/40">/ {packs.length}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {packs.map((_, i) => (
+                      <span
+                        key={i}
+                        className="h-1 w-3 sm:w-4 rounded-full transition-colors duration-300"
+                        style={{ background: i < packIdx ? rgba(accent, 0.55) : i === packIdx ? accent : 'rgba(255,255,255,0.15)' }}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
             <div className="absolute top-5 right-4 sm:right-6 z-40 flex items-center gap-2">
               {stage === 'reveal' && (
-                <button type="button" onClick={finish} className="rounded-full liquid-glass border border-white/20 hover:bg-white/10 px-4 py-2 text-xs sm:text-sm font-semibold text-white">
+                <button type="button" onClick={finish} className="rounded-full bg-black/60 border border-white/15 backdrop-blur-md hover:bg-white/10 px-4 h-9 text-xs sm:text-sm font-semibold text-white transition-colors">
                   {multi && packIdx + 1 < packs.length ? 'Booster suivant' : 'Tout révéler'}
                 </button>
               )}
               {multi && stage !== 'summary' && (
-                <button type="button" onClick={finishAll} className="rounded-full liquid-glass border border-white/20 hover:bg-white/10 px-4 py-2 text-xs sm:text-sm font-semibold text-white flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={finishAll}
+                  className="rounded-full border backdrop-blur-md px-4 h-9 text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95"
+                  style={{ color: accent, borderColor: rgba(accent, 0.5), background: rgba(accent, 0.12) }}
+                >
                   <FastForward size={14} /> Tout ouvrir
                 </button>
               )}

@@ -926,6 +926,7 @@ export const CitizenProfileSheet: React.FC<CitizenProfileSheetProps> = ({
                       <option value="FONDATEUR" className="bg-black">FONDATEUR</option>
                       <option value="DÉVELOPPEUR" className="bg-black">DÉVELOPPEUR</option>
                       <option value="DIRECTEUR CASINO" className="bg-black">DIRECTEUR CASINO</option>
+                      <option value="ADMIN" className="bg-black">ADMIN</option>
                       <option value="MEMBRE" className="bg-black">CITOYEN / MEMBRE</option>
                     </select>
                   </div>

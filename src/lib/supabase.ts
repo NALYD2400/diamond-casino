@@ -66,11 +66,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // Types
 // -------------------------------------------------------------
 
-export type StaffRole = 'FONDATEUR' | 'DÉVELOPPEUR' | 'DIRECTEUR CASINO';
+export type StaffRole = 'FONDATEUR' | 'DÉVELOPPEUR' | 'DIRECTEUR CASINO' | 'ADMIN';
 export type ProfileRole = StaffRole | 'MEMBRE';
 export type VipTier = 'SILVER' | 'GOLD' | 'DIAMOND';
 
-export const STAFF_ROLES: readonly StaffRole[] = ['FONDATEUR', 'DÉVELOPPEUR', 'DIRECTEUR CASINO'];
+export const STAFF_ROLES: readonly StaffRole[] = ['FONDATEUR', 'DÉVELOPPEUR', 'DIRECTEUR CASINO', 'ADMIN'];
 export const PROFILE_ROLES: readonly ProfileRole[] = [...STAFF_ROLES, 'MEMBRE'];
 
 /** Shape returned by the get_my_profile / register_profile / spin_wheel RPCs */

@@ -314,6 +314,7 @@ export const ROLE_LABEL: Record<string, string> = {
   FONDATEUR: 'Fondateur',
   DÉVELOPPEUR: 'Développeur',
   'DIRECTEUR CASINO': 'Directeur casino',
+  ADMIN: 'Admin',
   MEMBRE: 'Membre',
 };
 

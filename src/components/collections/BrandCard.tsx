@@ -46,8 +46,8 @@ export const BrandCardFace: React.FC<BrandCardProps> = ({ card, width = 240, int
   // Logo absent (pas encore déposé) : logo typographique aux couleurs de la marque
   const [failed, setFailed] = useState<string | null>(null);
   const image = card.image && failed !== card.image ? card.image : null;
-  // Cartes secrètes des marques auto : le visuel est une carte complète (plein cadre)
-  const fullArt = !!image && card.secret && card.setId === 'autos';
+  // Cartes secrètes (auto et mode) : le visuel est une carte complète (plein cadre)
+  const fullArt = !!image && card.secret;
 
   return (
     <div
